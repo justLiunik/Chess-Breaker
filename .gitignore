@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm-cache/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local save games exported during development
+*.checkbreaker-save.json

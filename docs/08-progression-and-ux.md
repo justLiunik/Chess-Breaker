@@ -1,0 +1,193 @@
+# 08 — Progression & UX
+
+The UI's job is to make a hard planning game feel effortless and fair. Everything here serves one
+goal: **the player should always know three numbers — turns left, what winning is worth, and what
+their army can still do.**
+
+---
+
+## 1. Information hierarchy
+
+Priority order when two elements compete for space or attention:
+
+1. **Turns remaining** — the clock the player fears.
+2. **Coin preview** — what winning *right now* is worth. This number is the game's whole incentive
+   structure and must never be hidden behind a tooltip.
+3. **Board threats** — what can capture what. Always visible, never "discoverable."
+4. **Focus and move credits** — what this turn can afford.
+5. **Durability and charges** — what the rest of the run can afford.
+6. **Everything else** — hints, history, help.
+
+If a screen cannot show 1–4 simultaneously, the screen is wrong.
+
+## 2. Screen inventory
+
+| Screen | Purpose | Reached from |
+|---|---|---|
+| **Run Map** | Act/stage progress, seed code, deck peek | Run start, stage end |
+| **Stage** | The game | Run Map / shop exit |
+| **Shop** | Spending coins | Automatic after a win |
+| **Deck** | Full deck management, durability detail | Stage overlay, shop panel |
+| **Results** | Run summary, cause of death, retry | Run end |
+| **Codex** | Rules reference, piece movement, skill glossary | Anywhere (paused) |
+
+No screen has a timer. The game is turn-based; urgency is diegetic (the counter), never real.
+
+## 3. The Stage screen
+
+### 3.1 Coin preview — the load-bearing number
+
+```
+preview = floor( (turnLimit − (turnsUsed + 1)) × coinRate(act) × payoutMultiplier )
+```
+
+Where `payoutMultiplier` is 1.0 for a checkmate in the current plan and 0.5 for a domination win.
+`turnsUsed` includes the turn currently being played, so the final turn of a stage always previews
+**+0**.
+
+The HUD shows a live, per-plan value:
+
+- **Checkmate available in this plan** → `+8 ◈` in full color.
+- **Domination available** → `+4 ◈` with a `½` marker and a tooltip naming the threshold.
+- **Neither** → shows the *next-turn* potential in muted text, so the player always sees the decay.
+- Winning on the last turn shows **`+0 ◈`** with the label `FINAL TURN` — an explicit, unmissable
+  "this turn must not be wasted."
+
+### 3.2 HUD layout
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +8 ◈           │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
+│     7  │  │  │  │♚ │  │  │  │  │                                     │
+│     6  │  │  │  │  │  │♞ │  │  │      ENEMY  ♟♟♟♞  9                 │
+│     5  │  │  │  │  │  │  │  │  │      SWING  +2 / +5  (domination)    │
+│     4  │  │  │  │  │  │  │  │  │                                     │
+│     3  │  │  │  │  │  │  │  │  │                                     │
+│     2  │  │  │♙ │  │  │  │  │  │      YOU    ♟♟♟♞♝  6                 │
+│     1  │♖ │  │  │♔ │  │  │  │  │                                     │
+│        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1,2)       │
+│         a  b  c  d  e  f  g  h                                      │
+├──────────────────────────────────────────────────────────────────────┤
+│  FOCUS ◉◉○  2/3      MOVES ●○  1 credit      DEPLOY ○ 0/1            │
+│                                                                      │
+│  QUEUE: [Twin Step] → [Deploy ♖ → h1] → [♖ h1→h7]        +1 credit   │
+│                                                          pending     │
+│  [ Twin Step ◈1 ●●● ] [ Ascension ◈2 ●● ]        [ COMMIT ]  [UNDO]  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.3 The Action Queue builder
+
+This is the signature UI and the game's main skill-expression surface.
+
+- **Queue is a left-to-right strip** under the board. Each entry shows its action icon, cost, and
+  the square it targets.
+- **Append by clicking** the board (move), the deployment tray (deploy), or a skill card (activate).
+  Order is click order; entries can be dragged to reorder, and dragging re-validates in real time.
+- **Live preview:** the board renders the *result of the whole queue* as a ghosted overlay, with the
+  intermediate steps available as a step-through (arrow keys) that highlights each entry.
+- **Affordability is inline:** an entry that cannot be afforded at its position turns red and
+  blocks COMMIT with a reason (`Not enough Focus at step 3`).
+- **Illegal end state** blocks COMMIT with the specific invariant (`Your king would be in check
+  after Ascension reverts`). This is the single most important error message in the game — it must
+  name the *cause*, never just say "invalid."
+- **UNDO is free and total before COMMIT.** After commit there is no undo (§6).
+
+**Deliberate non-feature:** no auto-solver, no "hint: play Rxf7." Hints describe *intent*
+([§7](#7-hints-and-chess-literacy)).
+
+### 3.4 Deployment interaction
+
+- Deployment squares are tinted on the board whenever a deploy is queued or hovered.
+- Dragging a piece from the deck tray to the board creates a `DEPLOY` entry.
+- Hovering a target square shows the threat overlay: which enemy pieces attack it, and the capture
+  line that would follow (see [06 §8](06-deck-durability-and-permadeath.md#8-communication-rules-ui-contract)).
+- If the target leaves the king in check, the square is marked invalid with a king-safety icon.
+- The tray shows durability pips and disables pieces with `spent` status.
+
+## 4. The Run Map
+
+Minimal — this is a puzzle game with a run wrapper, not a map crawl.
+
+```
+        ACT I            ACT II           ACT III
+   ┌──┐ ┌──┐ ┌────┐  ┌──┐ ┌──┐ ┌────┐  ┌──┐ ┌──┐ ┌────┐
+   │✔ │→│✔ │→│ ★  │  │✔ │→│▶ │ │ ★  │  │ ▢│ │ ▢│ │ ★  │
+   └──┘ └──┘ └────┘  └──┘ └──┘ └────┘  └──┘ └──┘ └────┘
+   SEED 7F3A-2210        ◈ 18 coins        DECK 7/8
+```
+
+Shows: act/stage progress, coins, deck size, and the **seed code** (for bug reports and sharing).
+Clicking the seed copies it. The map is a between-stage checkpoint, not a branching path — branching
+is deferred ([11](11-open-decisions.md)).
+
+## 5. Onboarding ramp
+
+Chess literacy is not assumed. The ramp is content, not a tutorial wall.
+
+| Moment | Teaching | Mechanism |
+|---|---|---|
+| Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Scripted enemy; only 4 pieces on the board; tooltip on the coin preview |
+| Run 1, Act I stage 2 | Deployment and durability | Deck shown with pips; first deploy is prompted |
+| Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
+| Act I boss | Material domination as an alternative win | Threshold visibly marked on the HUD |
+| Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
+| Act III | Everything composes | No scaffolding |
+
+Rules for teaching:
+- **One new concept per stage.** Never two.
+- **Teach by forcing, not explaining.** A prompt that requires the action beats a text box.
+- **No modal tutorial longer than two sentences.** The codex holds the depth.
+- **Never teach with notation.** "The knight can reach that square in one hop," not "Nf5."
+
+## 6. Commit, undo, and honesty
+
+| Moment | Allowed |
+|---|---|
+| Before COMMIT | Free, unlimited undo and reordering |
+| After COMMIT, during animation | Nothing (input locked) |
+| After the enemy replies | Nothing. The turn is spent. |
+| Piece captured | Nothing. It is gone. |
+
+**No takebacks.** The game's tension comes entirely from the commit being real. Any "undo turn"
+feature would collapse the durability economy to zero. This is a hard design rule, not a UI choice.
+
+The only concession: **restart stage** is available, but a restarted stage reverts to its generated
+state *and does not refund durability already spent* — restarting is for mis-clicked plans, not for
+scouting.
+
+## 7. Hints and chess literacy
+
+- **Two hints per stage**, each a sentence of intent: "Your rook is doing nothing. The enemy queen
+  is the only defender of f6."
+- Hints **do not** name coordinates or moves.
+- Hints may be disabled in a run for a discipline option (deferred; see [11](11-open-decisions.md)).
+- The Codex contains a piece-movement reference with diagrams, the full rules of
+  [02](02-rules-framework.md), and a searchable skill glossary.
+- Algebraic notation appears nowhere in required UI; it is available as an optional overlay for
+  chess-literate players.
+
+## 8. Accessibility
+
+| Concern | Requirement |
+|---|---|
+| Color blindness | Threat = icon + shape, never color alone. Deployment ranks = hatch pattern. |
+| Motion | Reduced-motion setting disables piece travel animation; state changes become fades. |
+| Timing | No timed inputs anywhere. |
+| Keyboard | Full play without a mouse: board focus grid, arrow keys to navigate, `Enter` to select, `Q`/`E` for queue reorder, `Space` to commit. |
+| Text scale | UI scales to 150% without clipping the HUD numbers. |
+| Contrast | HUD numbers meet WCAG AA against the board background. |
+| Screen reader | Queue entries and HUD counters are live regions; the board exposes square coordinates and occupant description. |
+
+## 9. UX anti-patterns to avoid
+
+- ❌ A win-condition tooltip the player must hover to discover the threshold.
+- ❌ Animating the enemy reply before showing the player's resolved position.
+- ❌ Hiding an unaffordable price.
+- ❌ Free-form "invalid move" errors without a named cause.
+- ❌ A shop that pressures with a timer.
+- ❌ Sorting the deck by durability (it reshuffles under the player's hand).
+- ❌ Any screen where the coin preview is not visible.

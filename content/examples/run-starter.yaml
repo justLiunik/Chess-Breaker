@@ -1,0 +1,77 @@
+# RunState at the start of a fresh run — the "starter deck".
+#
+# 7 of 8 capacity slots are filled, deliberately leaving one free slot so the
+# first shop can sell something without forcing the player to cut a piece.
+# The King occupies no slot and has null durability (immortal).
+#
+# See docs/09-technical-architecture.md §3 for the type and
+# schemas/run.schema.json for the contract.
+
+version: 1
+seed: 7F3A-2210
+actIndex: 0
+stageIndex: 0
+coins: 0
+deckCapacity: 8
+
+deck:
+  - instanceId: p_king_01
+    pieceType: king
+    durability: null
+    durabilityMax: null
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_02
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_03
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_04
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_05
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_knight_06
+    pieceType: knight
+    durability: 2
+    durabilityMax: 2
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_bishop_07
+    pieceType: bishop
+    durability: 2
+    durabilityMax: 2
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+loadout: []
+history: []
+rngCursor: 0
+status: in_progress

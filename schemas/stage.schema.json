@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://checkbreaker.dev/schemas/stage.schema.json",
+  "title": "StageState",
+  "description": "One generated chess encounter. Ephemeral: discarded at stage end. Emitted by the pipeline in docs/04 §3 and consumed by the engine in docs/02.",
+  "type": "object",
+  "required": [
+    "stageSeed", "templateId", "playerColor", "board", "turnsUsed", "turnLimit",
+    "focus", "focusPool", "moveCredits", "deploymentsThisTurn", "deploymentsPerTurn",
+    "deploymentRanks", "materialThreshold", "swing", "modifiers", "enemyPolicy", "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "stageSeed": { "type": "string", "pattern": "^[0-9A-F]{4}-[0-9A-F]{4}$" },
+    "templateId": { "type": "string", "pattern": "^tpl-[a-z0-9-]+$" },
+    "playerColor": { "enum": ["white", "black"] },
+    "board": {
+      "type": "object",
+      "description": "Sparse map of occupied squares only. Keys are algebraic squares.",
+      "patternProperties": {
+        "^[a-h][1-8]$": { "$ref": "#/$defs/boardPiece" }
+      },
+      "additionalProperties": false
+    },
+    "turnsUsed": { "type": "integer", "minimum": 0 },
+    "turnLimit": { "type": "integer", "minimum": 1 },
+    "focus": { "type": "integer", "minimum": 0 },
+    "focusPool": { "type": "integer", "minimum": 1 },
+    "moveCredits": { "type": "integer", "minimum": 0 },
+    "deploymentsThisTurn": { "type": "integer", "minimum": 0 },
+    "deploymentsPerTurn": { "type": "integer", "minimum": 0 },
+    "deploymentRanks": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 8 },
+      "minItems": 1
+    },
+    "materialThreshold": { "type": "integer", "minimum": 1 },
+    "swing": {
+      "type": "object",
+      "required": ["captured", "lost"],
+      "additionalProperties": false,
+      "description": "Domination metric: captured - lost. See docs/02 §7.",
+      "properties": {
+        "captured": { "type": "integer", "minimum": 0 },
+        "lost": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "modifiers": {
+      "type": "array",
+      "description": "Active skill effects. Expiry is ordered by duration in docs/02 §6.",
+      "items": { "$ref": "#/$defs/activeModifier" }
+    },
+    "enemyPolicy": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["best_move", "scripted"] },
+        "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "seed": { "type": "string" },
+        "line": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "status": { "enum": ["active", "won", "lost"] },
+    "winReason": { "enum": ["checkmate", "domination"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "templateId": { "type": "string" },
+        "seed": { "type": "string" },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "validationFailed": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "boardPiece": {
+      "type": "object",
+      "required": ["pieceType", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "pieceType": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] },
+        "color": { "enum": ["white", "black"] },
+        "instanceId": {
+          "type": "string",
+          "description": "Present only for deck-owned (player) pieces; enemy pieces have no instance."
+        },
+        "transformed": {
+          "type": "object",
+          "required": ["pieceType", "modifierId"],
+          "additionalProperties": false,
+          "description": "Temporary override from a transformation skill. Reverts at R1.",
+          "properties": {
+            "pieceType": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] },
+            "modifierId": { "type": "string" }
+          }
+        }
+      }
+    },
+    "activeModifier": {
+      "type": "object",
+      "required": ["modifierId", "primitive", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "modifierId": { "type": "string" },
+        "primitive": {
+          "enum": [
+            "grant_move_credit",
+            "grant_focus",
+            "set_piece_type",
+            "override_moveset",
+            "ignore_blockers",
+            "suppress_piece",
+            "shield_king",
+            "remove_piece",
+            "place_piece",
+            "displace_piece",
+            "reveal_intent",
+            "add_plan_undo"
+          ]
+        },
+        "source": { "type": "string", "description": "Skill id that created it." },
+        "target": { "type": "string", "description": "Square or piece the modifier applies to." },
+        "duration": { "enum": ["instant", "this_turn", "next_enemy_turn", "permanent"] },
+        "appliedOnTurn": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

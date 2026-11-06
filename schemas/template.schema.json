@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://checkbreaker.dev/schemas/template.schema.json",
+  "title": "StageTemplate",
+  "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's army (that comes from the deck) or exact squares (that is generated). See docs/04-stage-generation-and-authoring.md.",
+  "type": "object",
+  "required": [
+    "id", "title", "act", "tier", "turnLimit", "materialThreshold",
+    "openingPlacements", "enemyArmy", "enemyZone", "deploymentRanks",
+    "deploymentsPerTurn", "focusPool", "enemyPolicy", "preconditions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^tpl-[a-z0-9-]+$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "act": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "tier": { "enum": ["normal", "boss"] },
+    "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "materialThreshold": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Required material SWING (captured minus lost). Must satisfy threshold <= 0.75 * enemy material value."
+    },
+    "openingPlacements": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Pieces drawn from the deck for the free opening line, King always included."
+    },
+    "enemyArmy": {
+      "type": "object",
+      "description": "Inclusive [min,max] counts per enemy piece type, excluding the king (always exactly 1).",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "pawn": { "$ref": "#/$defs/range" },
+        "knight": { "$ref": "#/$defs/range" },
+        "bishop": { "$ref": "#/$defs/range" },
+        "rook": { "$ref": "#/$defs/range" },
+        "queen": { "$ref": "#/$defs/range" }
+      }
+    },
+    "enemyZone": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 8 },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Ranks the enemy army may occupy."
+    },
+    "deploymentRanks": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 8 },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "deploymentsPerTurn": { "type": "integer", "minimum": 0, "maximum": 3 },
+    "focusPool": { "type": "integer", "minimum": 1, "maximum": 9 },
+    "enemyPolicy": { "$ref": "#/$defs/enemyPolicy" },
+    "preconditions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "king_on_board",
+          "no_precheck",
+          "no_immediate_mate",
+          "deployment_squares_available",
+          "enemy_value_in_band",
+          "threshold_feasible"
+        ]
+      }
+    },
+    "designNote": {
+      "type": "string",
+      "description": "What this template is meant to teach or test."
+    }
+  },
+  "$defs": {
+    "range": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 8 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "enemyPolicy": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["best_move", "scripted"] },
+        "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "seed": { "type": "string" },
+        "line": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required when type is 'scripted'."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "scripted" } }, "required": ["type"] },
+          "then": { "required": ["line"] }
+        }
+      ]
+    }
+  }
+}

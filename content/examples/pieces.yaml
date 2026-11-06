@@ -1,0 +1,71 @@
+# Piece definitions.
+#
+# These are piece TYPES. Per-piece instance state (remaining durability) lives in
+# the run, not here — see docs/06-deck-durability-and-permadeath.md.
+#
+# durabilityMax is the design statement of the game: durability is inversely
+# correlated with power, so a reliable deck and a spiky deck are genuinely
+# different choices. The queen may be deployed exactly once per purchase.
+
+pieces:
+  - id: king
+    pieceType: king
+    value: 0
+    cost: null
+    durabilityMax: null
+    purchasable: false
+    notes: >-
+      Run identity. Never capturable, never destroyed, occupies no deck slot.
+      Always included in the generated opening line. Checkmate of the player
+      king ends the run.
+
+  - id: pawn
+    pieceType: pawn
+    value: 1
+    cost: 3
+    durabilityMax: 3
+    purchasable: true
+    notes: >-
+      The cheapest way to buy an action. Because deployment costs a move credit,
+      a pawn is really a tempo purchase.
+
+  - id: knight
+    pieceType: knight
+    value: 3
+    cost: 8
+    durabilityMax: 2
+    purchasable: true
+    notes: >-
+      The reliable mid-piece. Two deployments is enough to commit one and keep
+      one in reserve.
+
+  - id: bishop
+    pieceType: bishop
+    value: 3
+    cost: 8
+    durabilityMax: 2
+    purchasable: true
+    notes: >-
+      Standard value; also the only legal target for the Ascension skill, which
+      makes it the deck's most skill-dependent piece.
+
+  - id: rook
+    pieceType: rook
+    value: 5
+    cost: 10
+    durabilityMax: 2
+    purchasable: true
+    notes: >-
+      Reach across the board. A rook delivered early is a tempo weapon; a rook
+      captured is 5 material of swing handed to the enemy.
+
+  - id: queen
+    pieceType: queen
+    value: 9
+    cost: 16
+    durabilityMax: 1
+    purchasable: true
+    notes: >-
+      One deployment, ever. The queen is a burst that wins a specific stage and
+      then evaporates. If durability were flat this piece would dominate every
+      slot — it must not.

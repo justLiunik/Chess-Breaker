@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://checkbreaker.dev/schemas/piece.schema.json",
+  "title": "PieceDefinition",
+  "description": "A purchasable/collectible chess piece TYPE. Instance state (remaining durability) lives in run.schema.json, never here. See docs/06-deck-durability-and-permadeath.md.",
+  "type": "object",
+  "required": ["id", "pieceType", "value", "durabilityMax", "purchasable"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Stable machine key, e.g. 'queen'."
+    },
+    "pieceType": {
+      "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"]
+    },
+    "value": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Chess material value (P1 N3 B3 R5 Q9). King is 0 and is never counted."
+    },
+    "cost": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Act I shop price in coins. null = not purchasable."
+    },
+    "durabilityMax": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Deployments per purchase. null = immortal (king only)."
+    },
+    "purchasable": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Design intent. Not shown to players."
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Only the king may be immortal, and the king may never be sold.",
+      "if": { "properties": { "pieceType": { "const": "king" } }, "required": ["pieceType"] },
+      "then": {
+        "properties": {
+          "durabilityMax": { "const": null },
+          "cost": { "const": null },
+          "purchasable": { "const": false }
+        }
+      },
+      "else": {
+        "properties": {
+          "durabilityMax": { "type": "integer", "minimum": 1 },
+          "purchasable": { "const": true }
+        }
+      }
+    }
+  ]
+}

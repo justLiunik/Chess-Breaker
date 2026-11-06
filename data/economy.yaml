@@ -1,0 +1,169 @@
+# Checkbreaker — tuning constants
+#
+# SINGLE SOURCE OF TRUTH. Every number that shapes the game lives here and nowhere
+# else. Prose in docs/ may explain a number, but this file is what the engine reads.
+#
+# Changing a constant here must never require a code change. If it does, the
+# constant is in the wrong place.
+
+version: 0.1.0
+
+# ---------------------------------------------------------------------------
+# Rules — see docs/02-rules-framework.md
+# ---------------------------------------------------------------------------
+rules:
+  boardSize: 8
+  playerColor: white            # player always moves first (open decision F)
+  freeMovesPerTurn: 1           # the Free Move; only skills add credits
+  focusPool: 3                  # refills each turn, no carryover
+  deploymentRanks: [1, 2]       # empty squares here may receive a DEPLOY
+  deploymentsPerTurn: 1
+  openingPlacements: 3          # free, random, always includes the King
+  castling: false
+  enPassant: false
+  promotion:
+    enabled: false              # templates avoid promotion squares in MVP
+    choice: queen
+  kingCapturable: false         # invariant I3 — never
+  stalemateBehavior: enemy_passes
+
+# ---------------------------------------------------------------------------
+# Economy — see docs/05-run-structure-and-economy.md
+# ---------------------------------------------------------------------------
+economy:
+  coinRate:                     # coins per unused turn, by act
+    act1: 2
+    act2: 3
+    act3: 4
+  dominationPayoutMultiplier: 0.5   # safe route pays half
+  starterCoins: 0
+
+  salvage:                      # coins for capturing an enemy piece
+    enabled: true
+    divisor: 3                  # floor(value / divisor): pawn 0, minor 1, rook 1, queen 3
+
+  priceInflationPerAct: 0.20    # price(act) = round(base * (1 + 0.20 * (act - 1)))
+
+  services:
+    repair: 4                   # +1 durability, never above max, never on spent pieces
+    deckSlot: 12                # +1 capacity
+    reroll: 2                   # after the free reroll
+    freeRerollsPerVisit: 1
+    maxRerollsPerVisit: 3
+
+  shop:
+    slots: 5
+    pawnFloorSlot: 1            # always a pawn
+    pawnFloorMinPrice: 1        # discounted to the player's balance if they cannot afford it
+    randomSlots: 2
+    recoveryDeckThreshold: 4    # if non-king deck < 4 → guaranteed half-price replacement
+    recoveryDiscount: 0.5
+
+# ---------------------------------------------------------------------------
+# Pieces — mirror of content/examples/pieces.yaml values
+# ---------------------------------------------------------------------------
+pieces:
+  king:
+    value: 0
+    cost: null
+    durabilityMax: null         # immortal
+    purchasable: false
+  pawn:
+    value: 1
+    cost: 3
+    durabilityMax: 3            # sustainable action
+    purchasable: true
+  knight:
+    value: 3
+    cost: 8
+    durabilityMax: 2
+    purchasable: true
+  bishop:
+    value: 3
+    cost: 8
+    durabilityMax: 2
+    purchasable: true
+  rook:
+    value: 5
+    cost: 10
+    durabilityMax: 2
+    purchasable: true
+  queen:
+    value: 9
+    cost: 16
+    durabilityMax: 1            # one deployment ever — a burst, not a soldier
+    purchasable: true
+
+# ---------------------------------------------------------------------------
+# Deck — see docs/06-deck-durability-and-permadeath.md
+# ---------------------------------------------------------------------------
+deck:
+  startCapacity: 8
+  maxCapacity: 14
+  kingOccupiesSlot: false       # capacity counts non-king pieces only
+  starterDeck:
+    king: 1
+    pawn: 4
+    knight: 1
+    bishop: 1                   # 7 of 8 slots — leaves one free slot for the first shop
+  durability:
+    spentIsFinal: true          # a piece at 0 durability may not be repaired
+    destroyedAtStageEnd: true   # spent pieces are removed after the stage, not instantly
+  capture:
+    removesFromRun: true        # permanent, unrecoverable
+    appliesToOpeningLine: true  # the opening line is drawn from the deck, so it can die too
+
+# ---------------------------------------------------------------------------
+# Run and stages — see docs/05 and docs/04
+# ---------------------------------------------------------------------------
+stages:
+  acts: 3
+  stagesPerAct: 3
+  bossStageIndex: 3
+  shopAfterEveryStage: true
+  shopAfterFinalStage: false
+
+  turnLimits:
+    act1: 8
+    act2: 6
+    act3: 5
+    bossPenalty: 1              # bosses get limit - 1
+
+  materialThreshold:            # required capture swing, by act
+    act1: 5
+    act2: 7
+    act3: 9
+
+  enemyArmyValueBand:           # per docs/04 §6 difficulty curve
+    act1: [7, 9]
+    act2: [10, 14]
+    act3: [14, 22]
+    bossMultiplier: 1.25
+
+# ---------------------------------------------------------------------------
+# Generation and solver — see docs/04
+# ---------------------------------------------------------------------------
+generation:
+  maxRegenerations: 20
+  maxPlacementTries: 50
+  thresholdFeasibilityRatio: 0.75   # materialThreshold <= ratio * enemyMaterialValue
+  solver:
+    nodeBudget: 200000
+    timeMs: 2000
+    minSolveTurns: 2                # rejects free wins
+    orderHeuristic: mate_first
+  acceptance:
+    minSolvableRate: 0.95
+    checkmateShareMin: 0.20
+    medianWinTurnTolerance: 0.20
+
+# ---------------------------------------------------------------------------
+# Skills — see docs/03
+# ---------------------------------------------------------------------------
+skills:
+  loadoutSlots: 3
+  chargesRefreshPerStage: true
+  duplicatePurchase:
+    priceMultiplier: 0.5
+    chargeBonus: 1
+  tuningOrder: [charges, cost, duration, targeting, new_primitive]

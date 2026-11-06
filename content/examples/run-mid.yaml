@@ -1,0 +1,113 @@
+# RunState mid-run, at the start of Act II stage 2.
+#
+# Demonstrates the state that actually needs saving: per-instance durability,
+# skill charges part-spent, and cumulative history. Two pieces have been lost to
+# captures (knight, pawn) and one pawn is down to a single deployment.
+#
+# Note the economy shape: 18 coins is "comfortable" — one meaningful purchase
+# this shop, not a rebuild.
+
+version: 1
+seed: 7F3A-2210
+actIndex: 1
+stageIndex: 1
+coins: 18
+deckCapacity: 8
+
+deck:
+  - instanceId: p_king_01
+    pieceType: king
+    durability: null
+    durabilityMax: null
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_02
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_03
+    pieceType: pawn
+    durability: 2
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_pawn_04
+    pieceType: pawn
+    durability: 3
+    durabilityMax: 3
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_knight_08
+    pieceType: knight
+    durability: 1
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 2
+    status: in_deck
+
+  - instanceId: p_bishop_07
+    pieceType: bishop
+    durability: 2
+    durabilityMax: 2
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_rook_09
+    pieceType: rook
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 5
+    status: in_deck
+
+loadout:
+  - skillId: twin_step
+    charges: 1
+    chargesMax: 3
+  - skillId: lockdown
+    charges: 3
+    chargesMax: 3
+
+history:
+  - stageSeed: 1A20-33C8
+    templateId: tpl-act1-open-field
+    outcome: win
+    winReason: checkmate
+    turnsUsed: 4
+    coinsEarned: 9
+    piecesLost: 0
+  - stageSeed: 44B1-9D02
+    templateId: tpl-act1-open-field
+    outcome: win
+    winReason: checkmate
+    turnsUsed: 4
+    coinsEarned: 9
+    piecesLost: 1
+  - stageSeed: 77E0-01AF
+    templateId: tpl-act3-boss-redoubt
+    outcome: win
+    winReason: domination
+    turnsUsed: 7
+    coinsEarned: 3
+    piecesLost: 1
+  - stageSeed: 9C41-0B77
+    templateId: tpl-act2-fortress
+    outcome: win
+    winReason: checkmate
+    turnsUsed: 3
+    coinsEarned: 10
+    piecesLost: 0
+
+rngCursor: 412
+status: in_progress

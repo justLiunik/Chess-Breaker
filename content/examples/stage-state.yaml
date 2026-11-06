@@ -1,0 +1,84 @@
+# A generated StageState, mid-stage.
+#
+# This is what the generation pipeline (docs/04 §3) emits and what the engine
+# (docs/02) consumes. Note:
+#   - Player pieces carry instanceId (they belong to the deck, so they can die).
+#   - Enemy pieces do not (there is no enemy deck).
+#   - swing is {captured: 3, lost: 0}: a knight has been captured, so the player
+#     is 3 of the 5 material needed for a domination win.
+#   - A Lockdown modifier is live against the b7 pawn, expiring at the end of the
+#     enemy's next turn.
+
+stageSeed: 9C41-0B77
+templateId: tpl-act1-open-field
+playerColor: white
+
+board:
+  a1:
+    pieceType: rook
+    color: white
+    instanceId: p_rook_02
+  e1:
+    pieceType: king
+    color: white
+    instanceId: p_king_01
+  c2:
+    pieceType: pawn
+    color: white
+    instanceId: p_pawn_03
+  a7:
+    pieceType: pawn
+    color: black
+  b7:
+    pieceType: pawn
+    color: black
+  c7:
+    pieceType: pawn
+    color: black
+  g7:
+    pieceType: pawn
+    color: black
+  h7:
+    pieceType: pawn
+    color: black
+  e8:
+    pieceType: king
+    color: black
+  f6:
+    pieceType: knight
+    color: black
+
+turnsUsed: 2
+turnLimit: 8
+focus: 3
+focusPool: 3
+moveCredits: 0
+deploymentsThisTurn: 0
+deploymentsPerTurn: 1
+deploymentRanks: [1, 2]
+materialThreshold: 5
+
+swing:
+  captured: 3
+  lost: 0
+
+modifiers:
+  - modifierId: mod_0007
+    primitive: suppress_piece
+    source: lockdown
+    target: b7
+    duration: next_enemy_turn
+    appliedOnTurn: 2
+
+enemyPolicy:
+  type: best_move
+  depth: 2
+  seed: 9C41-0B77-2
+
+status: active
+
+provenance:
+  templateId: tpl-act1-open-field
+  seed: 9C41-0B77
+  attempts: 3
+  validationFailed: false

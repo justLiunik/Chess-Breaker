@@ -1,0 +1,69 @@
+# Launch skills — one per supported framework axis.
+#
+# Each skill breaks exactly ONE named rule of chess (pillar 3) and composes
+# entirely from the effect primitives in docs/03. Charges are per STAGE and
+# refresh at every stage start, so a skill is a strategic identity rather than
+# ammunition. See docs/03-skill-framework.md §5.
+
+skills:
+  - id: twin_step
+    name: Twin Step
+    category: action_economy
+    ruleBroken: "You get one move per turn."
+    text: "Gain one extra move this turn."
+    trigger: activate
+    cost: 1
+    charges: 3
+    target:
+      kind: none
+    effects:
+      - primitive: grant_move_credit
+        params:
+          amount: 1
+        duration: this_turn
+    restrictions:
+      - once_per_turn
+    status: mvp
+
+  - id: ascension
+    name: Ascension
+    category: transformation
+    ruleBroken: "A bishop is a bishop, forever."
+    text: "One of your bishops becomes a queen until the end of this turn."
+    trigger: activate
+    cost: 2
+    charges: 2
+    target:
+      kind: own_piece
+      pieceType: bishop
+      must_be_on_board: true
+    effects:
+      - primitive: set_piece_type
+        params:
+          pieceType: queen
+        duration: this_turn
+    restrictions:
+      - once_per_turn
+    status: mvp
+
+  - id: lockdown
+    name: Lockdown
+    category: status
+    ruleBroken: "A piece can always move."
+    text: "Choose an enemy piece. It cannot move on the enemy's next turn."
+    trigger: activate
+    cost: 1
+    charges: 3
+    target:
+      kind: enemy_piece
+      must_be_on_board: true
+      excludes:
+        - king
+    effects:
+      - primitive: suppress_piece
+        params: {}
+        duration: next_enemy_turn
+    restrictions:
+      - once_per_turn
+      - distinct_targets
+    status: mvp

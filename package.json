@@ -1,0 +1,17 @@
+{
+  "name": "checkbreaker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A chess-puzzle roguelike where you break one rule at a time.",
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-content.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.6.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
