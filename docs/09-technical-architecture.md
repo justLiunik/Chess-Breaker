@@ -64,10 +64,12 @@ Boundary rules:
 type Square = string;                          // 'a1' … 'h8'
 type PieceType = 'king' | 'pawn' | 'knight' | 'bishop' | 'rook' | 'queen';
 type Color = 'white' | 'black';
+type Rarity = 'normal' | 'rare' | 'epic' | 'unique' | 'legendary';   // ascending; docs/06 §4
 
-interface PieceInstance {
+interface PieceInstance {                // a Hero Piece
   instanceId: string;
   pieceType: PieceType;
+  rarity: Rarity | null;         // fixed at creation; null = king only (I12)
   durability: number | null;     // remaining deployments; null = immortal (king)
   durabilityMax: number | null;  // null = immortal (king)
   origin: 'starter' | 'shop' | 'reward';
@@ -94,7 +96,8 @@ interface RunState {
 interface BoardPiece {
   pieceType: PieceType;
   color: Color;
-  instanceId?: string;             // present only for deck-owned pieces
+  instanceId?: string;             // present only for Hero Pieces; rarity is read from the deck
+                                   // instance. Absent = Stage Piece, implicitly Normal (I13).
   transformed?: { pieceType: PieceType; modifierId: string };
 }
 
@@ -170,7 +173,8 @@ function rng(seed: string, cursor: number): { value: number; next: number }
   - `runSeed            = player seed or generated`
   - `stageSeed          = hash(runSeed, actIndex, stageIndex)`
   - `enemySeed          = hash(stageSeed, turnsUsed)`
-  - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)`
+  - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)` — covers piece
+    type *and* rarity rolls, including rerolls
 
 Because every random decision is a pure function of `(seed, cursor)`, a run is fully reproducible
 from a short string — which powers bug reports, QA replay, and (later) seed sharing.
@@ -201,6 +205,8 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Branching run map | `RunState.history` already records a path; add `RunState.route` |
 | Skills with new primitives | `engine/skills` primitive registry — add one entry, no other change |
 | Meta-progression | `RunState` gains no fields; a separate `ProfileState` is added beside it |
+| Rarity effects (decision O) | `PieceInstance.rarity` already exists; effects enter as `data/economy.yaml → rarity` constants and, for traits, entries in the `engine/skills` primitive registry |
+| Neutral Stage Pieces (decision P) | `BoardPiece.color` gains a third value; still no `instanceId` |
 
 ## 8. Persistence
 
@@ -216,7 +222,8 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I11 over generated random queues (fuzz) |
+| Invariants | Property tests asserting I1–I13 over generated random queues (fuzz) |
+| Shop rarity | Property test over seeded shop rolls: I14 holds for every act, guaranteed slots are Normal |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate(q).state === apply(q).state` for random legal-ish queues |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |

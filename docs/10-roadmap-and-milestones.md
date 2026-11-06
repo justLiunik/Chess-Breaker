@@ -18,6 +18,9 @@ repository scaffolding.
 - [x] Example content validates against the schemas via `npm run validate`.
 - [x] No unresolved `TBD` in the core rules; deferrals logged in `docs/11`.
 - [x] Interaction matrix covers every pair of the six systems.
+- [x] Rarity tiers, Stage vs Hero piece categories, and act-gated shop rarity are specified
+      (`docs/06 §4`, `docs/07 §2.1`), with tuning in `data/economy.yaml → rarity` checked by
+      `npm run validate`; rarity *effects* are logged as decision O in `docs/11`.
 
 **Explicitly not delivered:** engine code, UI code, the full skill list.
 
@@ -52,7 +55,8 @@ must be resisted — that would silently delete the game's core mechanic.
 **Delivers:** the three launch skills, the modifier stack, durability, deployment, the opening line.
 
 **Scope**
-- `PieceInstance` lifecycle (`in_deck` → `deployed` → `captured` | `spent`).
+- `PieceInstance` lifecycle (`in_deck` → `deployed` → `captured` | `spent`), including the
+  fixed `rarity` field (null for the King).
 - `DEPLOY` action with durability spend and non-destructive failure.
 - Opening-line draw.
 - `ACTIVATE_SKILL` with `grant_move_credit`, `set_piece_type`, `suppress_piece`.
@@ -67,6 +71,7 @@ must be resisted — that would silently delete the game's core mechanic.
 - [ ] Durability 0 → `spent` → removed at stage end, never earlier (test).
 - [ ] Captured instance is permanently absent from `RunState.deck` (test).
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
+- [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
 
 **Risks:** duration semantics creep. Any new duration requires a `docs/03` update first.
 
@@ -90,6 +95,7 @@ report.
 - [ ] Median accepted stage generated in < 250 ms on a laptop.
 - [ ] Every template reports checkmate share ≥ 20% and median win turn within ±20% of band.
 - [ ] Exhausted-regeneration path terminates and falls through to another template.
+- [ ] 100% of generated Stage Pieces are Normal rarity (I13).
 
 **Risks:** solver cost. Mitigations staged in
 [04 §5](04-stage-generation-and-authoring.md#5-the-solver) (cache → offline archetypes → tighter
@@ -105,6 +111,8 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 - Run advancement across 9 stages, boss flagging, no shop after the final stage.
 - Payout math (checkmate full rate, domination half rate) and salvage on capture.
 - Shop stock generation with pawn floor and recovery offer.
+- Rarity roll on random piece offers from the act-gated pool (`docs/07 §2.1`); rarity pricing and
+  effects only once decision O is made.
 - Purchases: pieces, skills, skill upgrades, repairs, deck slots, rerolls, bank & skip.
 - `localStorage` save/resume with version gating.
 
@@ -115,6 +123,8 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 - [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
 - [ ] Pawn floor is affordable whenever the player has ≥1 coin (test).
 - [ ] Recovery offer fires exactly when non-king deck < 4 and disappears at 4 (test).
+- [ ] 10,000 seeded shop visits per act, rerolls included, never offer a tier above that act's
+      ceiling; no Act I visit offers Epic or higher; pawn floor and recovery offer are always Normal (I14).
 - [ ] Save → reload → resume mid-run preserves coins, deck durability, and loadout charges exactly.
 
 **Risks:** economy is untunable without telemetry, and there is no telemetry by design. Mitigation:
@@ -183,6 +193,7 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Deferred-validation rule "fixed" by a contributor | Medium | Critical | Documented in `docs/02` as core, covered by tests | M1 |
 | Content volume assumptions wrong | Low | Medium | Templates, not levels, scale content | M3 |
 | Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09` | M1 |
+| Rarity power creep breaks the durability trade | Medium | High | Decision O's constraints (`docs/11`); act-gated ceilings; solver models any effect | M4, M6 |
 
 ## Dependencies
 

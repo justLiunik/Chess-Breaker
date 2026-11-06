@@ -95,6 +95,17 @@ The *first* column of that last column is the design statement: a pawn is the ch
 **actions**, a queen is the most expensive way to buy **one** action. Durability is priced, not
 hidden.
 
+### Rarity and prices
+
+Every piece bought in the shop is a Hero Piece with a rarity tier, rolled from an act-gated pool:
+Act I can offer at most **Rare**, Act II at most **Unique**, Act III up to **Legendary** (full table
+in [07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)). Moving through the acts
+therefore raises two things together: prices *and* the rarity ceiling.
+
+Rarity does **not** change prices yet. Whether higher tiers cost more, and what they give in return,
+is Open Decision O ([11](11-open-decisions.md#o-rarity-effects)). Any price rule it adds must keep
+the coins-per-durability column above honest: a tier that adds power must add cost.
+
 ### Services
 
 | Service | Price | Effect |
@@ -171,6 +182,8 @@ never *forced* to lose. They are only forced to play well.
 | `priceInflationPerAct` | 0.20 | Tightens Act II–III economy |
 | `starterCoins` | 0 | Front-loads build choices before stage 1 |
 | `shop.slots` | 5 | Widens variance and choice |
+| `rarity.shopPool.{act}.weights` | 75/25 · 45/35/15/5 · 25/35/25/12/3 | Makes higher tiers commoner in that act |
+| `rarity.shopPool.{act}.ceiling` | rare · unique · legendary | Unlocks higher tiers earlier (Act I must stay at `rare`) |
 
 **Tuning order:** `coinRate` first (it is the universal dial), then `priceInflationPerAct`, then
 prices. Never tune `turnLimit` and `coinRate` in the same pass — you will not be able to attribute

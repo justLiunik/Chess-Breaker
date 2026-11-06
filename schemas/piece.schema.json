@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://checkbreaker.dev/schemas/piece.schema.json",
   "title": "PieceDefinition",
-  "description": "A purchasable/collectible chess piece TYPE. Instance state (remaining durability) lives in run.schema.json, never here. See docs/06-deck-durability-and-permadeath.md.",
+  "description": "A purchasable/collectible chess piece TYPE. Instance state (remaining durability, rarity) lives in run.schema.json, never here: rarity belongs to an instance, not a type. See docs/06-deck-durability-and-permadeath.md.",
   "type": "object",
   "required": ["id", "pieceType", "value", "durabilityMax", "purchasable"],
   "additionalProperties": false,

@@ -2,7 +2,8 @@
 #
 # 7 of 8 capacity slots are filled, deliberately leaving one free slot so the
 # first shop can sell something without forcing the player to cut a piece.
-# The King occupies no slot and has null durability (immortal).
+# The King occupies no slot and has null durability (immortal) and null rarity.
+# Every starter piece is Normal rarity (data/economy.yaml → rarity.starterRarity).
 #
 # See docs/09-technical-architecture.md §3 for the type and
 # schemas/run.schema.json for the contract.
@@ -17,6 +18,7 @@ deckCapacity: 8
 deck:
   - instanceId: p_king_01
     pieceType: king
+    rarity: null
     durability: null
     durabilityMax: null
     origin: starter
@@ -25,6 +27,7 @@ deck:
 
   - instanceId: p_pawn_02
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -33,6 +36,7 @@ deck:
 
   - instanceId: p_pawn_03
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -41,6 +45,7 @@ deck:
 
   - instanceId: p_pawn_04
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -49,6 +54,7 @@ deck:
 
   - instanceId: p_pawn_05
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -57,6 +63,7 @@ deck:
 
   - instanceId: p_knight_06
     pieceType: knight
+    rarity: normal
     durability: 2
     durabilityMax: 2
     origin: starter
@@ -65,6 +72,7 @@ deck:
 
   - instanceId: p_bishop_07
     pieceType: bishop
+    rarity: normal
     durability: 2
     durabilityMax: 2
     origin: starter

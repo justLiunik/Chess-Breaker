@@ -58,7 +58,9 @@ preconditions:
 ```
 
 Templates never specify the player's army — that comes from the deck. Templates never specify the
-enemy's exact squares — that is generated within `enemyZone`.
+enemy's exact squares — that is generated within `enemyZone`. Templates never specify **rarity**:
+every piece a template produces is a Stage Piece, locked to Normal
+([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
 
 Template authoring is a **design** activity, not a content grind: a template is ~15 lines and yields
 a large family of stages.
@@ -72,9 +74,9 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 |---|---|---|
 | **G0** | Derive seed: `hash(runSeed, actIndex, stageIndex)` | — |
 | **G1** | Select template: filter by act + tier, weighted; exclude templates used in the previous stage of the same act where possible | No template → engine bug (every act/tier must have ≥2 templates) |
-| **G2** | Roll enemy army from `enemyArmy` ranges | — |
+| **G2** | Roll enemy army from `enemyArmy` ranges. Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
 | **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start) | Retry placement (max 50 tries) → regenerate |
-| **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks` | Regenerate |
+| **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks`. These are Hero Pieces and keep their own rarity | Regenerate |
 | **G5** | Compute material threshold; verify `threshold ≤ 0.75 × enemyMaterialValue` | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
 | **G7** | **Solver check** (§5) using the current board + remaining deck | Regenerate |
@@ -101,6 +103,10 @@ an unverified stage. This is a **fail-loud** path, not a silent fallback.
 The solver answers exactly one question: **"can this stage be won within the turn limit, with this
 deck and this loadout?"** It does not need to find the *best* line, only a winning one — which keeps
 it tractable.
+
+"This deck" includes each Hero Piece's rarity. Rarity has no in-play effect today, so the solver
+ignores it; if Open Decision O ([11](11-open-decisions.md#o-rarity-effects)) gives tiers an effect,
+the solver must model that effect before any such piece can appear in a stage.
 
 ### Search shape
 
@@ -190,6 +196,7 @@ The **checkmate share** is the single best health metric for a template.
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
 | Threshold feasibility | 100% of stages satisfy `threshold ≤ 0.75 × enemyValue` |
 | Deployment availability | 100% of stages have ≥2 free deployment squares |
+| Stage rarity | 100% of Stage Pieces are Normal (I13); opening-line pieces match their deck instance's rarity |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |
 | Difficulty banding | Median solver win turn within ±20% of the template's target band |

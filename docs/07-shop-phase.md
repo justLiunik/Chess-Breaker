@@ -39,6 +39,7 @@ Five slots, generated from the run seed **after** the stage's coins are awarded:
 
 Generation rules:
 
+- Every piece offer is a **Hero Piece** and carries a rarity tier (see §2.1).
 - No item may exceed the player's `maxCapacity` implications (no deck slot offer at max capacity).
 - Repair is only offered if at least one piece has durability below its max.
 - Skills already at their loadout cap (3) are still offered, but flagged `replace` — buying one
@@ -46,6 +47,38 @@ Generation rules:
 - The same skill may appear at most once per visit.
 - An item the player cannot possibly afford is still shown (with a disabled state) so the shop
   teaches future pricing; it is never silently hidden.
+
+### 2.1 Rarity pool and progression gating
+
+Rarity is rolled for every **random** piece offer (a piece in slots 2–4), after its piece type, from
+the pool of the act whose stage was just cleared — the same act whose prices apply. The roll uses
+the shop seed, so it is reproducible like the rest of the stock.
+
+| Pool (act cleared) | Ceiling | Normal | Rare | Epic | Unique | Legendary |
+|---|---|---|---|---|---|---|
+| **Act I** | **Rare** | 75 | 25 | — | — | — |
+| **Act II** | Unique | 45 | 35 | 15 | 5 | — |
+| **Act III** | Legendary | 25 | 35 | 25 | 12 | 3 |
+
+Weights are relative; `—` means weight 0, impossible. Values live in
+[`data/economy.yaml`](../data/economy.yaml) → `rarity.shopPool` and are provisional until the M6
+balance pass. The structural rules are not provisional:
+
+1. **The ceiling is hard.** No shop ever offers a piece above its act's ceiling — not via reroll, the
+   recovery offer, or any other path. Epic, Unique and Legendary pieces are impossible to acquire in
+   Act I.
+2. **Ceilings never go down.** A later act's ceiling is equal to or higher than an earlier act's.
+3. **Guaranteed slots are Normal.** The pawn floor (slot 1) and the recovery offer are always Normal.
+   Pity items are a floor, not a lottery.
+4. **Rerolls re-roll rarity too.** A reroll redraws type *and* tier for slots 2–4 from the same pool;
+   it cannot raise the ceiling.
+5. **No pity timer, no guarantee of a high tier.** A visit may offer only Normal pieces. Hidden
+   "bad-luck protection" would conflict with the fair-and-provable pillar; the pool is the whole truth,
+   and the shop can show it (§6).
+
+The rarity tier's *effect* — and therefore whether it changes the price — is Open Decision O
+([11](11-open-decisions.md#o-rarity-effects)). Until it is decided, a piece's price depends only on
+its type and act.
 
 ## 3. Guarantees
 
@@ -62,7 +95,7 @@ is accepted as pity with negligible balance impact.
 ### Recovery offer
 
 If the player's **non-king deck contains fewer than `recoveryDeckThreshold` (4) pieces**, slot 2 is
-replaced by a guaranteed replacement piece at **50% of its normal price**.
+replaced by a guaranteed **Normal-rarity** replacement piece at **50% of its normal price**.
 
 This is insurance against one catastrophic stage, not an ongoing subsidy: the offer disappears as
 soon as the deck is back to 4 pieces. It fires in addition to the pawn floor.
@@ -71,7 +104,7 @@ soon as the deck is back to 4 pieces. It fires in addition to the pawn floor.
 
 | Category | Item | Notes |
 |---|---|---|
-| **Piece** | Any of pawn / knight / bishop / rook / queen | Creates a **new instance** at full durability; must fit in capacity |
+| **Piece** | Any of pawn / knight / bishop / rook / queen, at a rolled rarity (§2.1) | Creates a **new Hero Piece instance** at full durability with that rarity; must fit in capacity |
 | **Skill** | One of the skill catalogue | Occupies a loadout slot (3 max); permanent for the run |
 | **Skill upgrade** | A skill already owned | **+1 charge** at 50% price — deepen a build, don't widen it |
 | **Repair** | +1 durability to one chosen piece | Never above that piece's max; not offered for `spent` pieces |
@@ -113,11 +146,12 @@ genuine strategic option, not a failure state, and the UI should not frame it as
 │  SHOP                                                                │
 │  ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐                  │
 │  │ PAWN   ││ ROOK   ││ Queen  ││ BISHOP ││ REPAIR │                  │
+│  │ Normal ││ Rare   ││ Epic   ││ Normal ││        │                  │
 │  │ ◈ 3    ││ ◈ 12   ││ ◈ 19   ││ ◈ 10   ││ ◈ 4    │                  │
 │  │ ●●●    ││ ●●     ││ ●      ││ ●●     ││ +1 pip │                  │
 │  │[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   │                  │
 │  └────────┘└────────┘└────────┘└────────┘└────────┘                  │
-│                           [ Reroll ◈ 0 ]   [ Leave shop ]           │
+│  POOL Act II · up to Unique   [ Reroll ◈ 0 ]   [ Leave shop ]        │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -126,6 +160,9 @@ Design notes:
 - **Deck with durability pips visible while shopping** — the purchase decision depends on deck health.
 - **Durability pips on item cards** so the player compares like with like.
 - Price of a piece the player cannot afford is shown in a muted color, never hidden.
+- **Rarity on every piece card**, as a tier name plus frame shape ([06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
+- **The pool line** states the current act's ceiling ("up to Unique"); hovering it shows the weight
+  table from §2.1. The player can always see what the shop *could* have offered.
 - The loadout panel shows **remaining charges** (they refresh next stage — the shop should say so on
   hover, once).
 
@@ -140,4 +177,7 @@ Design notes:
 | Duplicate skill purchase | Becomes a +1 charge upgrade at 50% price |
 | Loadout full, buys new skill | Forced swap chooser; the displaced skill is lost |
 | Player has 0 coins | Shop still opens, shows stock, allows leaving (no reroll) |
+| Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
+| Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
+| Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |
 | Shop opens on a lost stage | Impossible by definition — the run is over |

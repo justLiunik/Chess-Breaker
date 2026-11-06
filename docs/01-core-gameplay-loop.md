@@ -87,7 +87,8 @@ single number is the pressure that makes the durability economy bite.
 After each cleared stage (never after the last): spend coins. Four purchase categories compete for
 one purse:
 
-- **Pieces** — replace attrition, or upgrade the deck's power per slot.
+- **Pieces** — replace attrition, or upgrade the deck's power per slot. Every piece bought is a
+  Hero Piece with a rarity tier; the act sets the highest tier the shop can offer (Rare in Act I).
 - **Skills** — the only way to break chess; also the only way to exceed one action per turn.
 - **Repairs** — restore durability on a piece you want to keep.
 - **Capacity and rerolls** — make every future shop better.

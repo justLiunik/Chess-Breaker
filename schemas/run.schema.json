@@ -55,14 +55,19 @@
   "$defs": {
     "pieceInstance": {
       "type": "object",
+      "description": "A Hero Piece: one deck-owned instance. See docs/06 §3–§4.",
       "required": [
-        "instanceId", "pieceType", "durability", "durabilityMax",
+        "instanceId", "pieceType", "rarity", "durability", "durabilityMax",
         "origin", "acquiredAtStage", "status"
       ],
       "additionalProperties": false,
       "properties": {
         "instanceId": { "type": "string", "pattern": "^p_[a-z0-9_]+$" },
         "pieceType": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] },
+        "rarity": {
+          "enum": ["normal", "rare", "epic", "unique", "legendary", null],
+          "description": "Fixed at creation. null = the King only, which has no rarity (invariant I12). Order is data/economy.yaml → rarity.tiers."
+        },
         "durability": {
           "type": ["integer", "null"],
           "minimum": 0,
@@ -76,7 +81,15 @@
         "origin": { "enum": ["starter", "shop", "reward"] },
         "acquiredAtStage": { "type": "integer", "minimum": 0 },
         "status": { "enum": ["in_deck", "deployed", "captured", "spent"] }
-      }
+      },
+      "allOf": [
+        {
+          "$comment": "Invariant I12: the King has no rarity; every other piece has exactly one tier.",
+          "if": { "properties": { "pieceType": { "const": "king" } }, "required": ["pieceType"] },
+          "then": { "properties": { "rarity": { "const": null } } },
+          "else": { "properties": { "rarity": { "type": "string" } } }
+        }
+      ]
     },
     "loadedSkill": {
       "type": "object",

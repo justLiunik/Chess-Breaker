@@ -55,6 +55,7 @@ durability and separate fates.
 interface PieceInstance {
   instanceId: string;        // stable for the run, e.g. "p_a1f3_07"
   pieceType: 'king' | 'pawn' | 'knight' | 'bishop' | 'rook' | 'queen';
+  rarity: Rarity | null;     // fixed at creation; null for the King only (§4)
   durability: number;        // remaining deployments
   durabilityMax: number;     // from the piece definition
   origin: 'starter' | 'shop' | 'reward';
@@ -66,7 +67,68 @@ interface PieceInstance {
 Durability is **instance state persisted in `RunState`**. It is the reason a run cannot be
 reconstructed from its piece list alone, and the reason save files must version the deck.
 
-## 4. Durability lifecycle
+Rarity is instance state too: two knights in the same deck may hold different tiers.
+
+## 4. Piece categories and rarity
+
+### 4.1 Two categories of piece
+
+Every piece on a board belongs to exactly one category, and the category decides where it comes
+from and what rarity it may hold.
+
+| Category | What it is | Owned by | Comes from | Rarity |
+|---|---|---|---|---|
+| **Stage Piece** | A piece pre-placed by the stage itself: the enemy army (and any future neutral pieces — [11 P](11-open-decisions.md#p-neutral-stage-pieces)) | The stage | Rolled from the template at generation ([04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)) | **Always Normal** |
+| **Hero Piece** | A piece the player owns: every instance in the deck | The player, for the run | Starter deck, shop, rewards | **Any tier** |
+
+How to tell them apart on a board: a Hero Piece carries an `instanceId` that points into
+`RunState.deck`; a Stage Piece has none. Stage Pieces are ephemeral — they exist only inside one
+`StageState` and are never added to the deck, even when captured.
+
+**Opening-line pieces are Hero Pieces.** They are drawn from the deck ([02 §5](02-rules-framework.md#5-deployment))
+and keep their own rarity; "placed at stage start" does not make a piece a Stage Piece.
+
+### 4.2 Rarity tiers
+
+| Order | Tier | First offered in the shop | Who can hold it |
+|---|---|---|---|
+| 1 | **Normal** | Act I | Every Stage Piece; any Hero Piece |
+| 2 | **Rare** | Act I | Hero Pieces only |
+| 3 | **Epic** | Act II | Hero Pieces only |
+| 4 | **Unique** | Act II | Hero Pieces only |
+| 5 | **Legendary** | Act III | Hero Pieces only |
+
+The order is load-bearing: "above the ceiling" and "higher rarity" always mean a later row in this
+table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `rarity.tiers`.
+
+### 4.3 Rules
+
+1. **The King has no rarity.** Its `rarity` is `null`, always. It is not Normal — it is outside the
+   system, like its durability.
+2. **Every other piece has exactly one rarity tier.**
+3. **Stage Pieces are locked to Normal.** Templates cannot specify enemy rarity, and generation never
+   rolls it.
+4. **Hero Pieces may hold any tier.** Starter-deck pieces are all Normal; higher tiers enter the deck
+   only through the shop (or future rewards).
+5. **Rarity is fixed at creation.** An instance keeps its tier for its whole life. Transforms
+   (e.g. Ascension) change the piece type temporarily, never the rarity. Repairs do not change
+   rarity. There is no upgrade path in MVP (see decision O).
+6. **Rarity availability is gated by progression.** The shop draws rarity from an act-specific pool
+   with a ceiling; in Act I that ceiling is **Rare**, so Epic, Unique and Legendary pieces cannot be
+   acquired until later acts. Full rules: [07 §2](07-shop-phase.md#2-stock-generation).
+7. **Skills have no rarity.** Rarity is a property of pieces only.
+
+### 4.4 What rarity does — not yet decided
+
+The *structure* above is fixed. The *effect* of a tier — on durability, price, traits, or nothing at
+all — is **Open Decision O** ([11](11-open-decisions.md#o-rarity-effects)). Until it is decided,
+rarity is tracked, rolled, saved and displayed, and changes no rule, price, or chess value.
+
+Whatever O decides, it must not undo §1: **durability stays inversely correlated with power.** A
+higher tier that simply added durability to a queen would make the queen strictly dominant again,
+which is exactly the deck shape the durability table exists to prevent.
+
+## 5. Durability lifecycle
 
 ```
                     ┌──────────────────────────────────────────┐
@@ -108,7 +170,7 @@ absurd to watch and removes the tension of playing out a stage with a doomed arm
 lets the player spend it *now* and feel the cost *after* — which is the same shape as the coin
 economy and teaches the same lesson.
 
-## 5. Capture and permadeath
+## 6. Capture and permadeath
 
 | Event | Effect on the run |
 |---|---|
@@ -122,13 +184,14 @@ opening-line piece and a deployed piece is who chose the square. Both persist, b
 both die permanently. This closes the "free cannon fodder" loophole that would otherwise let a player
 avoid all risk by never deploying.
 
-## 6. The King
+## 7. The King
 
 | Property | Rule |
 |---|---|
 | Presence | Guaranteed in the deck; always placed in the opening line |
 | Capacity | Occupies no deck slot |
 | Durability | Infinite; never decremented, never spent |
+| Rarity | None — `null`, outside the rarity system (§4) |
 | Capture | Impossible (invariant I3) |
 | Removal | Cannot be sold, sacked, or destroyed by any effect |
 | Defeat | Checkmate of the player king ends the run |
@@ -138,7 +201,7 @@ state caused by an empty deck — only one caused by their own play. This is a l
 it is what lets the game promise "the pawn floor plus the opening line means you are never forced to
 lose."
 
-## 7. Guardrails
+## 8. Guardrails
 
 | Lever | Rule | Prevented failure |
 |---|---|---|
@@ -149,7 +212,7 @@ lose."
 | **Salvage** | Captures pay coins | Attrition has no counter-income |
 | **Telegraphing** | UI warns when a deployment target is attacked | Losing pieces to invisible threats |
 
-## 8. Communication rules (UI contract)
+## 9. Communication rules (UI contract)
 
 Durability must be readable without opening a panel.
 
@@ -163,9 +226,14 @@ Durability must be readable without opening a panel.
    derive by hand; hiding it only punishes carelessness, not judgment.
 5. **Deck panel sort:** group by durability ascending? **No** — group by `pieceType` (stable), with a
    filter for "spent" and "one deployment left." Sorting by durability would reshuffle under the
-   player's hand mid-plan.
+   player's hand mid-plan. Within a type, order by rarity (Normal first), which is stable for the
+   life of each instance.
+6. **Rarity marker** on every Hero Piece tile and shop card: the tier name plus a distinct frame
+   shape per tier, readable without color. Rarity never uses glow or the hot accent colors — those are
+   reserved for threat and rule-breaking ([00](00-vision-and-pillars.md#tone--art-direction-brief)).
+   Stage Pieces show no rarity marker, because theirs never varies. The King shows none either.
 
-## 9. Edge cases
+## 10. Edge cases
 
 | Case | Resolution |
 |---|---|
@@ -173,6 +241,9 @@ Durability must be readable without opening a panel.
 | Deploy with no legal square | Action cannot be committed; durability not spent |
 | Deploy that would leave own king in check | Commit refused (I2); durability not spent |
 | Captured while transformed (Ascension) | Piece destroyed normally; no reversion step |
+| Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
+| Captured Epic/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
+| Two instances of one type at different tiers | Both legal; they are independent instances (§3) |
 | Repaired piece at max durability | Repair is not offered (cannot exceed max) |
 | Spent piece captured | Same as any capture — it was already leaving the deck; the capture just gets it first |
 | Deck exceeds capacity (e.g. after a purchase bug) | Invariant I9 fails loudly at commit; purchases are refused at the shop instead |

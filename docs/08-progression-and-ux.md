@@ -104,9 +104,10 @@ This is the signature UI and the game's main skill-expression surface.
 - Deployment squares are tinted on the board whenever a deploy is queued or hovered.
 - Dragging a piece from the deck tray to the board creates a `DEPLOY` entry.
 - Hovering a target square shows the threat overlay: which enemy pieces attack it, and the capture
-  line that would follow (see [06 §8](06-deck-durability-and-permadeath.md#8-communication-rules-ui-contract)).
+  line that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
 - If the target leaves the king in check, the square is marked invalid with a king-safety icon.
-- The tray shows durability pips and disables pieces with `spent` status.
+- The tray shows durability pips and the rarity marker (tier name + frame shape), and disables pieces
+  with `spent` status. On the board, Hero Pieces keep their rarity frame; Stage Pieces have none.
 
 ## 4. The Run Map
 
@@ -191,3 +192,5 @@ scouting.
 - ❌ A shop that pressures with a timer.
 - ❌ Sorting the deck by durability (it reshuffles under the player's hand).
 - ❌ Any screen where the coin preview is not visible.
+- ❌ Rarity shown by glow or by the threat/rule-breaking accent colors — rarity must never read as
+  danger. Tier name plus frame shape, never color alone.

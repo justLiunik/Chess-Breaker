@@ -17,6 +17,9 @@ This document is the authority. If any other document disagrees with it, this on
 | **Move credit** | Currency that pays for `MOVE` and `DEPLOY`. Starts at 1 per turn (the **Free Move**). |
 | **Focus** | Currency that pays for `ACTIVATE_SKILL` only. Refills to the pool value each turn. |
 | **Durability** | A piece instance's remaining deployments (see [06](06-deck-durability-and-permadeath.md)). |
+| **Hero Piece** | A piece the player owns: an instance in `RunState.deck`. On a board it carries an `instanceId`. May hold any rarity. |
+| **Stage Piece** | A piece pre-placed by the stage — the enemy army (or future neutral pieces). No `instanceId`, never joins the deck, always Normal rarity. |
+| **Rarity** | A piece's tier: Normal, Rare, Epic, Unique, Legendary (ascending). Every piece except the King has one (see [06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)). |
 | **Deployment square** | An empty square in the player's deployment ranks where a piece may be placed. |
 | **End state** | The board position after the queue resolves *and* after end-of-turn expiry (step R1). |
 
@@ -33,6 +36,11 @@ This document is the authority. If any other document disagrees with it, this on
   - Pawn promotions that would occur are handled by the normal chess rule (to queen only), but
     generated stage templates avoid promotion squares so the interaction never arises in MVP.
 - Castling rights are absent; generated stages have no castling flags.
+- Every piece on the board is either a **Hero Piece** (the player's, from the deck) or a **Stage
+  Piece** (placed by the stage). Every piece except the King has a **rarity**; Stage Pieces are
+  always Normal. Rarity currently changes no rule in this document — its effect is Open Decision O
+  ([11](11-open-decisions.md#o-rarity-effects)). Material values (P1 N3 B3 R5 Q9) are the same at
+  every tier.
 
 ### Deliberately ignored chess rules
 
@@ -184,6 +192,7 @@ when both fire on the same turn.
 - The enemy is **standard-move-only** in MVP: it never deploys, never uses skills, and never gains
   reinforcement mid-stage. (Boss skills are an M6 feature; the schema already reserves
   `enemyLoadout`.)
+- Every enemy piece is a **Stage Piece** at Normal rarity. Enemy rarity is never rolled or authored.
 - The enemy takes exactly **one standard move** per turn.
 - The enemy's policy is one of:
   - `best_move` — seeded, fixed-depth minimax with stable move ordering. Deterministic for a given
@@ -210,6 +219,9 @@ These are the contract the engine, the generator, and the tests all share.
 | **I9** | Deck size never exceeds capacity; the king is never destroyed or removed from the deck. |
 | **I10** | The coin payout shown in the preview equals the payout at evaluation, for the same plan. |
 | **I11** | Given identical `(RunState, seed)`, generation and all enemy decisions are reproducible. |
+| **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance. |
+| **I13** | Every Stage Piece is Normal rarity. |
+| **I14** | No shop offers a Hero Piece above its act's rarity ceiling; the Act I ceiling is Rare. |
 
 ## 10. Worked example turn
 

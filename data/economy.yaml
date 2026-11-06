@@ -95,6 +95,43 @@ pieces:
     purchasable: true
 
 # ---------------------------------------------------------------------------
+# Rarity — see docs/06 §4 and docs/07 §2
+#
+# Every piece except the King has a rarity tier. Stage Pieces (enemy, and any
+# future neutral pieces) are always the base tier. Hero Pieces (deck-owned) may
+# hold any tier, and the shop's rarity pool is gated by act.
+#
+# What a tier DOES in play (durability, price, traits…) is Open Decision O
+# (docs/11). Until it is decided there is deliberately no per-tier effect or
+# price multiplier in this file: rarity is tracked, rolled and displayed, and
+# changes nothing else.
+# ---------------------------------------------------------------------------
+rarity:
+  tiers: [normal, rare, epic, unique, legendary]   # ascending; order is load-bearing
+  kingHasRarity: false            # the King has no rarity (null), ever
+  stagePieceRarity: normal        # Stage Pieces are locked to this tier
+  starterRarity: normal           # every starter-deck piece
+  pawnFloorRarity: normal         # shop slot 1 is always a Normal pawn
+  recoveryOfferRarity: normal     # the recovery replacement piece is Normal
+
+  # Weights for the rarity roll on random shop piece offers (slots 2–4), keyed by
+  # the act of the stage just cleared — the same act whose prices apply.
+  # `ceiling` is the highest tier the pool may produce; every tier above it must
+  # have weight 0. Ceilings never go down from one act to the next, and Act I is
+  # capped at `rare` by design (validated in scripts/validate-content.mjs).
+  # The weights themselves are provisional, pending the M6 balance pass.
+  shopPool:
+    act1:
+      ceiling: rare
+      weights: { normal: 75, rare: 25, epic: 0, unique: 0, legendary: 0 }
+    act2:
+      ceiling: unique
+      weights: { normal: 45, rare: 35, epic: 15, unique: 5, legendary: 0 }
+    act3:
+      ceiling: legendary
+      weights: { normal: 25, rare: 35, epic: 25, unique: 12, legendary: 3 }
+
+# ---------------------------------------------------------------------------
 # Deck — see docs/06-deck-durability-and-permadeath.md
 # ---------------------------------------------------------------------------
 deck:

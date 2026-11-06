@@ -3,6 +3,7 @@
 # Demonstrates the state that actually needs saving: per-instance durability,
 # skill charges part-spent, and cumulative history. Two pieces have been lost to
 # captures (knight, pawn) and one pawn is down to a single deployment.
+# The shop-bought knight is Rare: the highest tier the Act I pool can offer.
 #
 # Note the economy shape: 18 coins is "comfortable" — one meaningful purchase
 # this shop, not a rebuild.
@@ -17,6 +18,7 @@ deckCapacity: 8
 deck:
   - instanceId: p_king_01
     pieceType: king
+    rarity: null
     durability: null
     durabilityMax: null
     origin: starter
@@ -25,6 +27,7 @@ deck:
 
   - instanceId: p_pawn_02
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -33,6 +36,7 @@ deck:
 
   - instanceId: p_pawn_03
     pieceType: pawn
+    rarity: normal
     durability: 2
     durabilityMax: 3
     origin: starter
@@ -41,6 +45,7 @@ deck:
 
   - instanceId: p_pawn_04
     pieceType: pawn
+    rarity: normal
     durability: 3
     durabilityMax: 3
     origin: starter
@@ -49,6 +54,7 @@ deck:
 
   - instanceId: p_knight_08
     pieceType: knight
+    rarity: rare                  # bought after Act I stage 2 — Act I pool caps at Rare
     durability: 1
     durabilityMax: 2
     origin: shop
@@ -57,6 +63,7 @@ deck:
 
   - instanceId: p_bishop_07
     pieceType: bishop
+    rarity: normal
     durability: 2
     durabilityMax: 2
     origin: starter
@@ -65,6 +72,7 @@ deck:
 
   - instanceId: p_rook_09
     pieceType: rook
+    rarity: normal
     durability: 2
     durabilityMax: 2
     origin: shop

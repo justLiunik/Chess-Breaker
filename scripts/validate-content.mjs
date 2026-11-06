@@ -5,7 +5,8 @@
  * Two passes:
  *   1. SCHEMA   — every file in content/examples/ against its JSON Schema.
  *   2. SEMANTIC — cross-file design invariants that a schema cannot express:
- *                 template feasibility, act value bands, deck legality, board sanity.
+ *                 template feasibility, act value bands, deck legality, board sanity,
+ *                 rarity tiers and act-gated shop pools.
  *
  * Pass 2 is the point. A JSON Schema can prove a template is well-formed; only
  * this pass can prove it is *a legal, reachable encounter* under data/economy.yaml.
@@ -198,6 +199,77 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
   }
 }
 
+// 2a'. Rarity: tier list matches the schema, and the shop pool is act-gated
+// (docs/06 §4, docs/07 §2.1, invariant I14).
+const RARITY_TIERS = ['normal', 'rare', 'epic', 'unique', 'legendary'];
+const rarity = economy.rarity ?? {};
+const tiers = rarity.tiers ?? [];
+const tierRank = (t) => tiers.indexOf(t);
+
+if (JSON.stringify(tiers) !== JSON.stringify(RARITY_TIERS)) {
+  fail(`economy.yaml: rarity.tiers ${JSON.stringify(tiers)} must be ${JSON.stringify(RARITY_TIERS)} (matches run.schema.json)`);
+} else {
+  ok(`economy.yaml: ${tiers.length} rarity tiers in order`);
+}
+for (const key of ['stagePieceRarity', 'starterRarity', 'pawnFloorRarity', 'recoveryOfferRarity']) {
+  if (rarity[key] !== tiers[0]) fail(`economy.yaml: rarity.${key} must be "${tiers[0]}", got "${rarity[key]}"`);
+}
+if (rarity.kingHasRarity !== false) fail('economy.yaml: rarity.kingHasRarity must be false (invariant I12)');
+
+const actCount = economy.stages?.acts ?? 3;
+let prevCeiling = -1;
+for (let act = 1; act <= actCount; act += 1) {
+  const pool = rarity.shopPool?.[`act${act}`];
+  const where = `economy.yaml: rarity.shopPool.act${act}`;
+  if (!pool) {
+    fail(`${where} is missing`);
+    continue;
+  }
+  const ceiling = tierRank(pool.ceiling);
+  if (ceiling < 0) {
+    fail(`${where}: unknown ceiling "${pool.ceiling}"`);
+    continue;
+  }
+  const weights = pool.weights ?? {};
+  let total = 0;
+  let problems = 0;
+  for (const [tier, w] of Object.entries(weights)) {
+    if (tierRank(tier) < 0) {
+      fail(`${where}: unknown tier "${tier}" in weights`);
+      problems += 1;
+      continue;
+    }
+    if (typeof w !== 'number' || w < 0) {
+      fail(`${where}: weight for ${tier} must be a non-negative number`);
+      problems += 1;
+      continue;
+    }
+    if (tierRank(tier) > ceiling && w > 0) {
+      fail(`${where}: ${tier} has weight ${w} but is above the ceiling "${pool.ceiling}"`);
+      problems += 1;
+    }
+    total += w;
+  }
+  if (!(weights[pool.ceiling] > 0)) {
+    fail(`${where}: ceiling "${pool.ceiling}" has no weight, so it can never be rolled`);
+    problems += 1;
+  }
+  if (total <= 0) {
+    fail(`${where}: weights sum to 0`);
+    problems += 1;
+  }
+  if (ceiling < prevCeiling) {
+    fail(`${where}: ceiling "${pool.ceiling}" is lower than the previous act's — ceilings never go down`);
+    problems += 1;
+  }
+  if (act === 1 && ceiling > tierRank('rare')) {
+    fail(`${where}: Act I ceiling must be at most "rare", got "${pool.ceiling}"`);
+    problems += 1;
+  }
+  if (problems === 0) ok(`${where}: capped at ${pool.ceiling}`);
+  prevCeiling = Math.max(prevCeiling, ceiling);
+}
+
 // 2b. Runs: deck legality and economy invariants.
 for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
   const run = docs[file];
@@ -218,6 +290,9 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
     const label = `${file}:${p.instanceId}`;
     if (p.pieceType === 'king' && p.durability !== null) fail(`${label}: king durability must be null`);
     if (p.pieceType !== 'king' && p.durability === null) fail(`${label}: non-king durability cannot be null`);
+    if (p.pieceType !== 'king' && p.origin === 'starter' && p.rarity !== rarity.starterRarity) {
+      fail(`${label}: starter pieces must be "${rarity.starterRarity}" rarity, got "${p.rarity}"`);
+    }
     if (p.status === 'captured') fail(`${label}: captured pieces are removed from the run, not kept in the deck`);
     if (p.status === 'spent') fail(`${label}: spent pieces are removed at stage end, not kept in the deck`);
     if (typeof p.durability === 'number' && p.durability < 1 && p.pieceType !== 'king') {

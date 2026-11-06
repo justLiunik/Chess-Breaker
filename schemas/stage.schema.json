@@ -84,7 +84,7 @@
         "color": { "enum": ["white", "black"] },
         "instanceId": {
           "type": "string",
-          "description": "Present only for deck-owned (player) pieces; enemy pieces have no instance."
+          "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces (enemy) have no instance and are always Normal rarity (invariant I13), so no rarity field exists here."
         },
         "transformed": {
           "type": "object",

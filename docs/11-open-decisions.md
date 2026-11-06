@@ -2,7 +2,8 @@
 
 Decisions deliberately **not** made in M0. Each records the question, the options considered, the
 current default, and the trigger that forces a decision. Nothing here blocks implementation of
-M1–M5.
+M1–M5, with one partial exception: decision O must be made before rarity can change prices or play
+in M4.
 
 ---
 
@@ -152,6 +153,54 @@ economy by making late acts trivial.
 **Default:** no. The game's fairness comes from the solver guarantee, not from adjustable difficulty.
 **Alternative:** a "practice" mode with hints forced on and no run death — teaches without diluting.
 **Trigger:** if onboarding data shows a hard wall at Act II for new players.
+
+---
+
+## O. Rarity effects
+
+**Question:** what does a piece's rarity tier (Normal → Rare → Epic → Unique → Legendary) actually
+change?
+**Already decided (not open):** the tiers and their order; the King has none; Stage Pieces are always
+Normal; Hero Pieces may hold any tier; the shop pool is gated by act with Act I capped at Rare
+([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity),
+[07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
+**Options:**
+1. **Durability bonus** — higher tiers raise `durabilityMax`, with a matching price rise.
+2. **Piece-bound trait** — higher tiers add one passive trait to the piece, expressed through the
+   engine's primitive registry ([03](03-skill-framework.md)), never as a special case.
+3. **Price and prestige only** — tiers change price, sell value or presentation, not play.
+4. A capped mix of the above.
+
+**Default:** none yet. Rarity is tracked, rolled, saved and displayed, and changes nothing else.
+**Constraints any answer must meet:**
+- **Pillar 2:** a tier that adds power adds cost (coins, permanence, or both). No free tempo, no free
+  durability.
+- **Durability stays inversely correlated with power** ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)).
+  A Legendary queen with several deployments would be the strictly dominant slot the table forbids;
+  option 1 needs a per-type cap.
+- **Pillar 3:** each tier's effect fits in one short sentence on the piece card.
+- **Pillar 4:** the solver models the effect, so every stage stays provably solvable with the
+  player's actual deck ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)).
+- **Chess values stay standard.** Swing and salvage keep using P1 N3 B3 R5 Q9 at every tier, so
+  domination math remains readable.
+- **No rules in the UI** ([09 §6](09-technical-architecture.md#6-module-responsibilities)); every
+  tier constant lives in `data/economy.yaml → rarity`.
+
+**Sub-questions to settle with it:** can a piece's rarity ever be upgraded (shop service, reward)?
+Should the pool shift within an act (per shop visit) rather than per act?
+**Trigger:** before M4 shop work starts. **Blocker for:** rarity pricing and effects only; the tiers,
+categories and gating can be implemented without it.
+
+---
+
+## P. Neutral Stage Pieces
+
+**Question:** should stages place pieces that belong to neither side (blockers, capturable targets)?
+**Default:** none in MVP. The **Stage Piece** category already covers them: if added, they are
+Normal rarity, carry no `instanceId`, and never join the deck.
+**Cost:** a third side means new rules for who may capture them, whether they count toward swing,
+and how the enemy policy treats them. They also overlap with terrain (L).
+**Trigger:** M6+, together with L.
 
 ---
 

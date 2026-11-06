@@ -79,3 +79,6 @@ each failure with its JSON pointer path.
 | **Durability** | A piece instance's remaining deployments. Zero destroys it. |
 | **Salvage** | Coins earned for capturing an enemy piece. |
 | **Domination** | Winning by material threshold instead of checkmate (lower payout). |
+| **Hero Piece** | A piece you own, held in your deck. Can be any rarity. |
+| **Stage Piece** | A piece the stage places itself, such as the enemy army. Always Normal rarity. |
+| **Rarity** | A piece's tier: Normal, Rare, Epic, Unique, Legendary. The King has none. The shop's highest tier rises with each act (Act I: Rare). |
