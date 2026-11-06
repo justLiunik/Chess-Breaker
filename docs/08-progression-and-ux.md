@@ -38,32 +38,31 @@ No screen has a timer. The game is turn-based; urgency is diegetic (the counter)
 ### 3.1 Coin preview — the load-bearing number
 
 ```
-preview = floor( (turnLimit − (turnsUsed + 1)) × coinRate(act) × payoutMultiplier )
+preview = baseReward(act, tier) + (turnLimit − (turnsUsed + 1)) × coinRate(act)
 ```
 
-Where `payoutMultiplier` is 1.0 for a checkmate in the current plan and 0.5 for a domination win.
-`turnsUsed` includes the turn currently being played, so the final turn of a stage always previews
-**+0**.
+`turnsUsed` includes the turn currently being played, so the final turn of a stage previews the
+**base reward only** (e.g. **+4** in Act I). Salvage is shown separately as it is earned.
 
 The HUD shows a live, per-plan value:
 
-- **Checkmate available in this plan** → `+8 ◈` in full color.
-- **Domination available** → `+4 ◈` with a `½` marker and a tooltip naming the threshold.
-- **Neither** → shows the *next-turn* potential in muted text, so the player always sees the decay.
-- Winning on the last turn shows **`+0 ◈`** with the label `FINAL TURN` — an explicit, unmissable
-  "this turn must not be wasted."
+- **Checkmate available in this plan** → `+14 ◈` in full color.
+- **No mate in this plan** → shows the *next-turn* potential in muted text, so the player always sees
+  the decay.
+- On the last turn it shows **`+4 ◈`** with the label `FINAL TURN` — an explicit, unmissable "mate
+  now or lose the run; every saved turn would have paid more."
 
 ### 3.2 HUD layout
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +8 ◈           │
+│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +14 ◈          │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
 │     7  │  │  │  │♚ │  │  │  │  │                                     │
 │     6  │  │  │  │  │  │♞ │  │  │      ENEMY  ♟♟♟♞  9                 │
-│     5  │  │  │  │  │  │  │  │  │      SWING  +2 / +5  (domination)    │
+│     5  │  │  │  │  │  │  │  │  │      SALVAGE  +1 ◈ this stage        │
 │     4  │  │  │  │  │  │  │  │  │                                     │
 │     3  │  │  │  │  │  │  │  │  │                                     │
 │     2  │  │  │♙ │  │  │  │  │  │      YOU    ♟♟♟♞♝  6                 │
@@ -144,9 +143,10 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Scripted enemy; only 4 pieces on the board; tooltip on the coin preview |
 | Run 1, Act I stage 2 | Deployment and durability | Deck shown with pips; first deploy is prompted |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
-| Act I boss | Material domination as an alternative win | Threshold visibly marked on the HUD |
+| Act I boss | Mating under turn pressure | One turn less than the rest of Act I; the coin preview's decay is highlighted once |
 | Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
+| First time three identical pieces are owned | Merging | The shop highlights the set and its `[MERGE]` action once |
 | First Rare+ piece acquired | That tier's ability | The piece card shows the ability sentence once; its first selection previews the new squares |
 | Act III | Everything composes | No scaffolding |
 
@@ -197,7 +197,7 @@ scouting.
 
 ## 9. UX anti-patterns to avoid
 
-- ❌ A win-condition tooltip the player must hover to discover the threshold.
+- ❌ A win-condition tooltip the player must hover to discover — the only win, checkmate, is stated on the stage intro.
 - ❌ Animating the enemy reply before showing the player's resolved position.
 - ❌ Hiding an unaffordable price.
 - ❌ Free-form "invalid move" errors without a named cause.

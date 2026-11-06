@@ -138,10 +138,11 @@ with deployment ranks and transform durations.
 
 ## M. Squad-size and capacity ceiling
 
-**Question:** is 8→14 deck capacity and 3 loadout slots the right ceiling?
-**Default:** 8 start, 14 max, 3 skills.
-**Note:** capacity is the highest-leverage purchase in the game; raising the ceiling flattens the
-economy by making late acts trivial.
+**Status:** deck capacity is **decided**: a fixed 8 pieces, never raised, no deck-slot purchase
+([06 §2](06-deck-durability-and-permadeath.md#2-deck-capacity)). Deck growth comes from tiers and
+merging instead.
+**Still open:** are 3 loadout slots the right ceiling for skills?
+**Default:** 3 skills.
 **Trigger:** after the M6 balance pass.
 
 ---
@@ -166,8 +167,9 @@ Legendary rook and queen multi-capture two connected enemies (the queen even aft
 Legendary queen is 5× rarer than other Legendary pieces.
 
 **Still open:**
-1. **Rarity upgrades.** Can a piece's tier ever rise after creation (a shop service, a reward)?
-   Default: no — rarity is fixed at creation (I12).
+1. ~~Rarity upgrades~~ — **decided:** merging 3 identical pieces creates one piece of the next tier
+   ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)); an existing instance's tier never
+   changes (I12).
 2. **Pool cadence.** Should the rarity pool shift per shop visit rather than per act? Default: per act.
 3. **Legendary knight count.** Should a deck hold at most one Legendary knight, if two make the solver
    or the double-move tempo too strong? Default: no cap; revisit after M3 measures solver cost.
@@ -177,7 +179,7 @@ Legendary queen is 5× rarer than other Legendary pieces.
 - **Durability stays inversely correlated with power** ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)).
 - **Pillar 3:** each tier's effect fits in one short sentence on the piece card.
 - **Pillar 4:** the solver models every effect ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)).
-- **Chess values stay standard** for swing and salvage.
+- **Chess values stay standard** for salvage and enemy value bands.
 - **No rules in the UI** ([09 §6](09-technical-architecture.md#6-module-responsibilities)): abilities
   are `pieces.yaml → rarityAbilities` entries interpreted by the engine.
 
@@ -191,7 +193,7 @@ Legendary queen is 5× rarer than other Legendary pieces.
 **Default:** none in MVP. The **Stage Piece** category already covers them: if added, they are
 Normal rarity, carry no `instanceId`, and never join the deck. (Spawned pawns are already a
 player-side kind of Stage Piece; neutral pieces would be a third side.)
-**Cost:** a third side means new rules for who may capture them, whether they count toward swing,
+**Cost:** a third side means new rules for who may capture them, whether capturing them pays salvage,
 and how the enemy policy treats them. They also overlap with terrain (L).
 **Trigger:** M6+, together with L.
 

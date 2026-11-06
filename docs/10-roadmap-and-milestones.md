@@ -24,6 +24,8 @@ repository scaffolding.
 - [x] Rarity rules for pawns (stage-only, promotion), knights, bishops, rooks and queens are specified (`docs/02 §2.1–2.3`),
       with abilities as data in `pieces.yaml` and prices in `economy.yaml`; rook and queen abilities
       follow-up questions are logged as decision O in `docs/11`.
+- [x] Checkmate is the only win; stage reward = base reward + unused-turn bonus + salvage; the deck is
+      fixed at 8; merging (3 → 1, next tier) is specified (`docs/02 §7`, `docs/05 §2`, `docs/06 §4.5`).
 
 **Explicitly not delivered:** engine code, UI code, the full skill list.
 
@@ -84,7 +86,7 @@ must be resisted — that would silently delete the game's core mechanic.
       durability 1; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
 - [ ] Ascension suspends rarity abilities and they return after the revert (test).
 - [ ] Rook and queen rows of `docs/02 §2.3` each have a test, including every multi-capture rule
-      (adjacency, gap, king exception, rook-after-leap single capture, one credit, swing + salvage).
+      (adjacency, gap, king exception, rook-after-leap single capture, one credit, salvage for both).
 - [ ] A Legendary knight that gives check with its first move can never capture or land on the king
       with its bonus move (test).
 - [ ] Lifeline fires once per queen instance and returns it at stage end with 1 durability (test).
@@ -103,14 +105,14 @@ report.
 - 6+ templates (≥2 per act, ≥1 boss per act).
 - Precondition suite + regeneration with fail-loud path.
 - Solver with node/time budgets and mate-first ordering.
-- `npm run gen:report` producing solvability rate, median win turn, checkmate share.
+- `npm run gen:report` producing solvability rate (mate within the limit) and median mating turn.
 
 **Acceptance criteria**
-- [ ] 10,000 generated stages: ≥95% solvable, 100% pass king/pre-check/material/deployment
+- [ ] 10,000 generated stages: ≥95% solvable, 100% pass king/pre-check/enemy-value/deployment
       preconditions ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
 - [ ] Same seed twice → byte-identical `StageState`.
 - [ ] Median accepted stage generated in < 250 ms on a laptop.
-- [ ] Every template reports checkmate share ≥ 20% and median win turn within ±20% of band.
+- [ ] Every template reports a median mating turn within ±20% of its band.
 - [ ] Exhausted-regeneration path terminates and falls through to another template.
 - [ ] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
       results never exceed the act ceiling (I14).
@@ -128,16 +130,20 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 
 **Scope**
 - Run advancement across 9 stages, boss flagging, no shop after the final stage.
-- Payout math (checkmate full rate, domination half rate) and salvage on capture.
+- Stage reward math (base reward + unused-turn bonus) and salvage on capture.
 - Shop stock generation with recovery offer (no pawns are sold).
 - Rarity roll on random piece offers from the act-gated pool and rarity pricing (`docs/07 §2.1–2.2`).
 - Stage-end over-capacity cut after a promotion, before the shop opens.
-- Purchases: pieces, skills, skill upgrades, repairs, deck slots, rerolls, bank & skip.
+- Purchases: pieces, skills, skill upgrades, repairs, rerolls, bank & skip. Merging (3 → 1, free). Fixed
+  8-piece deck — no capacity purchases.
 - `localStorage` save/resume with version gating.
 
 **Acceptance criteria**
-- [ ] Payout matches the [05 §2](05-run-structure-and-economy.md#2-income-turns--coins) table for
-      every turn/act combination (table-driven test).
+- [ ] Stage reward matches the [05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins) table for
+      every turn/act/tier combination, including the base-only final turn (table-driven test).
+- [ ] Merge: 3 identical pieces → 1 piece one tier up at full durability; refused above the act
+      ceiling and for Legendary inputs; the deck never exceeds 8 outside a stage (tests).
+- [ ] Recovery offer never fires because of a merge, only after pieces are lost (test).
 - [ ] Invariant I10 holds: preview equals payout for 1,000 random plans.
 - [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
 - [ ] The shop never offers a pawn (test).
@@ -162,7 +168,7 @@ One complete run playable start to finish in a browser.
 **Scope**
 - Board rendering with ghost preview and step-through.
 - Queue builder with reorder, inline affordability, named commit errors.
-- HUD: turns, live coin preview, focus, credits, deployments, material/threshold.
+- HUD: turns, live coin preview (base + turn bonus), focus, credits, deployments, salvage.
 - Deployment tray with durability pips and capture telegraphing.
 - Shop screen per the wireframe in [07 §6](07-shop-phase.md#6-screen-layout).
 - Keyboard play, reduced motion, colorblind-safe threat icons.
@@ -217,6 +223,8 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09` | M1 |
 | Rarity power creep breaks the durability trade | Medium | High | Price multipliers; Legendary bishop durability 1; Legendary queen retention 0.2; act-gated ceilings; decision O constraints | M2, M4, M6 |
 | Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
+| Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune turn limits and enemy bands first in M6 | M3, M6 |
+| Base reward + no capacity sink inflates coins | Medium | Medium | Headless-bot tuning of `baseReward` before prices; merges as the main deck-growth path | M4, M6 |
 | Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
 
 ## Dependencies

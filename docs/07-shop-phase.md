@@ -35,14 +35,15 @@ Five slots, generated from the run seed **after** the stage's coins are awarded:
 | 2 | **Piece** | One random piece |
 | 3 | **Piece or Skill** | Random |
 | 4 | **Piece or Skill** | Random |
-| 5 | **Service** | Repair, deck slot, or reroll |
+| 5 | **Service** | Repair or reroll |
 
 Generation rules:
 
 - **Pawns are never sold.** The shop offers knights, bishops, rooks and queens only; pawns come from
   the stage ([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)).
 - Every piece offer is a **Hero Piece** and carries a rarity tier (see §2.1).
-- No item may exceed the player's `maxCapacity` implications (no deck slot offer at max capacity).
+- The deck is fixed at **8** pieces; the shop never sells capacity. A piece purchase with a full deck
+  needs a cut or a merge first (§4.1).
 - Repair is only offered if at least one piece has durability below its max.
 - Skills already at their loadout cap (3) are still offered, but flagged `replace` — buying one
   prompts a swap.
@@ -113,8 +114,10 @@ gets extra pieces on the board every stage without spending a coin. The shop nee
 
 ### Recovery offer
 
-If the player's **non-king deck contains fewer than `recoveryDeckThreshold` (4) pieces**, slot 1 is
-replaced by a guaranteed **Normal-rarity knight or bishop** at **50% of its normal price**.
+If the player **lost at least one piece in the stage just cleared** (captured or spent) and their
+**non-king deck now holds fewer than `recoveryDeckThreshold` (4) pieces**, slot 1 is replaced by a
+guaranteed **Normal-rarity knight or bishop** at **50% of its normal price**. Merging down to fewer
+than 4 pieces does not trigger it — the offer is insurance against losses, not a merge discount.
 
 This is insurance against one catastrophic stage, not an ongoing subsidy: the offer disappears as
 soon as the deck is back to 4 pieces.
@@ -127,7 +130,6 @@ soon as the deck is back to 4 pieces.
 | **Skill** | One of the skill catalogue | Occupies a loadout slot (3 max); permanent for the run |
 | **Skill upgrade** | A skill already owned | **+1 charge** at 50% price — deepen a build, don't widen it |
 | **Repair** | +1 durability to one chosen piece | Never above that piece's max; not offered for `spent` pieces |
-| **Deck slot** | +1 capacity | Up to 14 |
 | **Reroll** | Reroll slots 1–5 (except a recovery offer) | First reroll each visit free, then 2 coins |
 
 Prices inflate per act by 20% and scale with rarity (§2.2,
@@ -137,11 +139,24 @@ Prices inflate per act by 20% and scale with rarity (§2.2,
 
 1. Player selects an item.
 2. If the purchase needs a target (repair → piece; skill → loadout swap) a chooser appears.
-3. Engine validates: affordable, capacity available, targets valid.
+3. Engine validates: affordable, a free slot in the 8-piece deck (or a cut/merge chosen), targets valid.
 4. On confirm: coins deducted, instance created or modified, stock slot marked `sold`.
 5. All state changes are immediate and **irreversible** — no undo in the shop.
 
 Sold slots empty out and do not restock. The shop is a fixed menu for the visit.
+
+### 4.1 Merging in the shop
+
+Whenever the deck holds **three pieces of the same type and tier** (each with durability ≥ 1), the
+shop offers a **Merge** action on them: the three become one piece of the next tier, at full
+durability, for **no coins** ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)).
+
+- Merging is free and can be done any number of times per visit, before or after buying.
+- It respects the act's ceiling: in Act I only Normal → Rare is possible.
+- It frees two deck slots, which is the main way to make room under the fixed capacity of 8.
+- Buying a third copy *in order to* merge is a legitimate plan, even though it always costs more
+  coins than buying the higher tier outright (prices ×1.5 / ×2 / ×3 rise slower than ×3 inputs).
+- Like every shop action, a merge is immediate and irreversible.
 
 ## 5. Bank & skip
 
@@ -184,6 +199,7 @@ Design notes:
 - **Rarity on every piece card and deck tile**, as a tier name (abbreviated on deck tiles) plus frame
   shape ([06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)). Hovering a
   card lists that tier's movement abilities.
+- **Merge on deck tiles:** three matching tiles light up with a `[MERGE → Rare]` action; never hidden.
 - **No pawn card, ever** — the deck shows no pawns either; they belong to the stage.
 - **The pool line** states the current act's ceiling ("up to Unique"); hovering it shows the weight
   table from §2.1. The player can always see what the shop *could* have offered.
@@ -195,7 +211,7 @@ Design notes:
 | Case | Resolution |
 |---|---|
 | No items affordable | Leave is the only action; next stage's spawned pawns still arrive for free |
-| Capacity full, tries to buy a piece | Blocked with an explicit "cut a piece" chooser; cuts are permanent and confirmed |
+| Capacity full (8), tries to buy a piece | Blocked with an explicit chooser: cut a piece, or merge three identical pieces if possible; cuts are permanent and confirmed |
 | All non-king pieces spent, deck effectively empty | Recovery offer fires; run continues |
 | Repair target has no damage | Repair not offered in stock generation |
 | Duplicate skill purchase | Becomes a +1 charge upgrade at 50% price |
@@ -204,5 +220,7 @@ Design notes:
 | Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
 | Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
 | Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |
-| Deck over capacity from a promotion | The stage-end cut chooser runs before the shop opens, so the shop always opens with a legal deck |
+| Deck over capacity from a promotion | The stage-end chooser (cut or merge) runs before the shop opens, so the shop always opens with a legal deck |
+| Merge would exceed the act ceiling | The Merge action is shown disabled with the reason ("Unique unlocks in Act II") |
+| Two identical pieces, wants to merge | Not enough: a merge needs three. The shop highlights pieces that would complete a set |
 | Shop opens on a lost stage | Impossible by definition — the run is over |

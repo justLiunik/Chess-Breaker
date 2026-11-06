@@ -7,7 +7,7 @@
   "required": [
     "stageSeed", "templateId", "playerColor", "board", "turnsUsed", "turnLimit",
     "focus", "focusPool", "moveCredits", "deploymentsThisTurn", "deploymentsPerTurn",
-    "deploymentRanks", "materialThreshold", "swing", "modifiers", "enemyPolicy", "status"
+    "deploymentRanks", "modifiers", "enemyPolicy", "status"
   ],
   "additionalProperties": false,
   "properties": {
@@ -34,17 +34,6 @@
       "items": { "type": "integer", "minimum": 1, "maximum": 8 },
       "minItems": 1
     },
-    "materialThreshold": { "type": "integer", "minimum": 1 },
-    "swing": {
-      "type": "object",
-      "required": ["captured", "lost"],
-      "additionalProperties": false,
-      "description": "Domination metric: captured - lost. See docs/02 §7.",
-      "properties": {
-        "captured": { "type": "integer", "minimum": 0 },
-        "lost": { "type": "integer", "minimum": 0 }
-      }
-    },
     "modifiers": {
       "type": "array",
       "description": "Active skill effects. Expiry is ordered by duration in docs/02 §6.",
@@ -62,7 +51,6 @@
       }
     },
     "status": { "enum": ["active", "won", "lost"] },
-    "winReason": { "enum": ["checkmate", "domination"] },
     "provenance": {
       "type": "object",
       "additionalProperties": false,

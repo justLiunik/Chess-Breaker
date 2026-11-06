@@ -108,7 +108,7 @@ pieces:
           text: "Can capture two adjacent enemies in one line, but not after a leap."
     notes: >-
       Reach across the board. A rook delivered early is a tempo weapon; a rook
-      captured is 5 material of swing handed to the enemy. Its rarity line ends
+      captured is gone for the run and one less piece for the mate. Its rarity line ends
       in a battering ram that can take two connected pieces at once.
 
   - id: queen

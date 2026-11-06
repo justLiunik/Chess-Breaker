@@ -76,30 +76,26 @@ history:
   - stageSeed: 1A20-33C8
     templateId: tpl-act1-open-field
     outcome: win
-    winReason: checkmate
     turnsUsed: 4
-    coinsEarned: 9
+    coinsEarned: 13               # base 4 + 4 turns x 2 + 1 salvage
     piecesLost: 0
   - stageSeed: 44B1-9D02
     templateId: tpl-act1-open-field
     outcome: win
-    winReason: checkmate
     turnsUsed: 4
-    coinsEarned: 9
+    coinsEarned: 13
     piecesLost: 1
   - stageSeed: 77E0-01AF
-    templateId: tpl-act3-boss-redoubt
+    templateId: tpl-act1-boss-gatehouse
     outcome: win
-    winReason: domination
-    turnsUsed: 7
-    coinsEarned: 3
+    turnsUsed: 5
+    coinsEarned: 11               # boss base 6 + 2 turns x 2 + 1 salvage
     piecesLost: 1
   - stageSeed: 9C41-0B77
     templateId: tpl-act2-fortress
     outcome: win
-    winReason: checkmate
     turnsUsed: 3
-    coinsEarned: 10
+    coinsEarned: 16               # base 6 + 3 turns x 3 + 1 salvage
     piecesLost: 0
 
 rngCursor: 412

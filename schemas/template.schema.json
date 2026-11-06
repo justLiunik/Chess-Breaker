@@ -5,7 +5,7 @@
   "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's deck army (that comes from the deck), exact squares (that is generated), or any rarity. See docs/04-stage-generation-and-authoring.md.",
   "type": "object",
   "required": [
-    "id", "title", "act", "tier", "turnLimit", "materialThreshold",
+    "id", "title", "act", "tier", "turnLimit",
     "openingPlacements", "enemyArmy", "enemyZone", "spawnedPawns", "deploymentRanks",
     "deploymentsPerTurn", "focusPool", "enemyPolicy", "preconditions"
   ],
@@ -16,11 +16,6 @@
     "act": { "type": "integer", "minimum": 1, "maximum": 3 },
     "tier": { "enum": ["normal", "boss"] },
     "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
-    "materialThreshold": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Required material SWING (captured minus lost). Must satisfy threshold <= 0.75 * enemy material value."
-    },
     "openingPlacements": {
       "type": "integer",
       "minimum": 1,
@@ -86,7 +81,6 @@
           "no_immediate_mate",
           "deployment_squares_available",
           "enemy_value_in_band",
-          "threshold_feasible",
           "spawned_pawns_placed"
         ]
       }

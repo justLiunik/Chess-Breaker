@@ -28,7 +28,7 @@ between them.
 | **Action** | seconds | "How do I sequence this turn?" | Focus, move credits |
 | **Stage** | 1–3 minutes | "Do I win fast, or cheap?" | Turns, durability |
 | **Shop** | 1 minute | "What does my deck need now?" | Coins |
-| **Run** | 25–35 minutes | "What shape is this deck becoming?" | Deck slots, lives |
+| **Run** | 25–35 minutes | "What shape is this deck becoming?" | Deck slots (8, fixed), lives |
 
 ## The conversion chain
 
@@ -42,7 +42,8 @@ durability  ──►  tempo  ──►  leftover turns  ──►  coins  ─�
 - **Durability buys tempo.** Deploying a piece costs one durability and one action. You spend it to
   bring more force to bear sooner.
 - **Tempo buys coins.** Winning in 3 of 8 turns pays 5 remaining turns × the act rate.
-- **Coins buy power.** Pieces (new durability), skills (new options), repairs, deck slots.
+- **Coins buy power.** Pieces (new durability), skills (new options), repairs. The deck is capped at
+  8 pieces, so power grows by quality — buying higher tiers and merging three pieces into one.
 - **Power buys deeper stages** — which demand *more* tempo, closing the loop.
 
 **The friction that makes it a game:** you cannot skip a step. There is no way to convert coins
@@ -73,16 +74,16 @@ are held to it.
   and therefore the coins, spent getting there ([02 §2.2](02-rules-framework.md#22-promotion)).
 - Play until a terminal condition fires (see
   [02 §7](02-rules-framework.md#7-stage-end-evaluation)).
-- Exit routes, in payoff order:
-  | Route | Speed | Payout |
-  |---|---|---|
-  | Checkmate | Fastest | Full rate — `leftover × coinRate` |
-  | Domination (material threshold) | Slower, safer | Half rate |
-  | Turn limit reached | — | **Loss** |
-  | King checkmated | — | **Loss, run over** |
+- Exit routes:
+  | Route | Payout |
+  |---|---|
+  | Checkmate — the **only** way to clear a stage | Base reward + `leftover × coinRate` bonus + salvage |
+  | Turn limit reached | **Loss** |
+  | King checkmated | **Loss, run over** |
 
 The stage loop's core tension is the **coin preview in the HUD**. It tells you, every turn, exactly
-what winning *right now* is worth — and it goes down by one rate step each turn you hesitate. That
+what mating *right now* is worth — and it goes down by one rate step each turn you hesitate, down to
+the base reward on the final turn. That
 single number is the pressure that makes the durability economy bite.
 
 ## Loop 3 — Shop

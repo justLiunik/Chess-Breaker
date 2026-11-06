@@ -31,11 +31,17 @@ rules:
 # Economy — see docs/05-run-structure-and-economy.md
 # ---------------------------------------------------------------------------
 economy:
-  coinRate:                     # coins per unused turn, by act
+  # Stage clear (checkmate is the only win):
+  #   coins = baseReward(act, tier) + (turnLimit - turnsUsed) * coinRate(act) + salvage
+  baseReward:                   # paid in full for every cleared stage
+    act1: 4
+    act2: 6
+    act3: 8
+    bossMultiplier: 1.5         # bosses: 6 / 9 / 12
+  coinRate:                     # bonus coins per unused turn, by act
     act1: 2
     act2: 3
     act3: 4
-  dominationPayoutMultiplier: 0.5   # safe route pays half
   starterCoins: 0
 
   salvage:                      # coins for capturing an enemy piece
@@ -46,7 +52,6 @@ economy:
 
   services:
     repair: 4                   # +1 durability, never above max, never on spent pieces
-    deckSlot: 12                # +1 capacity
     reroll: 2                   # after the free reroll
     freeRerollsPerVisit: 1
     maxRerollsPerVisit: 3
@@ -159,8 +164,7 @@ promotion:
 # Deck — see docs/06-deck-durability-and-permadeath.md
 # ---------------------------------------------------------------------------
 deck:
-  startCapacity: 8
-  maxCapacity: 14
+  capacity: 8                   # strict and fixed: never raised, no deck-slot purchase
   kingOccupiesSlot: false       # capacity counts non-king pieces only
   starterDeck:                  # all Normal rarity
     king: 1
@@ -170,8 +174,16 @@ deck:
     spentIsFinal: true          # a piece at 0 durability may not be repaired
     destroyedAtStageEnd: true   # spent pieces are removed after the stage, not instantly
   capture:
-    removesFromRun: true        # permanent, unrecoverable
+    removesFromRun: true        # permanent, unrecoverable (Unique+ queen lifeline excepted)
     appliesToOpeningLine: true  # the opening line is drawn from the deck, so it can die too
+  merge:                        # docs/06 §5 — 3 identical pieces → 1 piece one tier up
+    inputs: 3                   # same pieceType AND same rarity, all with durability >= 1
+    resultDurability: full      # full durabilityMax for the new type × tier
+    clampToActCeiling: true     # never above rarity.pool.act<N>.ceiling
+    maxInputTier: unique        # Legendary pieces cannot be merged further
+    excludedTypes: [king, pawn]
+    cost: 0                     # free; the price is giving up three pieces
+    when: [shop, capacity_cut]  # in the shop, and as an alternative to cutting after a promotion
 
 # ---------------------------------------------------------------------------
 # Run and stages — see docs/05 and docs/04
@@ -189,11 +201,6 @@ stages:
     act3: 5
     bossPenalty: 1              # bosses get limit - 1
 
-  materialThreshold:            # required capture swing, by act
-    act1: 5
-    act2: 7
-    act3: 9
-
   enemyArmyValueBand:           # per docs/04 §6 difficulty curve
     act1: [7, 9]
     act2: [10, 14]
@@ -206,7 +213,6 @@ stages:
 generation:
   maxRegenerations: 20
   maxPlacementTries: 50
-  thresholdFeasibilityRatio: 0.75   # materialThreshold <= ratio * enemyMaterialValue
   solver:
     nodeBudget: 200000
     timeMs: 2000
@@ -214,7 +220,6 @@ generation:
     orderHeuristic: mate_first
   acceptance:
     minSolvableRate: 0.95
-    checkmateShareMin: 0.20
     medianWinTurnTolerance: 0.20
 
 # ---------------------------------------------------------------------------

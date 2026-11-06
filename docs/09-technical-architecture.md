@@ -72,7 +72,7 @@ interface PieceInstance {                // a Hero Piece
   rarity: Rarity | null;         // fixed at creation; null = king only (I12)
   durability: number | null;     // remaining deployments; null = immortal (king)
   durabilityMax: number | null;  // null = immortal (king); depends on rarity for some types
-  origin: 'starter' | 'shop' | 'promotion' | 'reward';
+  origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
   usedOnce?: Array<'lifeline'>;  // once-per-run rarity abilities already used
@@ -86,7 +86,7 @@ interface RunState {
   actIndex: number;                // 0..2
   stageIndex: number;              // 0..2
   coins: number;
-  deckCapacity: number;
+  deckCapacity: 8;                 // fixed (docs/06 §2)
   deck: PieceInstance[];
   loadout: LoadedSkill[];
   history: StageRecord[];          // outcome, turns used, coins earned, pieces lost
@@ -118,12 +118,9 @@ interface StageState {
   deploymentsThisTurn: number;
   deploymentsPerTurn: number;
   deploymentRanks: number[];
-  materialThreshold: number;
-  swing: { captured: number; lost: number };   // domination metric, see docs/02 §7
   modifiers: ActiveModifier[];
   enemyPolicy: EnemyPolicy;
-  status: 'active' | 'won' | 'lost';
-  winReason?: 'checkmate' | 'domination';
+  status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
 }
 ```
 
@@ -232,7 +229,8 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Invariants | Property tests asserting I1–I13 over generated random queues (fuzz) |
 | Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
-| Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces in swing and salvage |
+| Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
+| Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
 | Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
 | Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, deployable in the same queue; over-capacity cut fires at stage end |

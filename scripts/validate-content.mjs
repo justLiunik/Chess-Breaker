@@ -141,8 +141,8 @@ for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
 // Pass 2 — semantic invariants
 // ---------------------------------------------------------------------------
 
-// 2a. Templates: material feasibility and act value band.
-const ratio = economy.generation?.thresholdFeasibilityRatio ?? 0.75;
+// 2a. Templates: act value band and turn-limit shape. (Checkmate is the only
+// win, so there is no material threshold to check — docs/02 §7.)
 const bossMultiplier = economy.stages?.enemyArmyValueBand?.bossMultiplier ?? 1.25;
 
 for (const t of docs['templates.yaml']?.templates ?? []) {
@@ -161,16 +161,6 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
 
   // The enemy king is always present and worth 0, but it counts as a piece.
   if (minValue <= 0) fail(`${t.id}: enemy army has no material value`);
-
-  // Domination is a captured-minus-lost swing, so the enemy must hold more
-  // material than the player needs to capture (docs/04 §4).
-  if (!(t.materialThreshold <= ratio * minValue)) {
-    fail(
-      `${t.id}: materialThreshold ${t.materialThreshold} > ${ratio} × minimum enemy value ${minValue} — domination unreachable`,
-    );
-  } else {
-    ok(`${t.id}: threshold ${t.materialThreshold} feasible against ${minValue}–${maxValue} enemy value`);
-  }
 
   const band = economy.stages?.enemyArmyValueBand?.[`act${t.act}`];
   if (!Array.isArray(band)) {
@@ -380,6 +370,49 @@ const abilitiesFor = (type, tier) => {
 }
 const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
 
+// Base reward and merge configuration (docs/05 §2, docs/06 §5).
+{
+  let problems = 0;
+  const base = economy.economy?.baseReward ?? {};
+  let prev = 0;
+  for (let act = 1; act <= actCount; act += 1) {
+    const b = base[`act${act}`];
+    if (!(Number.isInteger(b) && b >= 0)) {
+      fail(`economy.yaml: economy.baseReward.act${act} must be a non-negative integer`);
+      problems += 1;
+    } else if (b < prev) {
+      fail(`economy.yaml: economy.baseReward.act${act} (${b}) is lower than the previous act (${prev})`);
+      problems += 1;
+    } else prev = b;
+  }
+  if (!(base.bossMultiplier >= 1)) {
+    fail('economy.yaml: economy.baseReward.bossMultiplier must be >= 1');
+    problems += 1;
+  }
+  if (economy.economy?.dominationPayoutMultiplier !== undefined || economy.stages?.materialThreshold !== undefined) {
+    fail('economy.yaml: domination settings must not exist — checkmate is the only win');
+    problems += 1;
+  }
+  const merge = economy.deck?.merge ?? {};
+  if (!(Number.isInteger(merge.inputs) && merge.inputs >= 2)) {
+    fail('economy.yaml: deck.merge.inputs must be an integer >= 2');
+    problems += 1;
+  }
+  if (tierRank(merge.maxInputTier) < 0 || tierRank(merge.maxInputTier) >= tiers.length - 1) {
+    fail('economy.yaml: deck.merge.maxInputTier must be a tier below the highest');
+    problems += 1;
+  }
+  if (merge.clampToActCeiling !== true) {
+    fail('economy.yaml: deck.merge.clampToActCeiling must be true — merging must not bypass the act ceiling (I14)');
+    problems += 1;
+  }
+  if (!(Number.isInteger(economy.deck?.capacity) && economy.deck.capacity >= 1)) {
+    fail('economy.yaml: deck.capacity must be a positive integer');
+    problems += 1;
+  }
+  if (problems === 0) ok(`economy.yaml: base rewards rise by act; merge takes ${merge.inputs}, capped at the act ceiling; capacity ${economy.deck.capacity}`);
+}
+
 // 2a''''. Templates: spawned pawns must be able to promote within the turn limit.
 for (const t of docs['templates.yaml']?.templates ?? []) {
   const sp = t.spawnedPawns;
@@ -413,6 +446,9 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
   const kings = deck.filter((p) => p.pieceType === 'king');
 
   if (kings.length !== 1) fail(`${file}: expected exactly 1 king, found ${kings.length}`);
+  if (run.deckCapacity !== economy.deck?.capacity) {
+    fail(`${file}: deckCapacity ${run.deckCapacity} must equal data/economy.yaml deck.capacity (${economy.deck?.capacity})`);
+  }
   if (nonKing.length > run.deckCapacity) {
     fail(`${file}: deck holds ${nonKing.length} non-king pieces but capacity is ${run.deckCapacity}`);
   } else {
@@ -453,11 +489,27 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
     if (s.charges > s.chargesMax) fail(`${file}: ${s.skillId} charges ${s.charges} exceed max ${s.chargesMax}`);
   }
 
-  for (const h of run.history ?? []) {
-    if (!templateIds.has(h.templateId)) {
-      fail(`${file}: history references unknown template "${h.templateId}"`);
+  // History must follow the run shape: entry i is act floor(i / stagesPerAct) + 1,
+  // and the last stage of each act is a boss (docs/05 §1).
+  const perAct = economy.stages?.stagesPerAct ?? 3;
+  const bossIndex = (economy.stages?.bossStageIndex ?? 3) - 1;
+  (run.history ?? []).forEach((h, i) => {
+    const where = `${file}: history[${i}]`;
+    const tpl = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === h.templateId);
+    if (!tpl) {
+      fail(`${where} references unknown template "${h.templateId}"`);
+      return;
     }
-  }
+    const act = Math.floor(i / perAct) + 1;
+    const tier = i % perAct === bossIndex ? 'boss' : 'normal';
+    if (tpl.act !== act || tpl.tier !== tier) {
+      fail(`${where} is act ${act} ${tier} but uses ${tpl.id} (act ${tpl.act} ${tpl.tier})`);
+    }
+    if (h.turnsUsed > tpl.turnLimit) {
+      fail(`${where}: turnsUsed ${h.turnsUsed} exceeds ${tpl.id}'s turnLimit ${tpl.turnLimit}`);
+    }
+  });
+  if ((run.history ?? []).length > 0) ok(`${file}: ${run.history.length} history entries follow the act/boss shape`);
 }
 
 // 2c. Stage: board sanity and referential integrity.
@@ -531,10 +583,8 @@ if (stage) {
   }
 
   const template = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
-  if (template && template.materialThreshold !== stage.materialThreshold) {
-    fail(
-      `stage-state.yaml: materialThreshold ${stage.materialThreshold} does not match template ${template.id}'s ${template.materialThreshold}`,
-    );
+  if (template && template.turnLimit !== stage.turnLimit) {
+    fail(`stage-state.yaml: turnLimit ${stage.turnLimit} does not match template ${template.id}'s ${template.turnLimit}`);
   }
 
   // Enemy board material must sit inside the template's own range.

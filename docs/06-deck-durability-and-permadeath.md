@@ -39,8 +39,7 @@ ever raises durability.
 
 | Property | Value |
 |---|---|
-| Starting capacity | 8 slots |
-| Maximum capacity | 14 slots (bought in shop) |
+| Capacity | **8 slots, fixed** — it never rises, and there is no deck-slot purchase |
 | King occupies a slot | **No** — capacity counts non-king pieces |
 | Starter deck | King + 2 Knights + 2 Bishops, all Normal (4 of 8 slots) |
 | Pawns | Never in the deck — they come from the stage |
@@ -50,8 +49,9 @@ you something, and the first promotion should land in the deck, without forcing 
 deckbuilding lesson lands before the deckbuilding pressure. The board still feels full early on
 because every stage spawns its own pawns.
 
-Capacity is the run's power ceiling. Raising it is expensive (12 coins) because capacity is the
-purchase with the highest long-run return — it makes every subsequent shop better.
+Capacity is the run's power ceiling, and it is a hard one. With only eight slots, deck growth means
+**better pieces, not more pieces**: buying higher tiers, promoting pawns, and merging three pieces into
+one (§4.5). A full deck forces a choice on every purchase — cut, merge, or pass.
 
 ## 3. Piece instances
 
@@ -118,10 +118,10 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 3. **Enemy pieces are locked to Normal.** Templates cannot specify enemy rarity, and generation never
    rolls it.
 4. **Hero Pieces may hold any tier.** Starter-deck pieces are all Normal; higher tiers enter the deck
-   through the shop and through promotion.
+   through the shop, promotion, and merging.
 5. **Rarity is fixed at creation.** An instance keeps its tier for its whole life. Transforms
    (e.g. Ascension) change the piece type temporarily, never the rarity. Repairs do not change
-   rarity. There is no upgrade path.
+   rarity. The only way up is merging (§4.5), which creates a new instance.
 6. **Rarity availability is gated by progression.** Shop offers, spawned pawns and promotion results
    all respect the act's rarity ceiling; in Act I that ceiling is **Rare**, so Unique and Legendary
    pieces cannot be acquired until later acts. Full rules: [07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating).
@@ -138,9 +138,37 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 | Queen | Rare leaps allies (no capture on a leap) · Unique gains a once-per-run lifeline · Legendary captures after a leap and multi-captures on any move ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Every type | Shop price ×1 / ×1.5 / ×2 / ×3 ([05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)) |
 
-What rarity never changes: chess material value (swing and salvage), the cost of deploying (1 credit
+What rarity never changes: chess material value (salvage), the cost of deploying (1 credit
 + 1 durability), or repairs. Permadeath has exactly one exception: the Unique+ queen's once-per-run
 lifeline (§6).
+
+### 4.5 Merging
+
+Three identical pieces can be merged into one piece of the next tier. Merging is the only way a deck
+piece's rarity can rise, and it always creates a **new** instance — the inputs are consumed, never
+upgraded in place, so I12 still holds.
+
+| Rule | Value |
+|---|---|
+| Inputs | **3** deck pieces of the **same type and the same tier** (e.g. three Normal Knights) |
+| Input state | All `in_deck` with durability ≥ 1; spent or captured pieces cannot be used |
+| Result | **1** piece of the same type, **one tier higher** (Normal → Rare → Unique → Legendary) |
+| Result durability | **Full** for the new type and tier (a Legendary bishop: 1) |
+| Result state | Fresh instance, `origin: merge`, nothing in `usedOnce` (a merged queen has its lifeline) |
+| Ceiling | Never above the act's rarity ceiling: Normal → Rare only in Act I, Rare → Unique from Act II, Unique → Legendary in Act III |
+| Excluded | The King (no rarity), pawns (never in the deck), and Legendary pieces (no higher tier) |
+| Cost | **Free** — the price is giving up three pieces for one |
+| When | In the shop, any number of times per visit; and in the stage-end cut chooser after a promotion overflows the deck |
+
+**Why three.** Two-for-one would make tiers cheap: a single shop purchase plus an owned piece would
+reach the next tier. Three-for-one means committing three of the eight deck slots to one piece type,
+which is a real deckbuilding decision. It also keeps the Legendary queen rare without a dice roll: it
+needs three Unique queens, only possible in Act III.
+
+**Merging never saves coins.** Rarity prices rise ×1 → ×1.5 → ×2 → ×3, so three pieces of a tier
+always cost more to buy than one piece of the next. Merging is for turning pieces you already have —
+starters, promotion results, worn-out pieces — into one stronger piece, and for reaching a tier the
+shop has not offered.
 
 ## 5. Durability lifecycle
 
@@ -224,7 +252,7 @@ forced to lose."
 | **King immunity** | King never lost | Deck emptied entirely |
 | **Opening line** | Always drawn from the remaining deck | Stage starts with no army |
 | **Spawned pawns** | Every stage gives the player free pawns, whatever the deck holds | Broke and piece-less |
-| **Recovery offer** | Non-king deck < 4 → one discounted replacement guaranteed | Post-catastrophe death spiral |
+| **Recovery offer** | Pieces lost in the last stage and non-king deck < 4 → one discounted replacement guaranteed | Post-catastrophe death spiral |
 | **Salvage** | Captures pay coins | Attrition has no counter-income |
 | **Telegraphing** | UI warns when a deployment target is attacked | Losing pieces to invisible threats |
 
@@ -265,7 +293,7 @@ Durability must be readable without opening a panel.
 | Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
 | Captured Rare/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
 | Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must cut pieces until the deck fits (I9) |
-| Spawned pawn captured | Lost for this stage only; counts as 1 lost material in the swing; nothing leaves the deck |
+| Spawned pawn captured | Lost for this stage only; nothing leaves the deck |
 | Spawned pawn survives the stage without promoting | Discarded at stage end; nothing carries over |
 | Promoted piece deployed in the same stage | Allowed — it joins the deployable pool at once and pays the normal deploy cost |
 | Legendary knight + Twin Step | Both apply: Twin Step adds a credit for any piece; the knight's bonus move is only for itself |
@@ -280,4 +308,9 @@ Durability must be readable without opening a panel.
 | Repaired piece at max durability | Repair is not offered (cannot exceed max) |
 | Spent piece captured | Same as any capture — it was already leaving the deck; the capture just gets it first |
 | Deck exceeds capacity (e.g. after a purchase bug) | Invariant I9 fails loudly at commit; purchases are refused at the shop instead |
+| Three identical pieces, but the result would exceed the act ceiling | Merge refused with the reason shown ("Unique unlocks in Act II") |
+| Merge with a damaged input | Allowed if every input has durability ≥ 1; the result is full regardless |
+| Merge three Unique queens, one with its lifeline used | Allowed; the Legendary result is a new instance with its lifeline unused |
+| Merge three Legendary pieces | Not possible — Legendary is the top tier |
+| Merging drops the deck below 4 | Recovery offer does **not** fire: it needs pieces lost in the stage, not merged away |
 | All non-king pieces captured mid-run | Run continues with the King and each stage's spawned pawns; the shop's recovery offer fires; abandoning is allowed and labelled honestly |

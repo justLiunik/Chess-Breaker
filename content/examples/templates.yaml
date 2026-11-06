@@ -1,15 +1,12 @@
 # Stage templates — designed encounter skeletons.
 #
 # A template fixes the SHAPE of an encounter (enemy composition, turn limit,
-# board sparsity, material threshold) and leaves placement + the player's army
-# to generation. The player's army always comes from their current deck.
+# board sparsity) and leaves placement + the player's army to generation. The
+# player's army always comes from their current deck.
 #
-# Two feasibility rules every template must satisfy (docs/04 §4):
-#   enemyArmyValue    is inside the act band from docs/04 §6
-#   materialThreshold <= 0.75 * minimum enemyArmyValue
-#
-# Domination is measured as a captured-minus-lost SWING (docs/02 §7), so the
-# threshold is "win the exchange by N", not "own more material on the board".
+# Checkmate is the only way to clear a stage (docs/02 §7), so the one material
+# rule every template must satisfy is that enemyArmyValue sits inside the act
+# band from docs/04 §6; the solver then proves a mate exists within turnLimit.
 #
 # spawnedPawns are free, stage-only pawns for the player (docs/02 §2.2). Their
 # ranks must leave rank 8 reachable within the turn limit, so promotion is a
@@ -21,7 +18,6 @@ templates:
     act: 1
     tier: normal
     turnLimit: 8
-    materialThreshold: 5
     openingPlacements: 3
     enemyArmy:
       pawn: [5, 6]
@@ -42,19 +38,50 @@ templates:
       - no_immediate_mate
       - deployment_squares_available
       - enemy_value_in_band
-      - threshold_feasible
       - spawned_pawns_placed
     designNote: >-
       Teaching template. Enemy army value 8-9 against an 8-turn limit: enough
       slack to learn deployment and the turn counter without the stage being a
       free win. Depth-2 policy punishes obvious hangs only.
 
+  - id: tpl-act1-boss-gatehouse
+    title: The Gatehouse
+    act: 1
+    tier: boss
+    turnLimit: 7
+    openingPlacements: 3
+    enemyArmy:
+      pawn: [3, 4]
+      knight: [1, 1]
+      bishop: [1, 1]
+    enemyZone: [6, 7, 8]
+    spawnedPawns:
+      count: [1, 2]
+      ranks: [3, 4]
+    deploymentRanks: [1, 2]
+    deploymentsPerTurn: 1
+    focusPool: 3
+    enemyPolicy:
+      type: best_move
+      depth: 4
+    preconditions:
+      - king_on_board
+      - no_precheck
+      - no_immediate_mate
+      - deployment_squares_available
+      - enemy_value_in_band
+      - spawned_pawns_placed
+    designNote: >-
+      Act I boss. Enemy value 9-10 (the Act I band x1.25), seven turns,
+      depth-4 policy. Teaches mating under turn pressure: a thicker defence and
+      one turn less than the rest of Act I, so the player must find the mating
+      net early instead of trading down.
+
   - id: tpl-act2-fortress
     title: Fortress
     act: 2
     tier: normal
     turnLimit: 6
-    materialThreshold: 7
     openingPlacements: 3
     enemyArmy:
       pawn: [5, 6]
@@ -76,12 +103,11 @@ templates:
       - no_immediate_mate
       - deployment_squares_available
       - enemy_value_in_band
-      - threshold_feasible
       - spawned_pawns_placed
     designNote: >-
-      Enemy value 11-12, threshold 7, six turns. The slack from Act I is gone:
-      the player must either spend durability for tempo or accept a slow
-      domination win at half payout. Tests whether the deck was built or only
+      Enemy value 11-12, six turns. The slack from Act I is gone: there is no
+      slow win to fall back on, so the player must spend durability for tempo
+      to reach a mate in time. Tests whether the deck was built or only
       survived.
 
   - id: tpl-act3-boss-redoubt
@@ -89,7 +115,6 @@ templates:
     act: 3
     tier: boss
     turnLimit: 4
-    materialThreshold: 9
     openingPlacements: 3
     enemyArmy:
       pawn: [6, 7]
@@ -112,7 +137,6 @@ templates:
       - no_immediate_mate
       - deployment_squares_available
       - enemy_value_in_band
-      - threshold_feasible
       - spawned_pawns_placed
     designNote: >-
       Boss. Enemy value 20-21, four turns, depth-4 policy. There is no line that

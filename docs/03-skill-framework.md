@@ -162,8 +162,10 @@ status: mvp
 
 - The bishop moves, captures, and gives check as a queen for the rest of the queue's resolution, then
   reverts at **R1**.
-- It **cannot** win by checkmate: R1 reverts before R3 evaluates. It *can* win material, which is the
-  intended use.
+- It **cannot** win by checkmate: R1 reverts before R3 evaluates. Since checkmate is the only win
+  ([02 §7](02-rules-framework.md#7-stage-end-evaluation)), Ascension never clears a stage by itself; it
+  clears *defenders* — capturing pieces out of the mating net (and earning salvage) so a permanent
+  piece can mate later. That is the intended use.
 - It **can** be captured while transformed (defenders capture it as a queen, with queen value).
 - **Edge cases:** reverting to a bishop that would expose the player's king makes the end state
   illegal (I2), so the commit is refused. Transforming a bishop that is later captured simply

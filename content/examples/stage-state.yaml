@@ -8,8 +8,8 @@
 #     It is Rare, and its promotion result was rolled at generation and is shown
 #     to the player: a Rare knight. A Rare pawn would usually promote one tier up,
 #     but Act I caps everything at Rare (docs/02 §2.2).
-#   - swing is {captured: 3, lost: 0}: a knight has been captured, so the player
-#     is 3 of the 5 material needed for a domination win.
+#   - An enemy knight has already been captured (salvage paid); checkmate is the
+#     only way to clear the stage (docs/02 §7).
 #   - A Lockdown modifier is live against the b7 pawn, expiring at the end of the
 #     enemy's next turn.
 
@@ -64,12 +64,6 @@ moveCredits: 0
 deploymentsThisTurn: 0
 deploymentsPerTurn: 1
 deploymentRanks: [1, 2]
-materialThreshold: 5
-
-swing:
-  captured: 3
-  lost: 0
-
 modifiers:
   - modifierId: mod_0007
     primitive: suppress_piece

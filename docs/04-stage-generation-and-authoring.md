@@ -21,7 +21,7 @@ a deck the designer never anticipated. There is no such thing as an unwinable st
 bad shop, and no need for the designer to enumerate deck states.
 
 **Puzzle quality is preserved by templates, not by randomness.** A template is a designed encounter:
-it fixes the enemy composition, turn limit, board sparsity, and material threshold. Only the *exact
+it fixes the enemy composition, turn limit, board sparsity, and spawned pawns. Only the *exact
 placement* and *which of the player's pieces appear* are randomized. The puzzle's shape is authored;
 its instance is generated.
 
@@ -33,7 +33,6 @@ title: Open Field
 act: 1
 tier: normal          # normal | boss
 turnLimit: 8
-materialThreshold: 5
 openingPlacements: 3
 
 enemyArmy:            # ranges are inclusive [min, max]
@@ -57,7 +56,6 @@ preconditions:
   - king_on_board
   - no_immediate_mate
   - enemy_value_in_band
-  - threshold_feasible
   - deployment_squares_available
   - spawned_pawns_placed
 ```
@@ -87,9 +85,9 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 | **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start) | Retry placement (max 50 tries) → regenerate |
 | **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks`. These are Hero Pieces and keep their own rarity | Regenerate |
 | **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
-| **G5** | Compute material threshold; verify `threshold ≤ 0.75 × enemyMaterialValue` | Regenerate |
+| **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
-| **G7** | **Solver check** (§5) using the current board + remaining deck | Regenerate |
+| **G7** | **Solver check** (§5): a checkmate exists within the turn limit, using the current board + remaining deck | Regenerate |
 | **G8** | Emit `StageState` with provenance `{templateId, seed, attempts}` | — |
 
 Regeneration cap: `maxRegenerations` (20). On exhaustion, fall through to the next-best template for
@@ -104,7 +102,6 @@ an unverified stage. This is a **fail-loud** path, not a silent fallback.
 | `king_on_board` | Exactly one king of each color; player king in `deploymentRanks` | Player must own a starting army |
 | `no_immediate_mate` | The player has no mate available in one action | Instant wins are not puzzles |
 | `enemy_value_in_band` | `enemyArmyValue` within the act's band ([§6](#6-difficulty-curve)) | Prevents hopeless boards |
-| `threshold_feasible` | `materialThreshold ≤ 0.75 × enemyValue` | There must be enough enemy material to capture. Domination is measured as a **captured-minus-lost swing** ([02 §7](02-rules-framework.md#7-stage-end-evaluation)), so this is the only material-feasibility question. |
 | `deployment_squares_available` | ≥ 2 empty squares in `deploymentRanks` | Deployment must be possible later |
 | `no_precheck` | The player's king is not in check at stage start | The opening line must be playable |
 | `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity and `promotesTo` within the act ceiling | Promotion must be a real, visible option from turn 1 |
@@ -166,18 +163,25 @@ Mitigations if real numbers exceed budget (tracked in [10](10-roadmap-and-milest
 
 ## 6. Difficulty curve
 
-| Act | Turn limit | Enemy army value | Material threshold | Opening line | Enemy policy depth |
-|---|---|---|---|---|---|
-| **I** | 8 | 7–9 | +5 | 3 | 2 |
-| **II** | 6 | 10–14 | +7 | 3 | 3 |
-| **III** | 5 | 14–22 | +9 | 3 | 3 |
-| **Boss** | limit − 1 | previous act +25% | +9 | 3 | 4 or `scripted` |
+| Act | Turn limit | Enemy army value | Opening line | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
+|---|---|---|---|---|---|---|
+| **I** | 8 | 7–9 | 3 | 2 (3–4) | Normal–Rare | 2 |
+| **II** | 6 | 10–14 | 3 | 1–2 (3–4) | up to Unique | 3 |
+| **III** | 5 | 14–22 | 3 | 1–2 (3–5) | up to Legendary | 3 |
+| **Boss** | limit − 1 | its act's band ×1.25 | 3 | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
+
+Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only that
+rank 8 must be reachable within the turn limit from every spawn rank (§2). Rarity comes from the act's
+pool ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
 
 Three independent difficulty dials, applied in this order:
 
 1. **Turn limit** — the harshest dial; it removes slack rather than adding difficulty.
 2. **Enemy army** — scales the material problem and the amount of capture risk.
 3. **Policy depth** — makes the enemy punish loose play.
+
+Spawned pawns are a fourth, *reward* dial rather than a difficulty dial: more pawns, or pawns spawned
+closer to rank 8, make promotion cheaper and the stage more generous.
 
 Act I should be cleared on a first run by a player who understands the rules; Act II should not.
 
@@ -195,13 +199,14 @@ Act I should be cleared on a first run by a player who understands the rules; Ac
 2. **Draft the template** in `content/templates/`. Keep it ~15 lines.
 3. **Run the validator** (M3) which generates 200 seeded instances and reports:
    solver success rate, distribution of turns-to-win, and the failure-reason histogram.
-4. **Tune** the four numbers that matter: `turnLimit`, `materialThreshold`, `enemyArmy`,
-   `openingPlacements`.
-5. **Acceptance for a template:** ≥95% of generated instances solvable, median win around 60% of the
-   turn limit, and ≥20% of instances won by checkmate rather than domination.
+4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `openingPlacements`, and
+   `spawnedPawns`.
+5. **Acceptance for a template:** ≥95% of generated instances solvable (a mate exists within the
+   limit), and median mating turn around 60% of the turn limit.
 
-A template that yields mostly domination wins is too slow; one that always mates in 2 is too fast.
-The **checkmate share** is the single best health metric for a template.
+Checkmate is the only win, so the **median mating turn** is the single best health metric for a
+template: one whose mates cluster on the final turn is too tight (and pays only the base reward);
+one that always mates in 2 is too loose.
 
 ## 9. Test plan for generation (M3 acceptance)
 
@@ -211,7 +216,6 @@ The **checkmate share** is the single best health metric for a template.
 | King guarantee | 100% of stages have exactly one player king, placed in `deploymentRanks` |
 | No pre-check | 100% of stages start with the player king not in check |
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
-| Threshold feasibility | 100% of stages satisfy `threshold ≤ 0.75 × enemyValue` |
 | Deployment availability | 100% of stages have ≥2 free deployment squares |
 | Stage rarity | 100% of enemy pieces are Normal (I13); opening-line pieces match their deck instance's rarity; spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
 | Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks, with promotion reachable in the turn limit |

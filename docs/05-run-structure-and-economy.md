@@ -28,36 +28,40 @@ ACT I                    ACT II                   ACT III
 
 The last stage of the run is followed by a results screen, not a shop.
 
-## 2. Income: turns → coins
+## 2. Income: stage reward + turns → coins
 
-Coins are awarded **only** for unused turns, plus **salvage** for captures.
+Checkmate is the only way to clear a stage ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
+Every cleared stage pays its **base reward in full**, plus **bonus coins** for every unused turn,
+plus **salvage** for captures.
 
 ```
-checkmate win:   coins = (turnLimit − turnsUsed) × coinRate(act)
-domination win:  coins = floor((turnLimit − turnsUsed) × coinRate(act) × 0.5)
+coins = baseReward(act, tier) + (turnLimit − turnsUsed) × coinRate(act) + salvage
 ```
 
-| Act | `coinRate` |
-|---|---|
-| I | 2 |
-| II | 3 |
-| III | 4 |
-
-### Payout table — Act I, turn limit 8
-
-| Cleared on turn | Turns remaining | Checkmate payout | Domination payout |
+| Act | Base reward (normal) | Base reward (boss, ×1.5) | `coinRate` per unused turn |
 |---|---|---|---|
-| 2 | 6 | 12 | 6 |
-| 3 | 5 | 10 | 5 |
-| 4 | 4 | 8 | 4 |
-| 5 | 3 | 6 | 3 |
-| 6 | 2 | 4 | 2 |
-| 7 | 1 | 2 | 1 |
-| 8 | 0 | **0** | **0** |
+| I | 4 | 6 | 2 |
+| II | 6 | 9 | 3 |
+| III | 8 | 12 | 4 |
 
-Winning on the final turn is a win worth nothing. That is intentional and must be legible on the
-HUD: the coin preview reads **"+0"** on the last turn, which turns the final turn into a pure
-survival check rather than a reward.
+### Reward table — Act I normal stage, turn limit 8
+
+| Cleared on turn | Turns remaining | Base | Turn bonus | Total (before salvage) |
+|---|---|---|---|---|
+| 2 | 6 | 4 | 12 | 16 |
+| 3 | 5 | 4 | 10 | 14 |
+| 4 | 4 | 4 | 8 | 12 |
+| 5 | 3 | 4 | 6 | 10 |
+| 6 | 2 | 4 | 4 | 8 |
+| 7 | 1 | 4 | 2 | 6 |
+| 8 | 0 | 4 | **0** | **4** |
+
+Winning on the final turn still pays the base reward — clearing the stage is always worth something —
+but nothing more. That must be legible on the HUD: the coin preview reads **"+4 ◈ FINAL TURN"**,
+so the player sees that every turn they saved would have been worth extra.
+
+The base reward is the floor; the turn bonus is the incentive. Speed is still the main lever: in Act
+I, a turn-4 clear pays three times a turn-8 clear.
 
 ### Salvage
 
@@ -123,50 +127,60 @@ it costs the turns spent pushing the pawn, which the coin preview prices at one 
 | Service | Price | Effect |
 |---|---|---|
 | Repair | 4 | +1 durability to one piece (never above its max) |
-| Deck slot | 12 | +1 capacity, up to `maxCapacity` (14) |
 | Reroll | 2 | Reroll the shop (first reroll each visit is free) |
 
 ### Income vs. expenditure sanity check
 
-An Act I stage cleared on turn 4 pays 8 coins. A knight costs 8. So **one well-played stage ≈ one
-meaningful piece** — the run's core pacing unit. Stages cleared late pay 2–4 coins, which buys a
-repair or a banked surplus. If a player is clearing most stages on their last turn, they are on an
+An Act I stage cleared on turn 4 pays 12 coins. A Normal knight costs 8 and a Rare knight 12. So
+**one well-played stage ≈ one meaningful piece** — the run's core pacing unit. Stages cleared late
+pay 4–8 coins, which buys a repair, a Normal piece, or a banked surplus.
+
+There is no capacity to buy: the deck is fixed at 8 pieces ([06 §2](06-deck-durability-and-permadeath.md#2-deck-capacity)),
+so coins go into pieces, skills, repairs and rerolls only. Merging three identical pieces into one
+of the next tier is free ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)) — it costs pieces,
+not coins. If a player is clearing most stages on their last turn, they are on an
 economic treadmill and will visibly fall behind in Act II. That is the intended failure mode: the
 game tells you that you are losing before it kills you.
 
 ## 4. Illustrative run
 
-Assumptions: no losses, checkmate wins, one salvage per stage on average, no promotions. Prices
-shown at that act's inflation and the item's rarity.
+Assumptions: no losses, one salvage per stage on average, no promotions. Coins earned are
+base + turn bonus + salvage. Prices shown at that act's inflation and the item's rarity.
 
-| Stage | Limit | Cleared on | Coins earned | Balance | Purchase | Balance after |
-|---|---|---|---|---|---|---|
-| I-1 | 8 | 4 | 8 + 1 | 9 | — (bank) | 9 |
-| I-2 | 8 | 4 | 8 + 1 | 18 | Rare Knight (12) | 6 |
-| I-3 ★ | 7 | 4 | 6 + 1 | 13 | Reroll (0, free) + Repair (4) | 9 |
-| II-1 | 6 | 3 | 9 + 1 | 19 | Rook (12) | 7 |
-| II-2 | 6 | 3 | 9 + 1 | 17 | Skill: Twin Step (10) | 7 |
-| II-3 ★ | 5 | 3 | 6 + 1 | 14 | Deck slot (14) | 0 |
-| III-1 | 5 | 3 | 12 + 1 | 13 | Repair ×2 (8) | 5 |
-| III-2 | 5 | 2 | 16 + 1 | 22 | Rare Bishop (17) | 5 |
-| III-3 ★ | 4 | — | — | — | — | — |
+| Stage | Limit | Cleared on | Coins earned | Balance | Purchase / merge | Balance after | Deck |
+|---|---|---|---|---|---|---|---|
+| I-1 | 8 | 4 | 4 + 8 + 1 = 13 | 13 | Knight (8), then merge 3 Knights → Rare Knight | 5 | 3/8 |
+| I-2 | 8 | 4 | 4 + 8 + 1 = 13 | 18 | Rook (10) | 8 | 4/8 |
+| I-3 ★ | 7 | 4 | 6 + 6 + 1 = 13 | 21 | Reroll (free) + Repair (4) + Bishop (8), then merge 3 Bishops → Rare Bishop | 9 | 3/8 |
+| II-1 | 6 | 3 | 6 + 9 + 1 = 16 | 25 | Skill: Twin Step (10) | 15 | 3/8 |
+| II-2 | 6 | 3 | 6 + 9 + 1 = 16 | 31 | Rare Rook (18) | 13 | 4/8 |
+| II-3 ★ | 5 | 3 | 9 + 6 + 1 = 16 | 29 | Rare Knight (14) | 15 | 5/8 |
+| III-1 | 5 | 3 | 8 + 8 + 1 = 17 | 32 | Repair ×2 (8) | 24 | 5/8 |
+| III-2 | 5 | 2 | 8 + 12 + 1 = 21 | 45 | Rare Queen (35) | 10 | 6/8 |
+| III-3 ★ | 4 | — | — | — | — | — | — |
 
 Read the shape: the player oscillates between rich (can buy power) and broke (must survive on what
-they have). That oscillation is the desired texture. A run should never let a player feel permanently
-comfortable.
+they have), and merges trade deck width for tier — the deck shrinks to 3 twice in Act I to buy two
+Rare pieces early. That oscillation is the desired texture. A run should never let a player feel
+permanently comfortable.
+
+Compared with the earlier turn-bonus-only economy, the base reward raises income by roughly 40%, and
+the 12–14-coin deck-slot sink is gone. Prices have not been re-tuned for that yet; it is the first
+item for the M6 balance pass.
 
 ## 5. Failure-spiral guardrails
 
-The interaction of permadeath and a fixed income is the game's most dangerous feedback loop. Five
+The interaction of permadeath and a fixed income is the game's most dangerous feedback loop. Six
 levers, in order of precedence:
 
 | # | Lever | Rule | Rationale |
 |---|---|---|---|
-| 1 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
-| 2 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
-| 3 | **Recovery offer** | If non-king deck < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage |
-| 4 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
-| 5 | **Turn limits** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
+| 1 | **Base reward** | Every cleared stage pays its base reward, even on the final turn | A slow clear is never worthless |
+| 2 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
+| 3 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
+| 4 | **Recovery offer** | If pieces were lost in the stage just cleared and the non-king deck is now < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage — not a reward for merging down |
+| 5 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
+| 6 | **Turn limits** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
 
 **Explicit non-lever:** the game will **not** quietly raise income when the player is losing, and
 will **not** scale the enemy to the deck. Hidden assistance would destroy the "fair and provable"
@@ -188,8 +202,9 @@ player is never *forced* to lose. They are only forced to play well.
 
 | Knob | Default | Raising it does |
 |---|---|---|
-| `coinRate.{act}` | 2/3/4 | Makes runs richer and builds faster |
-| `dominationPayoutMultiplier` | 0.5 | Makes the safe route more attractive |
+| `baseReward.{act}` | 4/6/8 | Makes every clear worth more, regardless of speed |
+| `baseReward.bossMultiplier` | 1.5 | Makes bosses pay more |
+| `coinRate.{act}` | 2/3/4 | Makes speed pay more |
 | `salvage.divisor` | 3 | Makes contact play more profitable |
 | `priceInflationPerAct` | 0.20 | Tightens Act II–III economy |
 | `starterCoins` | 0 | Front-loads build choices before stage 1 |
@@ -199,8 +214,9 @@ player is never *forced* to lose. They are only forced to play well.
 | `rarity.priceMultiplier` | 1 / 1.5 / 2 / 3 | Makes higher tiers costlier; must never fall with tier |
 | `promotion.tierUpChance` | 0.75 | Makes promotion a stronger reward |
 | `promotion.resultTypeWeights` | N35 B35 R20 Q10 | Shifts promotion toward bigger pieces |
+| `deck.merge.inputs` | 3 | Makes merging rarer and costlier in pieces (2 = cheaper merges) |
 | `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |
 
-**Tuning order:** `coinRate` first (it is the universal dial), then `priceInflationPerAct`, then
-prices. Never tune `turnLimit` and `coinRate` in the same pass — you will not be able to attribute
+**Tuning order:** `baseReward` and `coinRate` first (together they set income; `coinRate` alone sets
+the reward for speed), then `priceInflationPerAct`, then prices. Never tune `turnLimit` and `coinRate` in the same pass — you will not be able to attribute
 the change.

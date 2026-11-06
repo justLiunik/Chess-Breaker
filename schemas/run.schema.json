@@ -25,14 +25,13 @@
     "coins": { "type": "integer", "minimum": 0 },
     "deckCapacity": {
       "type": "integer",
-      "minimum": 1,
-      "maximum": 14,
-      "description": "Slots for non-king pieces. The king never occupies a slot."
+      "const": 8,
+      "description": "Slots for non-king pieces: strictly 8, never raised (data/economy.yaml → deck.capacity). The king never occupies a slot."
     },
     "deck": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 15,
+      "maxItems": 9,
       "items": { "$ref": "#/$defs/pieceInstance" },
       "description": "Exactly one king must be present; at most deckCapacity + 1 entries."
     },
@@ -82,8 +81,8 @@
           "description": "null = immortal (king only). Depends on rarity for some types (pieces.yaml → durabilityMaxByRarity)."
         },
         "origin": {
-          "enum": ["starter", "shop", "promotion", "reward"],
-          "description": "promotion = created when a spawned pawn reached rank 8 (docs/02 §2.2)."
+          "enum": ["starter", "shop", "promotion", "merge", "reward"],
+          "description": "promotion = created when a spawned pawn reached rank 8 (docs/02 §2.2); merge = created from 3 identical pieces (docs/06 §5)."
         },
         "acquiredAtStage": { "type": "integer", "minimum": 0 },
         "usedOnce": {
@@ -123,7 +122,6 @@
         "stageSeed": { "type": "string", "pattern": "^[0-9A-F]{4}-[0-9A-F]{4}$" },
         "templateId": { "type": "string", "pattern": "^tpl-[a-z0-9-]+$" },
         "outcome": { "enum": ["win", "loss"] },
-        "winReason": { "enum": ["checkmate", "domination"] },
         "turnsUsed": { "type": "integer", "minimum": 1 },
         "coinsEarned": { "type": "integer", "minimum": 0 },
         "piecesLost": { "type": "integer", "minimum": 0 }

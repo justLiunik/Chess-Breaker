@@ -42,7 +42,7 @@ This document is the authority. If any other document disagrees with it, this on
 - Every piece on the board is either a **Hero Piece** (the player's, from the deck) or a **Stage
   Piece** (placed by the stage: the enemy army and the player's spawned pawns). Every piece except
   the King has a **rarity**; enemy pieces are always Normal. Material values (P1 N3 B3 R5 Q9) are
-  the same at every tier, for swing and salvage alike.
+  the same at every tier; they set salvage and the enemy army's value band.
 
 ### 2.1 Pawns come from the stage, never the deck
 
@@ -57,16 +57,15 @@ Pawns cannot be bought and never enter the deck. Each stage **spawns** pawns for
 - They move and capture as standard chess pawns at every tier (one square forward, capture
   diagonally; the two-square first step applies only from rank 2). Their rarity changes only what
   they promote into.
-- A captured spawned pawn is gone for the stage only — there is nothing permanent to lose — but it
-  still counts as 1 material **lost** toward the domination swing (§7). At stage end every surviving
+- A captured spawned pawn is gone for the stage only; there is nothing permanent to lose. At stage
+  end every surviving
   spawned pawn is discarded.
 
 ### 2.2 Promotion
 
 When a spawned pawn reaches rank 8, it **promotes**:
 
-1. The pawn leaves the board immediately; its square becomes empty. Nothing appears in its place,
-   and the pawn does **not** count as lost material for the swing.
+1. The pawn leaves the board immediately; its square becomes empty. Nothing appears in its place.
 2. A new **Hero Piece** instance is created: the pawn's `promotesTo` result, at full durability for
    its type and tier, with `origin: promotion`.
 3. The new piece joins the deck **at once** and is part of the deployable pool for the rest of the
@@ -83,8 +82,9 @@ result in view, the solver knows it, and preview equals outcome (I10).
 | Ceiling | Never above the act's rarity ceiling: in Act I a Rare pawn always promotes to Rare. A Legendary pawn promotes to Legendary |
 | Legendary queen | A result that would be a Legendary queen keeps that tier only 20% of the time, else it is a Unique queen ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)) |
 
-**Over capacity.** If the new piece pushes the deck above capacity, the stage continues normally;
-at stage end, before the shop, the player must cut pieces until the deck fits (I9).
+**Over capacity.** The deck holds at most 8 pieces. If the new piece pushes it above 8, the stage
+continues normally; at stage end, before the shop, the player must merge
+([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)) or cut pieces until the deck fits (I9).
 
 Promotion is a tempo trade, exactly as pillar 2 requires: every move spent pushing a pawn is a move
 not spent mating, and the coin preview drops one rate step per turn. The reward is a permanent piece
@@ -143,7 +143,7 @@ keeps everything below it. Data lives in `content/examples/pieces.yaml → rarit
 4. **King exception.** If Y holds the **enemy king**, it is not captured (I3). The move ends on X,
    and the king is in check from the mover in the ordinary way.
 5. A multi-capture is **one `MOVE`**: one move credit, one entry in the queue. Both captured pieces
-   count toward the swing (§7) and each pays its salvage.
+   each pay their salvage.
 6. **When it is allowed.** A Legendary queen may multi-capture on any move, including one that passed
    over allies. A Legendary rook may multi-capture only on a move that passed over **no** ally; after a
    leap it captures one piece at most.
@@ -153,7 +153,7 @@ keeps everything below it. Data lives in `content/examples/pieces.yaml → rarit
 
 - Triggers the first time in the run that this queen instance is captured — on the board from a
   deployment or from the opening line.
-- The queen leaves the board as usual, and the capture still counts as 9 material lost for the swing.
+- The queen leaves the board as usual.
 - Instead of being destroyed, the instance returns to the deck **at stage end** with **1 durability**,
   and is not deployable again during the stage in which it was captured.
 - The instance records `usedOnce: [lifeline]`; the next capture destroys it normally.
@@ -183,7 +183,7 @@ Rules that apply to every ability:
 |---|---|---|
 | Threefold repetition | Ignored | Stages are short and decisive; repetition cannot stall a decision |
 | Fifty-move rule | Ignored | Turn limits dominate |
-| Insufficient material | Ignored | Turn limit and domination threshold handle "no progress" |
+| Insufficient material | Ignored | The turn limit handles "no progress": a stage that cannot be mated in time is lost |
 | Draw by agreement | Doesn't exist | There is only win or loss |
 | Stalemate | **Enemy passes** (see §8) | Prevents dead stages and enables zugzwang play |
 
@@ -280,52 +280,47 @@ This order is fixed and load-bearing. Changing it changes the game.
 | **R1** | Expire temporary modifiers | All modifiers with duration `this_turn` revert. A bishop-turned-queen becomes a bishop again. |
 | **R2** | Illegal end-state assertion | The post-R1 state must satisfy §9. At runtime this should never fire (commit-time validation already covered it); if it does, it is an engine bug and the turn is rolled back. |
 | **R3** | Checkmate evaluation | If the enemy king is in check and has no legal move, the player **wins by checkmate**. |
-| **R4** | Objective and economy evaluation | Domination threshold checked; turn counter decremented; coin payout computed (see [05](05-run-structure-and-economy.md)). |
+| **R4** | Stage end and economy evaluation | Stage end conditions checked (§7); turn counter decremented; coin reward computed on a win (see [05](05-run-structure-and-economy.md)). |
 | **R5** | Enemy turn | The enemy makes one move per its policy, then the turn ends: Focus refills, new turn begins. |
 
 **Consequence worth calling out explicitly:** a temporarily transformed piece that delivers mate
 does **not** deliver mate, because R1 reverts it *before* R3 evaluates. Burst transformations cannot
-win the stage but can win *material* — which is exactly the intended use.
+win the stage; they win *position and material* — clearing defenders out of a mating net and
+earning salvage — which is exactly the intended use.
 
 Similarly, an end state in which reverting a transform would expose the player's own king is illegal
 and cannot be committed. A "free" transform is never free of positional consequence.
 
 ## 7. Stage end evaluation
 
+**Checkmate is the only way to clear a stage.** There is no material win, no domination route and no
+swing metric.
+
 Evaluated at R4 each turn, in this order; the first match wins:
 
 | Priority | Condition | Outcome |
 |---|---|---|
-| 1 | Enemy king is checkmated (from R3) | **WIN** — checkmate payout |
+| 1 | Enemy king is checkmated (from R3) | **WIN** — stage reward ([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins)) |
 | 2 | Player king is checkmated | **LOSS** — run ends immediately |
-| 3 | Player material **swing** ≥ stage threshold | **WIN** — domination payout (half rate) |
-| 4 | Turns remaining = 0 | **LOSS** — run ends |
+| 3 | Turns remaining = 0 | **LOSS** — run ends |
 
-**Domination is a material *swing*, not a board total:**
+**Stage reward:**
 
 ```
-swing = (value of enemy pieces you captured) − (value of your pieces lost)
-WIN when swing ≥ materialThreshold      values: P1 N3 B3 R5 Q9, king never counted
+coins = baseReward(act, tier) + (turnLimit − turnsUsed) × coinRate(act) + salvage
 ```
 
-This is the definition that matters, and it is deliberately **not** `playerMaterial −
-enemyMaterial` on the board. Two reasons:
+The base reward is paid in full for every cleared stage, even one cleared on its final turn; every
+unused turn adds bonus coins on top. Salvage for captured enemy pieces is paid as it happens.
 
-1. The enemy army is normally *larger* than the player's opening line, so a board total would make
-   domination almost unreachable no matter how well the player trades.
-2. A board total could be inflated by simply **deploying** a large piece — buying the win condition
-   with durability instead of winning the exchange. The swing metric is immune to that: only captures
-   and losses move it.
+**What captures are for.** Capturing no longer wins anything by itself. It is worth doing for three
+reasons: it removes defenders from the mating net, it removes attackers from the player's pieces, and
+it pays salvage. Losing a piece costs the run that piece; it does not move any win condition.
 
-`StageState.swing = { captured, lost }` is tracked continuously and shown on the HUD, so the player
-can always read "I am 2 material from a domination win."
-
-Note that swing is monotonic within a stage: it only ever gets easier to reach, which means the
-domination route is the *reliable* one and checkmate is the *fast* one. That asymmetry is the
-[payout](05-run-structure-and-economy.md#2-income-turns--coins) rationale.
-
-**Checkmate always outranks domination** so that the better play always gets the better payout, even
-when both fire on the same turn.
+**Why checkmate only.** A fallback material win let a player trade down slowly and still clear the
+stage. Without it, every stage is a mating problem against the clock, the solver proves exactly one
+thing (a mate exists within the limit, [04 §5](04-stage-generation-and-authoring.md#5-the-solver)),
+and the turn counter is the only pressure the player has to read.
 
 ## 8. Enemy behavior
 
@@ -357,10 +352,10 @@ These are the contract the engine, the generator, and the tests all share.
 | **I6** | Total Focus spent in a queue never exceeds the pool plus Focus granted during that queue. |
 | **I7** | A piece's durability never goes below 0; deploying requires durability ≥ 1. |
 | **I8** | No `DEPLOY` places a piece on an occupied square or outside the deployment ranks. |
-| **I9** | Outside a stage, deck size never exceeds capacity (a promotion may overflow it during a stage; the cut happens at stage end); the king is never destroyed or removed from the deck; the deck never holds a pawn. |
+| **I9** | Outside a stage, deck size never exceeds the fixed capacity of 8 (a promotion may overflow it during a stage; the cut happens at stage end); the king is never destroyed or removed from the deck; the deck never holds a pawn. |
 | **I10** | The coin payout shown in the preview equals the payout at evaluation, for the same plan. |
 | **I11** | Given identical `(RunState, seed)`, generation and all enemy decisions are reproducible. |
-| **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance. |
+| **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance (a merge creates a new instance; it never changes an existing one). |
 | **I13** | Every enemy piece is Normal rarity. |
 | **I14** | Nothing — shop offer, spawned pawn, or promotion result — is above its act's rarity ceiling; the Act I ceiling is Rare. |
 
@@ -387,10 +382,11 @@ inside ranks 1–2 (I8 ✓).
 R1: no `this_turn` modifiers to expire.
 R2: end-state legality assertion passes.
 R3: the enemy king on `g8` is not in check — no win.
-R4: swing unchanged (`captured 0, lost 0`) and turns remain — play continues.
+R4: no checkmate and turns remain — play continues.
 R5: the enemy replies; the `best_move` policy likely consolidates on the queenside.
 
-Note what the player *didn't* do: deploy onto `d1`'s line and hand the enemy 5 material of swing.
+Note what the player *didn't* do: deploy onto `d1`'s line and hand the enemy a free rook — lost
+for the run, and one less piece for the mating net.
 
 And note the freedom deferred validation buys: the same king may **step into check on one action and
 out of it on the next**, because check is evaluated only on the end state. That is not a loophole —

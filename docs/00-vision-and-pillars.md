@@ -4,9 +4,9 @@
 
 > Checkbreaker is a run-based chess-puzzle roguelike. Each stage is a tight, sparse-board mating
 > problem on a strict turn limit. Your army is a deck: durable pieces you deploy turn by turn, and
-> fragile pieces that die permanently when captured. Leftover turns become coins; coins buy new
-> pieces and the skills that let you break chess. You have 9 stages to prove you can win faster
-> than you lose material.
+> fragile pieces that die permanently when captured. Every checkmate pays coins, and every turn you
+> save pays more; coins buy new pieces and the skills that let you break chess. You have 9 stages to
+> prove you can mate faster than you lose your army.
 
 ## The one-sentence design thesis
 
