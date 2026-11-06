@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://checkbreaker.dev/schemas/template.schema.json",
   "title": "StageTemplate",
-  "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's army (that comes from the deck) or exact squares (that is generated). See docs/04-stage-generation-and-authoring.md.",
+  "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's deck army (that comes from the deck), exact squares (that is generated), or any rarity. See docs/04-stage-generation-and-authoring.md.",
   "type": "object",
   "required": [
     "id", "title", "act", "tier", "turnLimit", "materialThreshold",
-    "openingPlacements", "enemyArmy", "enemyZone", "deploymentRanks",
+    "openingPlacements", "enemyArmy", "enemyZone", "spawnedPawns", "deploymentRanks",
     "deploymentsPerTurn", "focusPool", "enemyPolicy", "preconditions"
   ],
   "additionalProperties": false,
@@ -47,6 +47,25 @@
       "uniqueItems": true,
       "description": "Ranks the enemy army may occupy."
     },
+    "spawnedPawns": {
+      "type": "object",
+      "required": ["count", "ranks"],
+      "additionalProperties": false,
+      "description": "Free, stage-only pawns spawned for the player (docs/02 §2.2). Rarity comes from data/economy.yaml → rarity.pool, never from the template.",
+      "properties": {
+        "count": {
+          "$ref": "#/$defs/range",
+          "description": "Inclusive [min,max] number of spawned pawns. min must be >= 1."
+        },
+        "ranks": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 2, "maximum": 7 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone, and rank 8 must be reachable within the turn limit."
+        }
+      }
+    },
     "deploymentRanks": {
       "type": "array",
       "items": { "type": "integer", "minimum": 1, "maximum": 8 },
@@ -67,7 +86,8 @@
           "no_immediate_mate",
           "deployment_squares_available",
           "enemy_value_in_band",
-          "threshold_feasible"
+          "threshold_feasible",
+          "spawned_pawns_placed"
         ]
       }
     },

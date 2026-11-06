@@ -1,11 +1,16 @@
 # Piece definitions.
 #
-# These are piece TYPES. Per-piece instance state (remaining durability) lives in
-# the run, not here — see docs/06-deck-durability-and-permadeath.md.
+# These are piece TYPES. Per-piece instance state (remaining durability, rarity)
+# lives in the run, not here — see docs/06-deck-durability-and-permadeath.md.
 #
 # durabilityMax is the design statement of the game: durability is inversely
 # correlated with power, so a reliable deck and a spiky deck are genuinely
 # different choices. The queen may be deployed exactly once per purchase.
+#
+# rarityAbilities lists what each tier ADDS on top of the tiers below it
+# (abilities are cumulative). The rules for every ability are in
+# docs/02-rules-framework.md §2.3. Types without an entry (king, pawn) have no
+# rarity abilities.
 
 pieces:
   - id: king
@@ -17,17 +22,18 @@ pieces:
     notes: >-
       Run identity. Never capturable, never destroyed, occupies no deck slot.
       Always included in the generated opening line. Checkmate of the player
-      king ends the run.
+      king ends the run. Has no rarity.
 
   - id: pawn
     pieceType: pawn
     value: 1
-    cost: 3
-    durabilityMax: 3
-    purchasable: true
+    cost: null
+    durabilityMax: null
+    purchasable: false
     notes: >-
-      The cheapest way to buy an action. Because deployment costs a move credit,
-      a pawn is really a tempo purchase.
+      Never sold and never in the deck. Each stage spawns a few pawns for the
+      player with a rolled rarity; the rarity only decides what the pawn
+      promotes into. Promotion turns stage tempo into a permanent deck piece.
 
   - id: knight
     pieceType: knight
@@ -35,19 +41,48 @@ pieces:
     cost: 8
     durabilityMax: 2
     purchasable: true
+    rarityAbilities:
+      rare:
+        - ability: add_leaper
+          params: { offsets: [[2, 0]] }
+          text: "Can also leap two squares in a straight line."
+      unique:
+        - ability: add_leaper
+          params: { offsets: [[2, 2]] }
+          text: "Can also leap two squares diagonally."
+      legendary:
+        - ability: bonus_self_move
+          params: { amount: 1 }
+          text: "After it moves, it may move once more this turn, for free."
     notes: >-
       The reliable mid-piece. Two deployments is enough to commit one and keep
-      one in reserve.
+      one in reserve. Its rarity line widens its jumps, then lets it act twice.
 
   - id: bishop
     pieceType: bishop
     value: 3
     cost: 8
     durabilityMax: 2
+    durabilityMaxByRarity:
+      legendary: 1
     purchasable: true
+    rarityAbilities:
+      rare:
+        - ability: leap_allies
+          params: { captureAfterLeap: false }
+          text: "Can leap over your own pieces, but not capture on that move."
+      unique:
+        - ability: leap_allies
+          params: { captureAfterLeap: true }
+          text: "Can capture after leaping over your own pieces."
+      legendary:
+        - ability: add_rider
+          params: { directions: orthogonal }
+          text: "Also moves like a rook, so it moves like a queen."
     notes: >-
       Standard value; also the only legal target for the Ascension skill, which
-      makes it the deck's most skill-dependent piece.
+      makes it the deck's most skill-dependent piece. A Legendary bishop moves
+      like a queen and is therefore limited to one deployment, like a queen.
 
   - id: rook
     pieceType: rook
@@ -55,9 +90,26 @@ pieces:
     cost: 10
     durabilityMax: 2
     purchasable: true
+    rarityAbilities:
+      rare:
+        - ability: leap_allies
+          params: { captureAfterLeap: false }
+          text: "Can leap over your own pieces, but not capture on that move."
+      unique:
+        - ability: add_leaper
+          params: { offsets: [[1, 1]] }
+          text: "Can also step one square diagonally."
+      legendary:
+        - ability: leap_allies
+          params: { captureAfterLeap: true }
+          text: "Can capture one piece after leaping over your own pieces."
+        - ability: multi_capture
+          params: { maxTargets: 2, afterLeap: false }
+          text: "Can capture two adjacent enemies in one line, but not after a leap."
     notes: >-
       Reach across the board. A rook delivered early is a tempo weapon; a rook
-      captured is 5 material of swing handed to the enemy.
+      captured is 5 material of swing handed to the enemy. Its rarity line ends
+      in a battering ram that can take two connected pieces at once.
 
   - id: queen
     pieceType: queen
@@ -65,7 +117,25 @@ pieces:
     cost: 16
     durabilityMax: 1
     purchasable: true
+    rarityAbilities:
+      rare:
+        - ability: leap_allies
+          params: { captureAfterLeap: false }
+          text: "Can leap over your own pieces, but not capture on that move."
+      unique:
+        - ability: lifeline
+          params: { usesPerRun: 1, returnDurability: 1 }
+          text: "Once per run, if captured, it returns to your deck instead."
+      legendary:
+        - ability: leap_allies
+          params: { captureAfterLeap: true }
+          text: "Can capture after leaping over your own pieces."
+        - ability: multi_capture
+          params: { maxTargets: 2, afterLeap: true }
+          text: "Can capture two adjacent enemies in one line, even after a leap."
     notes: >-
       One deployment, ever. The queen is a burst that wins a specific stage and
       then evaporates. If durability were flat this piece would dominate every
-      slot — it must not.
+      slot — it must not. Its higher tiers touch permanence (lifeline) before
+      power, and the Legendary queen is deliberately the rarest piece in the
+      game (data/economy.yaml → rarity.retention).

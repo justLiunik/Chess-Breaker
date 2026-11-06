@@ -65,6 +65,13 @@ change, not a skill authoring detail.
 | `reveal_intent` | — | Shows the enemy's next move (future; planning effect) |
 | `add_plan_undo` | — | Grants one post-commit undo (future; planning effect) |
 
+**Rarity abilities share this layer.** A piece's rarity abilities (`leap_allies`, `add_leaper`,
+`add_rider`, `bonus_self_move`, `multi_capture`, `lifeline` — [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) are
+interpreted by the same `engine/skills` machinery as permanent, piece-bound modifiers. They are not
+skills: they cost no Focus, have no charges, and occupy no loadout slot. But they follow the same
+rule — no special cases in `engine/rules` — and a skill that touches movement must state how it
+composes with them (default: a transform suspends rarity abilities until it reverts).
+
 ### Duration semantics
 
 | Duration | Expires | Typical use |

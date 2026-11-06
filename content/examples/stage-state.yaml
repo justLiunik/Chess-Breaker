@@ -3,7 +3,11 @@
 # This is what the generation pipeline (docs/04 §3) emits and what the engine
 # (docs/02) consumes. Note:
 #   - Player pieces carry instanceId (they belong to the deck, so they can die).
-#   - Enemy pieces do not (there is no enemy deck).
+#   - Enemy pieces do not (there is no enemy deck), and are always Normal.
+#   - The c4 pawn is a spawned pawn: free and stage-only, with no instanceId.
+#     It is Rare, and its promotion result was rolled at generation and is shown
+#     to the player: a Rare knight. A Rare pawn would usually promote one tier up,
+#     but Act I caps everything at Rare (docs/02 §2.2).
 #   - swing is {captured: 3, lost: 0}: a knight has been captured, so the player
 #     is 3 of the 5 material needed for a domination win.
 #   - A Lockdown modifier is live against the b7 pawn, expiring at the end of the
@@ -22,10 +26,14 @@ board:
     pieceType: king
     color: white
     instanceId: p_king_01
-  c2:
+  c4:
     pieceType: pawn
     color: white
-    instanceId: p_pawn_03
+    spawned: true
+    rarity: rare
+    promotesTo:
+      pieceType: knight
+      rarity: rare
   a7:
     pieceType: pawn
     color: black

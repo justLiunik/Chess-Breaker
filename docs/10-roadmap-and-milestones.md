@@ -20,7 +20,10 @@ repository scaffolding.
 - [x] Interaction matrix covers every pair of the six systems.
 - [x] Rarity tiers, Stage vs Hero piece categories, and act-gated shop rarity are specified
       (`docs/06 §4`, `docs/07 §2.1`), with tuning in `data/economy.yaml → rarity` checked by
-      `npm run validate`; rarity *effects* are logged as decision O in `docs/11`.
+      `npm run validate`.
+- [x] Rarity rules for pawns (stage-only, promotion), knights, bishops, rooks and queens are specified (`docs/02 §2.1–2.3`),
+      with abilities as data in `pieces.yaml` and prices in `economy.yaml`; rook and queen abilities
+      follow-up questions are logged as decision O in `docs/11`.
 
 **Explicitly not delivered:** engine code, UI code, the full skill list.
 
@@ -62,6 +65,10 @@ must be resisted — that would silently delete the game's core mechanic.
 - `ACTIVATE_SKILL` with `grant_move_credit`, `set_piece_type`, `suppress_piece`.
 - Duration semantics: `instant`, `this_turn`, `next_enemy_turn`.
 - Final R1→R5 ordering including revert-before-mate.
+- Rarity abilities (`leap_allies`, `add_leaper`, `add_rider`, `bonus_self_move`, `multi_capture`, `lifeline`), driven by
+  `pieces.yaml`.
+- Spawned pawns and promotion: pawn removed on rank 8, `promotesTo` instance added to the deck and
+  deployable in the same stage.
 
 **Acceptance criteria**
 - [ ] Twin Step, Ascension and Lockdown behave exactly as specified in `docs/03 §5`, including every
@@ -72,6 +79,16 @@ must be resisted — that would silently delete the game's core mechanic.
 - [ ] Captured instance is permanently absent from `RunState.deck` (test).
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
 - [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
+- [ ] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
+      not give check through an ally; Unique can; Legendary bishop moves like a queen with
+      durability 1; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
+- [ ] Ascension suspends rarity abilities and they return after the revert (test).
+- [ ] Rook and queen rows of `docs/02 §2.3` each have a test, including every multi-capture rule
+      (adjacency, gap, king exception, rook-after-leap single capture, one credit, swing + salvage).
+- [ ] A Legendary knight that gives check with its first move can never capture or land on the king
+      with its bonus move (test).
+- [ ] Lifeline fires once per queen instance and returns it at stage end with 1 durability (test).
+- [ ] Promotion never consumes randomness: the created piece always equals the pawn's `promotesTo` (test).
 
 **Risks:** duration semantics creep. Any new duration requires a `docs/03` update first.
 
@@ -95,7 +112,9 @@ report.
 - [ ] Median accepted stage generated in < 250 ms on a laptop.
 - [ ] Every template reports checkmate share ≥ 20% and median win turn within ±20% of band.
 - [ ] Exhausted-regeneration path terminates and falls through to another template.
-- [ ] 100% of generated Stage Pieces are Normal rarity (I13).
+- [ ] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
+      results never exceed the act ceiling (I14).
+- [ ] Solver models rarity abilities and promotion; measured node counts reported per tier mix.
 
 **Risks:** solver cost. Mitigations staged in
 [04 §5](04-stage-generation-and-authoring.md#5-the-solver) (cache → offline archetypes → tighter
@@ -110,9 +129,9 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 **Scope**
 - Run advancement across 9 stages, boss flagging, no shop after the final stage.
 - Payout math (checkmate full rate, domination half rate) and salvage on capture.
-- Shop stock generation with pawn floor and recovery offer.
-- Rarity roll on random piece offers from the act-gated pool (`docs/07 §2.1`); rarity pricing and
-  effects only once decision O is made.
+- Shop stock generation with recovery offer (no pawns are sold).
+- Rarity roll on random piece offers from the act-gated pool and rarity pricing (`docs/07 §2.1–2.2`).
+- Stage-end over-capacity cut after a promotion, before the shop opens.
 - Purchases: pieces, skills, skill upgrades, repairs, deck slots, rerolls, bank & skip.
 - `localStorage` save/resume with version gating.
 
@@ -121,10 +140,13 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
       every turn/act combination (table-driven test).
 - [ ] Invariant I10 holds: preview equals payout for 1,000 random plans.
 - [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
-- [ ] Pawn floor is affordable whenever the player has ≥1 coin (test).
+- [ ] The shop never offers a pawn (test).
 - [ ] Recovery offer fires exactly when non-king deck < 4 and disappears at 4 (test).
 - [ ] 10,000 seeded shop visits per act, rerolls included, never offer a tier above that act's
-      ceiling; no Act I visit offers Epic or higher; pawn floor and recovery offer are always Normal (I14).
+      ceiling; no Act I visit offers Unique or higher; recovery offers are always Normal (I14).
+- [ ] Prices match `docs/07 §2.2` for every type × tier × act (table-driven test).
+- [ ] Legendary queen retention: over 100,000 seeded rolls the Legendary-queen rate is 20% ± 1% of the
+      un-retained rate, in shop offers and promotion results (test).
 - [ ] Save → reload → resume mid-run preserves coins, deck durability, and loadout charges exactly.
 
 **Risks:** economy is untunable without telemetry, and there is no telemetry by design. Mitigation:
@@ -186,14 +208,16 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Risk | Likelihood | Impact | Mitigation | Milestone |
 |---|---|---|---|---|
 | Skills trivialize stages | High | High | Charge scarcity, action-priced deployment, solver validation, boss skills | M2, M6 |
-| Death spiral unfun | Medium | High | Pawn floor, recovery offer, salvage, bank & skip | M4 |
+| Death spiral unfun | Medium | High | Spawned pawns, promotion, recovery offer, salvage, bank & skip | M4 |
 | Solver too slow | Medium | Medium | Template narrowing, caching, offline archetypes | M3 |
 | Queue builder unusable | Medium | High | Preview-first design, keyboard parity, early playtests | M5 |
 | Economy untunable without telemetry | High | Medium | Headless bot as tuning harness | M4, M6 |
 | Deferred-validation rule "fixed" by a contributor | Medium | Critical | Documented in `docs/02` as core, covered by tests | M1 |
 | Content volume assumptions wrong | Low | Medium | Templates, not levels, scale content | M3 |
 | Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09` | M1 |
-| Rarity power creep breaks the durability trade | Medium | High | Decision O's constraints (`docs/11`); act-gated ceilings; solver models any effect | M4, M6 |
+| Rarity power creep breaks the durability trade | Medium | High | Price multipliers; Legendary bishop durability 1; Legendary queen retention 0.2; act-gated ceilings; decision O constraints | M2, M4, M6 |
+| Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
+| Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
 
 ## Dependencies
 

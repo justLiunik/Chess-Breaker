@@ -63,9 +63,12 @@
       "additionalProperties": false,
       "properties": {
         "instanceId": { "type": "string", "pattern": "^p_[a-z0-9_]+$" },
-        "pieceType": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] },
+        "pieceType": {
+          "enum": ["king", "knight", "bishop", "rook", "queen"],
+          "description": "No pawns: pawns are stage-only and never join the deck (docs/06 §4.2)."
+        },
         "rarity": {
-          "enum": ["normal", "rare", "epic", "unique", "legendary", null],
+          "enum": ["normal", "rare", "unique", "legendary", null],
           "description": "Fixed at creation. null = the King only, which has no rarity (invariant I12). Order is data/economy.yaml → rarity.tiers."
         },
         "durability": {
@@ -76,10 +79,19 @@
         "durabilityMax": {
           "type": ["integer", "null"],
           "minimum": 1,
-          "description": "null = immortal (king only)."
+          "description": "null = immortal (king only). Depends on rarity for some types (pieces.yaml → durabilityMaxByRarity)."
         },
-        "origin": { "enum": ["starter", "shop", "reward"] },
+        "origin": {
+          "enum": ["starter", "shop", "promotion", "reward"],
+          "description": "promotion = created when a spawned pawn reached rank 8 (docs/02 §2.2)."
+        },
         "acquiredAtStage": { "type": "integer", "minimum": 0 },
+        "usedOnce": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["lifeline"] },
+          "description": "Once-per-run rarity abilities this instance has already used (docs/02 §2.3). Omitted = none used."
+        },
         "status": { "enum": ["in_deck", "deployed", "captured", "spent"] }
       },
       "allOf": [

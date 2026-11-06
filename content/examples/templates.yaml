@@ -10,6 +10,10 @@
 #
 # Domination is measured as a captured-minus-lost SWING (docs/02 §7), so the
 # threshold is "win the exchange by N", not "own more material on the board".
+#
+# spawnedPawns are free, stage-only pawns for the player (docs/02 §2.2). Their
+# ranks must leave rank 8 reachable within the turn limit, so promotion is a
+# real option that competes with chasing the coin preview.
 
 templates:
   - id: tpl-act1-open-field
@@ -23,6 +27,9 @@ templates:
       pawn: [5, 6]
       knight: [1, 1]
     enemyZone: [7, 8]
+    spawnedPawns:
+      count: [2, 2]
+      ranks: [3, 4]
     deploymentRanks: [1, 2]
     deploymentsPerTurn: 1
     focusPool: 3
@@ -36,6 +43,7 @@ templates:
       - deployment_squares_available
       - enemy_value_in_band
       - threshold_feasible
+      - spawned_pawns_placed
     designNote: >-
       Teaching template. Enemy army value 8-9 against an 8-turn limit: enough
       slack to learn deployment and the turn counter without the stage being a
@@ -53,6 +61,9 @@ templates:
       knight: [1, 1]
       bishop: [1, 1]
     enemyZone: [6, 7, 8]
+    spawnedPawns:
+      count: [1, 2]
+      ranks: [3, 4]
     deploymentRanks: [1, 2]
     deploymentsPerTurn: 1
     focusPool: 3
@@ -66,6 +77,7 @@ templates:
       - deployment_squares_available
       - enemy_value_in_band
       - threshold_feasible
+      - spawned_pawns_placed
     designNote: >-
       Enemy value 11-12, threshold 7, six turns. The slack from Act I is gone:
       the player must either spend durability for tempo or accept a slow
@@ -85,6 +97,9 @@ templates:
       bishop: [1, 1]
       rook: [1, 1]
     enemyZone: [6, 7, 8]
+    spawnedPawns:
+      count: [1, 1]
+      ranks: [4, 5]
     deploymentRanks: [1, 2]
     deploymentsPerTurn: 1
     focusPool: 3
@@ -98,6 +113,7 @@ templates:
       - deployment_squares_available
       - enemy_value_in_band
       - threshold_feasible
+      - spawned_pawns_placed
     designNote: >-
       Boss. Enemy value 20-21, four turns, depth-4 policy. There is no line that
       does not spend charges and durability. The player who banked coins into

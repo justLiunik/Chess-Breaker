@@ -84,7 +84,25 @@
         "color": { "enum": ["white", "black"] },
         "instanceId": {
           "type": "string",
-          "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces (enemy) have no instance and are always Normal rarity (invariant I13), so no rarity field exists here."
+          "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces have no instance."
+        },
+        "spawned": {
+          "const": true,
+          "description": "Marks a spawned pawn: a player-side Stage Piece (docs/02 §2.2). Enemy pieces never carry it."
+        },
+        "rarity": {
+          "enum": ["normal", "rare", "unique", "legendary"],
+          "description": "Only on spawned pawns. Hero Piece rarity lives on the deck instance; enemy pieces are always Normal (I13)."
+        },
+        "promotesTo": {
+          "type": "object",
+          "required": ["pieceType", "rarity"],
+          "additionalProperties": false,
+          "description": "Only on spawned pawns: the piece this pawn becomes on reaching rank 8. Rolled at generation and shown to the player.",
+          "properties": {
+            "pieceType": { "enum": ["knight", "bishop", "rook", "queen"] },
+            "rarity": { "enum": ["normal", "rare", "unique", "legendary"] }
+          }
         },
         "transformed": {
           "type": "object",
@@ -96,7 +114,21 @@
             "modifierId": { "type": "string" }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "$comment": "A spawned pawn is a white pawn with a rarity and a visible promotion result, and no deck instance.",
+          "if": { "required": ["spawned"] },
+          "then": {
+            "required": ["rarity", "promotesTo"],
+            "properties": { "pieceType": { "const": "pawn" }, "color": { "const": "white" } },
+            "not": { "required": ["instanceId"] }
+          },
+          "else": {
+            "not": { "anyOf": [{ "required": ["rarity"] }, { "required": ["promotesTo"] }] }
+          }
+        }
+      ]
     },
     "activeModifier": {
       "type": "object",

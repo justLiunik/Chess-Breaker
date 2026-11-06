@@ -21,9 +21,9 @@ rules:
   openingPlacements: 3          # free, random, always includes the King
   castling: false
   enPassant: false
-  promotion:
-    enabled: false              # templates avoid promotion squares in MVP
-    choice: queen
+  promotion:                    # see docs/02 §2.2
+    playerPawns: reward         # a spawned pawn on rank 8 leaves the board and becomes a deck piece
+    enemyPawns: queen           # enemy pawns promote by the normal chess rule, to a Normal queen
   kingCapturable: false         # invariant I3 — never
   stalemateBehavior: enemy_passes
 
@@ -52,11 +52,9 @@ economy:
     maxRerollsPerVisit: 3
 
   shop:
-    slots: 5
-    pawnFloorSlot: 1            # always a pawn
-    pawnFloorMinPrice: 1        # discounted to the player's balance if they cannot afford it
-    randomSlots: 2
-    recoveryDeckThreshold: 4    # if non-king deck < 4 → guaranteed half-price replacement
+    slots: 5                    # 1–2 pieces, 3–4 piece or skill, 5 service (docs/07 §2)
+    randomSlots: 2              # slots 3–4: piece or skill
+    recoveryDeckThreshold: 4    # if non-king deck < 4 → slot 1 is a half-price Normal replacement
     recoveryDiscount: 0.5
 
 # ---------------------------------------------------------------------------
@@ -70,9 +68,9 @@ pieces:
     purchasable: false
   pawn:
     value: 1
-    cost: 3
-    durabilityMax: 3            # sustainable action
-    purchasable: true
+    cost: null                  # never sold — pawns only spawn on the stage (docs/06 §4.2)
+    durabilityMax: null         # stage-only: never in the deck, never deployed
+    purchasable: false
   knight:
     value: 3
     cost: 8
@@ -82,6 +80,8 @@ pieces:
     value: 3
     cost: 8
     durabilityMax: 2
+    durabilityMaxByRarity:
+      legendary: 1              # moves like a queen, so it deploys like one (docs/06 §1)
     purchasable: true
   rook:
     value: 5
@@ -101,35 +101,59 @@ pieces:
 # future neutral pieces) are always the base tier. Hero Pieces (deck-owned) may
 # hold any tier, and the shop's rarity pool is gated by act.
 #
-# What a tier DOES in play (durability, price, traits…) is Open Decision O
-# (docs/11). Until it is decided there is deliberately no per-tier effect or
-# price multiplier in this file: rarity is tracked, rolled and displayed, and
-# changes nothing else.
+# What each tier does in play is per piece type in
+# content/examples/pieces.yaml → rarityAbilities (rules: docs/02 §2.3).
 # ---------------------------------------------------------------------------
 rarity:
-  tiers: [normal, rare, epic, unique, legendary]   # ascending; order is load-bearing
+  tiers: [normal, rare, unique, legendary]   # ascending; order is load-bearing
   kingHasRarity: false            # the King has no rarity (null), ever
-  stagePieceRarity: normal        # Stage Pieces are locked to this tier
+  enemyPieceRarity: normal        # enemy Stage Pieces are locked to this tier
   starterRarity: normal           # every starter-deck piece
-  pawnFloorRarity: normal         # shop slot 1 is always a Normal pawn
   recoveryOfferRarity: normal     # the recovery replacement piece is Normal
 
-  # Weights for the rarity roll on random shop piece offers (slots 2–4), keyed by
-  # the act of the stage just cleared — the same act whose prices apply.
+  # price = round(basePrice × priceMultiplier[tier] × (1 + priceInflationPerAct × (act − 1)))
+  priceMultiplier: { normal: 1.0, rare: 1.5, unique: 2.0, legendary: 3.0 }
+
+  # Retention: a roll (shop offer or promotion result) that lands on this
+  # type × tier keeps that tier only with this probability; otherwise it drops
+  # one tier. Makes the Legendary queen ~5× rarer than other Legendary pieces.
+  retention:
+    queen: { legendary: 0.2 }
+
+  # Rarity pool by act. Used for (a) random shop piece offers, keyed by the act of
+  # the stage just cleared — the same act whose prices apply — and (b) spawned
+  # pawns, keyed by the act of the stage being generated.
   # `ceiling` is the highest tier the pool may produce; every tier above it must
   # have weight 0. Ceilings never go down from one act to the next, and Act I is
   # capped at `rare` by design (validated in scripts/validate-content.mjs).
   # The weights themselves are provisional, pending the M6 balance pass.
-  shopPool:
+  pool:
     act1:
       ceiling: rare
-      weights: { normal: 75, rare: 25, epic: 0, unique: 0, legendary: 0 }
+      weights: { normal: 75, rare: 25, unique: 0, legendary: 0 }
     act2:
       ceiling: unique
-      weights: { normal: 45, rare: 35, epic: 15, unique: 5, legendary: 0 }
+      weights: { normal: 50, rare: 38, unique: 12, legendary: 0 }
     act3:
       ceiling: legendary
-      weights: { normal: 25, rare: 35, epic: 25, unique: 12, legendary: 3 }
+      weights: { normal: 30, rare: 40, unique: 24, legendary: 6 }
+
+# ---------------------------------------------------------------------------
+# Spawned pawns and promotion — see docs/02 §2.2 and docs/06 §4.2
+#
+# Each stage spawns a few pawns for the player (count and ranks come from the
+# template). They are stage-only: no deck slot, no durability. Their rarity is
+# rolled from rarity.pool for the act, and their promotion result is rolled at
+# generation time and shown on the pawn, so promotion is never a hidden dice roll.
+# ---------------------------------------------------------------------------
+promotion:
+  resultTypeWeights: { knight: 35, bishop: 35, rook: 20, queen: 10 }
+  tierUpChance: 0.75              # else the result keeps the pawn's tier
+  clampToActCeiling: true         # never above rarity.pool.act<N>.ceiling
+  appliesRetention: true          # rarity.retention (e.g. Legendary queen) applies here too
+  rolledAtGeneration: true        # visible on the pawn from turn 1 (pillar 4)
+  joinsDeck: immediately          # deployable later in the same stage
+  overCapacity: cut_at_stage_end  # forced "cut a piece" chooser before the shop
 
 # ---------------------------------------------------------------------------
 # Deck — see docs/06-deck-durability-and-permadeath.md
@@ -138,11 +162,10 @@ deck:
   startCapacity: 8
   maxCapacity: 14
   kingOccupiesSlot: false       # capacity counts non-king pieces only
-  starterDeck:
+  starterDeck:                  # all Normal rarity
     king: 1
-    pawn: 4
-    knight: 1
-    bishop: 1                   # 7 of 8 slots — leaves one free slot for the first shop
+    knight: 2
+    bishop: 2                   # 4 of 8 slots; pawns come from the stage, not the deck
   durability:
     spentIsFinal: true          # a piece at 0 durability may not be repaired
     destroyedAtStageEnd: true   # spent pieces are removed after the stage, not instantly

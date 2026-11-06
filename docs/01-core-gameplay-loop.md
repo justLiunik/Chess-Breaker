@@ -47,8 +47,8 @@ durability  ──►  tempo  ──►  leftover turns  ──►  coins  ─�
 
 **The friction that makes it a game:** you cannot skip a step. There is no way to convert coins
 directly into a faster stage, no way to win turns without spending durability, and no way to regain
-durability except by buying a *new* piece instance. The chain has a leak — pieces get captured —
-and managing that leak is the run.
+durability except by getting a *new* piece instance — bought with coins, or promoted from a spawned
+pawn with turns. The chain has a leak — pieces get captured — and managing that leak is the run.
 
 ## Loop 1 — Action
 
@@ -68,6 +68,9 @@ are held to it.
 
 - Entry: the stage is generated from the player's **actual deck** (see
   [04](04-stage-generation-and-authoring.md)), so it is always provably solvable.
+- Every stage also **spawns free pawns** for the player, each with a rarity and a visible promotion
+  result. Pushing one to rank 8 turns it into a permanent deck piece — at the price of the turns,
+  and therefore the coins, spent getting there ([02 §2.2](02-rules-framework.md#22-promotion)).
 - Play until a terminal condition fires (see
   [02 §7](02-rules-framework.md#7-stage-end-evaluation)).
 - Exit routes, in payoff order:

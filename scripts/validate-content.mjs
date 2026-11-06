@@ -6,7 +6,8 @@
  *   1. SCHEMA   — every file in content/examples/ against its JSON Schema.
  *   2. SEMANTIC — cross-file design invariants that a schema cannot express:
  *                 template feasibility, act value bands, deck legality, board sanity,
- *                 rarity tiers and act-gated shop pools.
+ *                 rarity tiers and act-gated pools, piece abilities, spawned
+ *                 pawns and promotion.
  *
  * Pass 2 is the point. A JSON Schema can prove a template is well-formed; only
  * this pass can prove it is *a legal, reachable encounter* under data/economy.yaml.
@@ -199,9 +200,9 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
   }
 }
 
-// 2a'. Rarity: tier list matches the schema, and the shop pool is act-gated
-// (docs/06 §4, docs/07 §2.1, invariant I14).
-const RARITY_TIERS = ['normal', 'rare', 'epic', 'unique', 'legendary'];
+// 2a'. Rarity: tier list matches the schema, prices scale with tier, and the
+// rarity pool is act-gated (docs/06 §4, docs/07 §2.1, invariant I14).
+const RARITY_TIERS = ['normal', 'rare', 'unique', 'legendary'];
 const rarity = economy.rarity ?? {};
 const tiers = rarity.tiers ?? [];
 const tierRank = (t) => tiers.indexOf(t);
@@ -211,7 +212,7 @@ if (JSON.stringify(tiers) !== JSON.stringify(RARITY_TIERS)) {
 } else {
   ok(`economy.yaml: ${tiers.length} rarity tiers in order`);
 }
-for (const key of ['stagePieceRarity', 'starterRarity', 'pawnFloorRarity', 'recoveryOfferRarity']) {
+for (const key of ['enemyPieceRarity', 'starterRarity', 'recoveryOfferRarity']) {
   if (rarity[key] !== tiers[0]) fail(`economy.yaml: rarity.${key} must be "${tiers[0]}", got "${rarity[key]}"`);
 }
 if (rarity.kingHasRarity !== false) fail('economy.yaml: rarity.kingHasRarity must be false (invariant I12)');
@@ -219,8 +220,8 @@ if (rarity.kingHasRarity !== false) fail('economy.yaml: rarity.kingHasRarity mus
 const actCount = economy.stages?.acts ?? 3;
 let prevCeiling = -1;
 for (let act = 1; act <= actCount; act += 1) {
-  const pool = rarity.shopPool?.[`act${act}`];
-  const where = `economy.yaml: rarity.shopPool.act${act}`;
+  const pool = rarity.pool?.[`act${act}`];
+  const where = `economy.yaml: rarity.pool.act${act}`;
   if (!pool) {
     fail(`${where} is missing`);
     continue;
@@ -269,6 +270,138 @@ for (let act = 1; act <= actCount; act += 1) {
   if (problems === 0) ok(`${where}: capped at ${pool.ceiling}`);
   prevCeiling = Math.max(prevCeiling, ceiling);
 }
+const ceilingOf = (act) => tierRank(rarity.pool?.[`act${act}`]?.ceiling);
+
+// Price multipliers: one per tier, Normal = 1, never cheaper at a higher tier
+// (a tier that adds power must add cost — pillar 2).
+{
+  const mult = rarity.priceMultiplier ?? {};
+  let prev = 0;
+  let problems = 0;
+  for (const tier of tiers) {
+    const m = mult[tier];
+    if (typeof m !== 'number') {
+      fail(`economy.yaml: rarity.priceMultiplier.${tier} is missing`);
+      problems += 1;
+      continue;
+    }
+    if (m < prev) {
+      fail(`economy.yaml: rarity.priceMultiplier.${tier} (${m}) is lower than the tier below (${prev})`);
+      problems += 1;
+    }
+    prev = m;
+  }
+  if (mult.normal !== 1) {
+    fail('economy.yaml: rarity.priceMultiplier.normal must be 1');
+    problems += 1;
+  }
+  if (problems === 0) ok('economy.yaml: rarity price multipliers rise with tier');
+}
+
+// 2a''. Pieces: definitions mirror data/economy.yaml, rarity abilities and
+// durability overrides respect the durability-vs-power rule (docs/06 §1).
+const pieceDefs = new Map((docs['pieces.yaml']?.pieces ?? []).map((p) => [p.pieceType, p]));
+for (const [type, def] of pieceDefs) {
+  const eco = economy.pieces?.[type];
+  if (!eco) {
+    fail(`pieces.yaml:${type}: missing from data/economy.yaml → pieces`);
+    continue;
+  }
+  for (const key of ['value', 'cost', 'durabilityMax', 'purchasable']) {
+    if (eco[key] !== def[key]) fail(`pieces.yaml:${type}: ${key} ${def[key]} does not match economy.yaml (${eco[key]})`);
+  }
+  if (JSON.stringify(eco.durabilityMaxByRarity ?? {}) !== JSON.stringify(def.durabilityMaxByRarity ?? {})) {
+    fail(`pieces.yaml:${type}: durabilityMaxByRarity does not match economy.yaml`);
+  }
+  for (const [tier, d] of Object.entries(def.durabilityMaxByRarity ?? {})) {
+    if (typeof def.durabilityMax === 'number' && d > def.durabilityMax) {
+      fail(`pieces.yaml:${type}: ${tier} durability ${d} exceeds Normal ${def.durabilityMax} — higher tiers must never be more durable`);
+    }
+  }
+}
+const durabilityMaxFor = (type, tier) =>
+  pieceDefs.get(type)?.durabilityMaxByRarity?.[tier] ?? pieceDefs.get(type)?.durabilityMax;
+ok(`pieces.yaml: ${pieceDefs.size} piece types mirror data/economy.yaml`);
+
+// Abilities are cumulative: a tier has its own entries plus every lower tier's.
+const abilitiesFor = (type, tier) => {
+  const out = new Set();
+  const table = pieceDefs.get(type)?.rarityAbilities ?? {};
+  for (const t of tiers.slice(0, tierRank(tier) + 1)) for (const a of table[t] ?? []) out.add(a.ability);
+  return out;
+};
+
+// Retention (e.g. the Legendary queen's rarity): a probability for a real
+// purchasable type at a tier above Normal.
+{
+  let problems = 0;
+  for (const [type, perTier] of Object.entries(rarity.retention ?? {})) {
+    if (!pieceDefs.get(type)?.purchasable) {
+      fail(`economy.yaml: rarity.retention.${type} — not a purchasable piece type`);
+      problems += 1;
+    }
+    for (const [tier, r] of Object.entries(perTier ?? {})) {
+      if (tierRank(tier) < 1) {
+        fail(`economy.yaml: rarity.retention.${type}.${tier} — must be a tier above ${tiers[0]}`);
+        problems += 1;
+      }
+      if (!(r > 0 && r <= 1)) {
+        fail(`economy.yaml: rarity.retention.${type}.${tier} = ${r} must be in (0, 1]`);
+        problems += 1;
+      }
+    }
+  }
+  if (problems === 0) ok('economy.yaml: rarity retention values valid');
+}
+
+// 2a'''. Promotion (docs/02 §2.2).
+{
+  const promo = economy.promotion ?? {};
+  let problems = 0;
+  for (const [type, w] of Object.entries(promo.resultTypeWeights ?? {})) {
+    if (!pieceDefs.get(type)?.purchasable) {
+      fail(`economy.yaml: promotion.resultTypeWeights.${type} — promotion may only produce deck piece types`);
+      problems += 1;
+    }
+    if (typeof w !== 'number' || w < 0) {
+      fail(`economy.yaml: promotion.resultTypeWeights.${type} must be a non-negative number`);
+      problems += 1;
+    }
+  }
+  if (!(promo.tierUpChance >= 0 && promo.tierUpChance <= 1)) {
+    fail('economy.yaml: promotion.tierUpChance must be between 0 and 1');
+    problems += 1;
+  }
+  if (promo.clampToActCeiling !== true) {
+    fail('economy.yaml: promotion.clampToActCeiling must be true — promotion must not bypass the act ceiling (I14)');
+    problems += 1;
+  }
+  if (problems === 0) ok('economy.yaml: promotion results are deck pieces, clamped to the act ceiling');
+}
+const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
+
+// 2a''''. Templates: spawned pawns must be able to promote within the turn limit.
+for (const t of docs['templates.yaml']?.templates ?? []) {
+  const sp = t.spawnedPawns;
+  if (!sp) continue;
+  const [lo, hi] = sp.count;
+  let problems = 0;
+  if (lo < 1 || hi < lo) {
+    fail(`${t.id}: spawnedPawns.count ${JSON.stringify(sp.count)} must be [min>=1, max>=min]`);
+    problems += 1;
+  }
+  const overlap = sp.ranks.filter((r) => (t.enemyZone ?? []).includes(r));
+  if (overlap.length > 0) {
+    fail(`${t.id}: spawnedPawns.ranks overlap enemyZone on rank(s) ${overlap.join(', ')}`);
+    problems += 1;
+  }
+  const distance = 8 - Math.min(...sp.ranks);
+  if (distance > t.turnLimit) {
+    fail(`${t.id}: a pawn spawned on rank ${Math.min(...sp.ranks)} needs ${distance} moves to promote, but turnLimit is ${t.turnLimit}`);
+    problems += 1;
+  }
+  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, promotion reachable`);
+}
 
 // 2b. Runs: deck legality and economy invariants.
 for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
@@ -292,6 +425,14 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
     if (p.pieceType !== 'king' && p.durability === null) fail(`${label}: non-king durability cannot be null`);
     if (p.pieceType !== 'king' && p.origin === 'starter' && p.rarity !== rarity.starterRarity) {
       fail(`${label}: starter pieces must be "${rarity.starterRarity}" rarity, got "${p.rarity}"`);
+    }
+    for (const used of p.usedOnce ?? []) {
+      if (!abilitiesFor(p.pieceType, p.rarity).has(used)) {
+        fail(`${label}: usedOnce lists "${used}", which a ${p.rarity} ${p.pieceType} does not have`);
+      }
+    }
+    if (p.pieceType !== 'king' && p.durabilityMax !== durabilityMaxFor(p.pieceType, p.rarity)) {
+      fail(`${label}: durabilityMax ${p.durabilityMax} should be ${durabilityMaxFor(p.pieceType, p.rarity)} for a ${p.rarity} ${p.pieceType}`);
     }
     if (p.status === 'captured') fail(`${label}: captured pieces are removed from the run, not kept in the deck`);
     if (p.status === 'spent') fail(`${label}: spent pieces are removed at stage end, not kept in the deck`);
@@ -328,10 +469,29 @@ if (stage) {
     fail(`stage-state.yaml: unknown template "${stage.templateId}"`);
   }
 
+  const stageTemplate = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
+  const stageCeiling = stageTemplate ? ceilingOf(stageTemplate.act) : -1;
+  let spawnedCount = 0;
+
   for (const [square, piece] of pieces) {
-    if (piece.color === 'white' && !piece.instanceId && piece.pieceType !== 'king') {
-      // Player pieces come from the deck, so they must be identifiable.
+    if (piece.color === 'white' && !piece.instanceId && piece.pieceType !== 'king' && !piece.spawned) {
+      // Player pieces come from the deck (or are spawned pawns), so they must be identifiable.
       fail(`stage-state.yaml:${square}: white piece missing instanceId`);
+    }
+    if (piece.spawned) {
+      spawnedCount += 1;
+      const pawnTier = tierRank(piece.rarity);
+      const resultTier = tierRank(piece.promotesTo?.rarity);
+      if (stageCeiling >= 0 && pawnTier > stageCeiling) {
+        fail(`stage-state.yaml:${square}: spawned pawn rarity "${piece.rarity}" is above the act ceiling`);
+      }
+      const expectedHigh = Math.min(pawnTier + 1, stageCeiling >= 0 ? stageCeiling : pawnTier + 1);
+      if (resultTier < Math.min(pawnTier, expectedHigh) || resultTier > expectedHigh) {
+        fail(`stage-state.yaml:${square}: promotesTo rarity "${piece.promotesTo?.rarity}" must be the pawn's tier or one higher, within the act ceiling`);
+      }
+      if (!(promotionWeights[piece.promotesTo?.pieceType] > 0)) {
+        fail(`stage-state.yaml:${square}: promotesTo type "${piece.promotesTo?.pieceType}" has no promotion weight`);
+      }
     }
     if (piece.color === 'black' && piece.instanceId) {
       fail(`stage-state.yaml:${square}: black piece must not carry an instanceId (no enemy deck)`);
@@ -341,6 +501,12 @@ if (stage) {
     if (piece.color === 'white' && piece.pieceType === 'king' && !piece.instanceId) {
       fail(`stage-state.yaml:${square}: the player king must be a deck instance`);
     }
+  }
+
+  if (stageTemplate?.spawnedPawns && spawnedCount > stageTemplate.spawnedPawns.count[1]) {
+    fail(`stage-state.yaml: ${spawnedCount} spawned pawns exceed template max ${stageTemplate.spawnedPawns.count[1]}`);
+  } else if (spawnedCount > 0) {
+    ok(`stage-state.yaml: ${spawnedCount} spawned pawn(s) with valid rarity and promotion result`);
   }
 
   const whiteKings = pieces.filter(([, p]) => p.color === 'white' && p.pieceType === 'king');

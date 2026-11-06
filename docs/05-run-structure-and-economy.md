@@ -78,11 +78,11 @@ default is on.
 
 ## 3. Expenditure: coins → power
 
-### Piece prices (Act I base)
+### Piece prices (Act I base, Normal rarity)
 
 | Piece | Value | Price | Durability | Coins per durability |
 |---|---|---|---|---|
-| Pawn | 1 | 3 | 3 | 1.0 |
+| Pawn | 1 | not sold | — | — (spawned free by each stage) |
 | Knight | 3 | 8 | 2 | 4.0 |
 | Bishop | 3 | 8 | 2 | 4.0 |
 | Rook | 5 | 10 | 2 | 5.0 |
@@ -91,9 +91,10 @@ default is on.
 **Price inflation:** `price(act) = round(basePrice × (1 + 0.20 × (act − 1)))` — Act II ×1.2,
 Act III ×1.44.
 
-The *first* column of that last column is the design statement: a pawn is the cheapest way to buy
+That last column is the design statement: a knight or bishop is the cheapest way to buy
 **actions**, a queen is the most expensive way to buy **one** action. Durability is priced, not
-hidden.
+hidden. The cheapest action of all is a spawned pawn, which costs no coins — only the turns spent
+moving it.
 
 ### Rarity and prices
 
@@ -102,9 +103,20 @@ Act I can offer at most **Rare**, Act II at most **Unique**, Act III up to **Leg
 in [07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)). Moving through the acts
 therefore raises two things together: prices *and* the rarity ceiling.
 
-Rarity does **not** change prices yet. Whether higher tiers cost more, and what they give in return,
-is Open Decision O ([11](11-open-decisions.md#o-rarity-effects)). Any price rule it adds must keep
-the coins-per-durability column above honest: a tier that adds power must add cost.
+Rarity multiplies the price:
+
+```
+price = round(basePrice × rarityMultiplier × (1 + 0.20 × (act − 1)))
+rarityMultiplier:  Normal ×1 · Rare ×1.5 · Unique ×2 · Legendary ×3
+```
+
+A tier that adds power adds cost, which keeps the coins-per-durability column honest. A Legendary
+bishop (24 base) costs more than a Normal queen (16) and, like the queen, deploys only once. The full
+price grid is in [07 §2.2](07-shop-phase.md#22-prices-by-rarity).
+
+Promotion is the other source of tiers: a spawned pawn that reaches rank 8 becomes a deck piece,
+usually one tier above the pawn ([02 §2.2](02-rules-framework.md#22-promotion)). It costs no coins —
+it costs the turns spent pushing the pawn, which the coin preview prices at one rate step per turn.
 
 ### Services
 
@@ -124,19 +136,19 @@ game tells you that you are losing before it kills you.
 
 ## 4. Illustrative run
 
-Assumptions: no losses, checkmate wins, one salvage per stage on average. Prices shown at that act's
-inflation.
+Assumptions: no losses, checkmate wins, one salvage per stage on average, no promotions. Prices
+shown at that act's inflation and the item's rarity.
 
 | Stage | Limit | Cleared on | Coins earned | Balance | Purchase | Balance after |
 |---|---|---|---|---|---|---|
-| I-1 | 8 | 4 | 8 + 1 | 9 | Pawn (3) | 6 |
-| I-2 | 8 | 4 | 8 + 1 | 15 | Knight (8) | 7 |
-| I-3 ★ | 7 | 4 | 6 + 1 | 14 | Reroll (0, free) + Repair (4) | 10 |
-| II-1 | 6 | 3 | 9 + 1 | 20 | Rook (12) | 8 |
-| II-2 | 6 | 3 | 9 + 1 | 18 | Skill: Twin Step (10) | 8 |
-| II-3 ★ | 5 | 3 | 6 + 1 | 15 | Deck slot (14) | 1 |
-| III-1 | 5 | 3 | 12 + 1 | 14 | Repair ×2 (8) | 6 |
-| III-2 | 5 | 2 | 16 + 1 | 23 | Queen (23) | 0 |
+| I-1 | 8 | 4 | 8 + 1 | 9 | — (bank) | 9 |
+| I-2 | 8 | 4 | 8 + 1 | 18 | Rare Knight (12) | 6 |
+| I-3 ★ | 7 | 4 | 6 + 1 | 13 | Reroll (0, free) + Repair (4) | 9 |
+| II-1 | 6 | 3 | 9 + 1 | 19 | Rook (12) | 7 |
+| II-2 | 6 | 3 | 9 + 1 | 17 | Skill: Twin Step (10) | 7 |
+| II-3 ★ | 5 | 3 | 6 + 1 | 14 | Deck slot (14) | 0 |
+| III-1 | 5 | 3 | 12 + 1 | 13 | Repair ×2 (8) | 5 |
+| III-2 | 5 | 2 | 16 + 1 | 22 | Rare Bishop (17) | 5 |
 | III-3 ★ | 4 | — | — | — | — | — |
 
 Read the shape: the player oscillates between rich (can buy power) and broke (must survive on what
@@ -151,7 +163,7 @@ levers, in order of precedence:
 | # | Lever | Rule | Rationale |
 |---|---|---|---|
 | 1 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
-| 2 | **Pawn floor** | Shop always stocks one Pawn; always affordable | A broke player can always buy *an action* |
+| 2 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
 | 3 | **Recovery offer** | If non-king deck < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage |
 | 4 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
 | 5 | **Turn limits** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
@@ -166,11 +178,11 @@ pillar. A lost run must be *diagnosable* from the numbers on screen.
 |---|---|---|
 | Rich (≥20 coins) | Buying power, not survival | Take riskier, faster lines; buy a second skill |
 | Comfortable (8–19) | One meaningful purchase per shop | Standard play |
-| Poor (1–7) | Repair or pawn only | Must slow down; must protect pieces |
-| Broke (0) | Cannot buy | Win the next stage on the opening line alone |
+| Poor (1–7) | Repair only, or bank | Must slow down; must protect pieces; promotion becomes attractive |
+| Broke (0) | Cannot buy | Win the next stage on the opening line and spawned pawns |
 
-The broke state is recoverable — the pawn floor plus the guaranteed opening line mean a player is
-never *forced* to lose. They are only forced to play well.
+The broke state is recoverable — the guaranteed opening line plus each stage's spawned pawns mean a
+player is never *forced* to lose. They are only forced to play well.
 
 ## 7. Tuning knobs (all in `data/economy.yaml`)
 
@@ -182,8 +194,12 @@ never *forced* to lose. They are only forced to play well.
 | `priceInflationPerAct` | 0.20 | Tightens Act II–III economy |
 | `starterCoins` | 0 | Front-loads build choices before stage 1 |
 | `shop.slots` | 5 | Widens variance and choice |
-| `rarity.shopPool.{act}.weights` | 75/25 · 45/35/15/5 · 25/35/25/12/3 | Makes higher tiers commoner in that act |
-| `rarity.shopPool.{act}.ceiling` | rare · unique · legendary | Unlocks higher tiers earlier (Act I must stay at `rare`) |
+| `rarity.pool.{act}.weights` | 75/25 · 50/38/12 · 30/40/24/6 | Makes higher tiers commoner in that act (shop and spawned pawns) |
+| `rarity.pool.{act}.ceiling` | rare · unique · legendary | Unlocks higher tiers earlier (Act I must stay at `rare`) |
+| `rarity.priceMultiplier` | 1 / 1.5 / 2 / 3 | Makes higher tiers costlier; must never fall with tier |
+| `promotion.tierUpChance` | 0.75 | Makes promotion a stronger reward |
+| `promotion.resultTypeWeights` | N35 B35 R20 Q10 | Shifts promotion toward bigger pieces |
+| `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |
 
 **Tuning order:** `coinRate` first (it is the universal dial), then `priceInflationPerAct`, then
 prices. Never tune `turnLimit` and `coinRate` in the same pass — you will not be able to attribute

@@ -75,10 +75,12 @@ each failure with its JSON pointer path.
 | **Action Queue** | The ordered list of actions you commit to in a turn. |
 | **Focus** | Per-turn resource that pays for skills only. |
 | **Free Move** | The single standard move you get each turn. |
-| **Deploy** | Summoning a deck piece onto the board; costs the Free Move + 1 durability. |
+| **Deploy** | Summoning a deck piece onto the board; costs the Free Move + 1 durability. Pawns are never deployed — they spawn. |
 | **Durability** | A piece instance's remaining deployments. Zero destroys it. |
 | **Salvage** | Coins earned for capturing an enemy piece. |
 | **Domination** | Winning by material threshold instead of checkmate (lower payout). |
-| **Hero Piece** | A piece you own, held in your deck. Can be any rarity. |
-| **Stage Piece** | A piece the stage places itself, such as the enemy army. Always Normal rarity. |
-| **Rarity** | A piece's tier: Normal, Rare, Epic, Unique, Legendary. The King has none. The shop's highest tier rises with each act (Act I: Rare). |
+| **Hero Piece** | A piece you own, held in your deck. Can be any rarity. Never a pawn. |
+| **Stage Piece** | A piece the stage places itself: the enemy army (always Normal rarity) and your spawned pawns. |
+| **Spawned pawn** | A free pawn the stage gives you, with a rolled rarity. Lives for one stage only. |
+| **Promotion** | A spawned pawn reaching rank 8 becomes a new deck piece, usually one rarity tier higher. |
+| **Rarity** | A piece's tier: Normal, Rare, Unique, Legendary. The King has none. Higher tiers give knights, bishops, rooks and queens new abilities and cost more; the highest tier available rises with each act (Act I: Rare). |

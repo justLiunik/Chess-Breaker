@@ -1,9 +1,12 @@
 # RunState mid-run, at the start of Act II stage 2.
 #
 # Demonstrates the state that actually needs saving: per-instance durability,
-# skill charges part-spent, and cumulative history. Two pieces have been lost to
-# captures (knight, pawn) and one pawn is down to a single deployment.
-# The shop-bought knight is Rare: the highest tier the Act I pool can offer.
+# rarity, skill charges part-spent, and cumulative history. Two starter pieces
+# have been lost to captures (p_knight_02, p_bishop_04) and two survivors are
+# down to a single deployment.
+# - The shop-bought knight is Rare: the highest tier the Act I pool can offer.
+# - The rook came from promotion in Act II stage 1: a Rare spawned pawn reached
+#   rank 8 and rolled one tier up, to Unique (allowed: the Act II ceiling).
 #
 # Note the economy shape: 18 coins is "comfortable" — one meaningful purchase
 # this shop, not a rebuild.
@@ -25,58 +28,40 @@ deck:
     acquiredAtStage: 0
     status: in_deck
 
-  - instanceId: p_pawn_02
-    pieceType: pawn
+  - instanceId: p_knight_03
+    pieceType: knight
     rarity: normal
-    durability: 3
-    durabilityMax: 3
+    durability: 1
+    durabilityMax: 2
     origin: starter
     acquiredAtStage: 0
     status: in_deck
 
-  - instanceId: p_pawn_03
-    pieceType: pawn
+  - instanceId: p_bishop_05
+    pieceType: bishop
     rarity: normal
-    durability: 2
-    durabilityMax: 3
-    origin: starter
-    acquiredAtStage: 0
-    status: in_deck
-
-  - instanceId: p_pawn_04
-    pieceType: pawn
-    rarity: normal
-    durability: 3
-    durabilityMax: 3
+    durability: 1
+    durabilityMax: 2
     origin: starter
     acquiredAtStage: 0
     status: in_deck
 
   - instanceId: p_knight_08
     pieceType: knight
-    rarity: rare                  # bought after Act I stage 2 — Act I pool caps at Rare
-    durability: 1
+    rarity: rare
+    durability: 2
     durabilityMax: 2
     origin: shop
     acquiredAtStage: 2
     status: in_deck
 
-  - instanceId: p_bishop_07
-    pieceType: bishop
-    rarity: normal
-    durability: 2
-    durabilityMax: 2
-    origin: starter
-    acquiredAtStage: 0
-    status: in_deck
-
   - instanceId: p_rook_09
     pieceType: rook
-    rarity: normal
+    rarity: unique
     durability: 2
     durabilityMax: 2
-    origin: shop
-    acquiredAtStage: 5
+    origin: promotion
+    acquiredAtStage: 4
     status: in_deck
 
 loadout:

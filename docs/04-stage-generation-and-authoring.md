@@ -43,6 +43,10 @@ enemyArmy:            # ranges are inclusive [min, max]
   rook:   [0, 1]
 enemyZone: [7, 8]     # enemy occupies these ranks (Black side)
 
+spawnedPawns:         # free, stage-only pawns for the player (docs/02 §2.1)
+  count: [2, 2]
+  ranks: [3, 4]       # rank 8 must be reachable within turnLimit
+
 deploymentRanks: [1, 2]
 deploymentsPerTurn: 1
 focusPool: 3
@@ -55,12 +59,17 @@ preconditions:
   - enemy_value_in_band
   - threshold_feasible
   - deployment_squares_available
+  - spawned_pawns_placed
 ```
 
-Templates never specify the player's army — that comes from the deck. Templates never specify the
-enemy's exact squares — that is generated within `enemyZone`. Templates never specify **rarity**:
-every piece a template produces is a Stage Piece, locked to Normal
-([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
+Templates never specify the player's deck army — that comes from the deck. Templates never specify
+exact squares — those are generated within `enemyZone` and `spawnedPawns.ranks`. Templates never
+specify **rarity**: enemy pieces are locked to Normal, and spawned pawns roll theirs from the act's
+rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
+
+Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
+further away makes it a costly detour from the coin preview. The validator rejects a template whose
+lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone`.
 
 Template authoring is a **design** activity, not a content grind: a template is ~15 lines and yields
 a large family of stages.
@@ -77,6 +86,7 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 | **G2** | Roll enemy army from `enemyArmy` ranges. Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
 | **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start) | Retry placement (max 50 tries) → regenerate |
 | **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks`. These are Hero Pieces and keep their own rarity | Regenerate |
+| **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
 | **G5** | Compute material threshold; verify `threshold ≤ 0.75 × enemyMaterialValue` | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
 | **G7** | **Solver check** (§5) using the current board + remaining deck | Regenerate |
@@ -97,6 +107,7 @@ an unverified stage. This is a **fail-loud** path, not a silent fallback.
 | `threshold_feasible` | `materialThreshold ≤ 0.75 × enemyValue` | There must be enough enemy material to capture. Domination is measured as a **captured-minus-lost swing** ([02 §7](02-rules-framework.md#7-stage-end-evaluation)), so this is the only material-feasibility question. |
 | `deployment_squares_available` | ≥ 2 empty squares in `deploymentRanks` | Deployment must be possible later |
 | `no_precheck` | The player's king is not in check at stage start | The opening line must be playable |
+| `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity and `promotesTo` within the act ceiling | Promotion must be a real, visible option from turn 1 |
 
 ## 5. The solver
 
@@ -104,9 +115,12 @@ The solver answers exactly one question: **"can this stage be won within the tur
 deck and this loadout?"** It does not need to find the *best* line, only a winning one — which keeps
 it tractable.
 
-"This deck" includes each Hero Piece's rarity. Rarity has no in-play effect today, so the solver
-ignores it; if Open Decision O ([11](11-open-decisions.md#o-rarity-effects)) gives tiers an effect,
-the solver must model that effect before any such piece can appear in a stage.
+"This deck" includes each Hero Piece's rarity, because rarity changes movement: the solver generates
+moves with the abilities of [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities) (ally leaps,
+extra leaps and steps, multi-capture, the Legendary knight's free second move). Lifeline does not
+affect a stage — the queen still leaves the board — so the solver ignores it. It also models spawned pawns and promotion,
+including deploying a freshly promoted piece later in the same stage. Because every promotion result is
+rolled at generation, the solver sees exactly what the player sees.
 
 ### Search shape
 
@@ -119,8 +133,11 @@ the solver must model that effect before any such piece can appear in a stage.
   - `DEPLOY` + one skill
   - skill + `MOVE` + `MOVE` (Twin Step lines)
   - `DEPLOY` + `MOVE` (when credits allow)
-- **Move enumeration** is chess-legal generation; skills add a small multiplicative factor (bounded
-  by charges remaining).
+  - `MOVE` + bonus `MOVE` (Legendary knight; also combined with each line above)
+- **Move enumeration** is chess-legal generation plus rarity abilities; skills add a small
+  multiplicative factor (bounded by charges remaining). Rare+ knights and bishops widen per-piece
+  branching, and a Legendary knight roughly squares its own; these are the first places to look if
+  solver budgets are exceeded.
 - **Enemy replies** are enumerated for `best_move` policy deterministically at the template's depth,
   or single-line for `scripted`.
 
@@ -196,7 +213,8 @@ The **checkmate share** is the single best health metric for a template.
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
 | Threshold feasibility | 100% of stages satisfy `threshold ≤ 0.75 × enemyValue` |
 | Deployment availability | 100% of stages have ≥2 free deployment squares |
-| Stage rarity | 100% of Stage Pieces are Normal (I13); opening-line pieces match their deck instance's rarity |
+| Stage rarity | 100% of enemy pieces are Normal (I13); opening-line pieces match their deck instance's rarity; spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
+| Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks, with promotion reachable in the turn limit |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |
 | Difficulty banding | Median solver win turn within ±20% of the template's target band |

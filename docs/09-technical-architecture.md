@@ -64,17 +64,18 @@ Boundary rules:
 type Square = string;                          // 'a1' … 'h8'
 type PieceType = 'king' | 'pawn' | 'knight' | 'bishop' | 'rook' | 'queen';
 type Color = 'white' | 'black';
-type Rarity = 'normal' | 'rare' | 'epic' | 'unique' | 'legendary';   // ascending; docs/06 §4
+type Rarity = 'normal' | 'rare' | 'unique' | 'legendary';   // ascending; docs/06 §4
 
 interface PieceInstance {                // a Hero Piece
   instanceId: string;
-  pieceType: PieceType;
+  pieceType: Exclude<PieceType, 'pawn'>;  // pawns never enter the deck
   rarity: Rarity | null;         // fixed at creation; null = king only (I12)
   durability: number | null;     // remaining deployments; null = immortal (king)
-  durabilityMax: number | null;  // null = immortal (king)
-  origin: 'starter' | 'shop' | 'reward';
+  durabilityMax: number | null;  // null = immortal (king); depends on rarity for some types
+  origin: 'starter' | 'shop' | 'promotion' | 'reward';
   acquiredAtStage: number;
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
+  usedOnce?: Array<'lifeline'>;  // once-per-run rarity abilities already used
 }
 
 interface LoadedSkill { skillId: string; charges: number; chargesMax: number; }
@@ -97,7 +98,11 @@ interface BoardPiece {
   pieceType: PieceType;
   color: Color;
   instanceId?: string;             // present only for Hero Pieces; rarity is read from the deck
-                                   // instance. Absent = Stage Piece, implicitly Normal (I13).
+                                   // instance. Absent = Stage Piece.
+  spawned?: true;                  // a spawned pawn (player-side Stage Piece), docs/02 §2.1
+  rarity?: Rarity;                 // spawned pawns only; enemy pieces are implicitly Normal (I13)
+  promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
+                                   // spawned pawns only; rolled at generation, shown to the player
   transformed?: { pieceType: PieceType; modifierId: string };
 }
 
@@ -175,6 +180,8 @@ function rng(seed: string, cursor: number): { value: number; next: number }
   - `enemySeed          = hash(stageSeed, turnsUsed)`
   - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)` — covers piece
     type *and* rarity rolls, including rerolls
+  - spawned-pawn rarity and `promotesTo` are drawn from `stageSeed` during generation (G4b), never
+    at the moment of promotion — so the engine's rules still consume no randomness
 
 Because every random decision is a pure function of `(seed, cursor)`, a run is fully reproducible
 from a short string — which powers bug reports, QA replay, and (later) seed sharing.
@@ -183,7 +190,7 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 
 | Module | Owns | Must not |
 |---|---|---|
-| `engine/board` | Square math, move generation per piece type | Know about durability or skills |
+| `engine/board` | Square math, move generation per piece type and rarity ability (data-driven from `pieces.yaml`) | Know about durability or skills |
 | `engine/legality` | Per-action legality, end-state invariants | Know about transitions/durations |
 | `engine/queue` | Sequential cost accounting, simulate/apply | Decide win conditions |
 | `engine/rules` | End-of-turn order R1–R5, stage end evaluation | Render or animate |
@@ -205,7 +212,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Branching run map | `RunState.history` already records a path; add `RunState.route` |
 | Skills with new primitives | `engine/skills` primitive registry — add one entry, no other change |
 | Meta-progression | `RunState` gains no fields; a separate `ProfileState` is added beside it |
-| Rarity effects (decision O) | `PieceInstance.rarity` already exists; effects enter as `data/economy.yaml → rarity` constants and, for traits, entries in the `engine/skills` primitive registry |
+| New rarity abilities (decision O follow-ups) | New `rarityAbilities` entries in `pieces.yaml`; a genuinely new behaviour adds one piece-ability primitive, nothing else |
 | Neutral Stage Pieces (decision P) | `BoardPiece.color` gains a third value; still no `instanceId` |
 
 ## 8. Persistence
@@ -223,7 +230,12 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
 | Invariants | Property tests asserting I1–I13 over generated random queues (fuzz) |
-| Shop rarity | Property test over seeded shop rolls: I14 holds for every act, guaranteed slots are Normal |
+| Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
+| Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
+| Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces in swing and salvage |
+| Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
+| Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
+| Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, deployable in the same queue; over-capacity cut fires at stage end |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate(q).state === apply(q).state` for random legal-ish queues |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |

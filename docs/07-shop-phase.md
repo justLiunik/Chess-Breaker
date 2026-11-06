@@ -31,14 +31,16 @@ Five slots, generated from the run seed **after** the stage's coins are awarded:
 
 | Slot | Source | Guarantee |
 |---|---|---|
-| 1 | **Pawn** | Always present, always affordable (§3) |
-| 2 | **Piece** | One random piece, at least one of knight/bishop/rook |
+| 1 | **Piece** | One random knight, bishop or rook — or the recovery offer (§3) |
+| 2 | **Piece** | One random piece |
 | 3 | **Piece or Skill** | Random |
 | 4 | **Piece or Skill** | Random |
 | 5 | **Service** | Repair, deck slot, or reroll |
 
 Generation rules:
 
+- **Pawns are never sold.** The shop offers knights, bishops, rooks and queens only; pawns come from
+  the stage ([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)).
 - Every piece offer is a **Hero Piece** and carries a rarity tier (see §2.1).
 - No item may exceed the player's `maxCapacity` implications (no deck slot offer at max capacity).
 - Repair is only offered if at least one piece has durability below its max.
@@ -50,68 +52,86 @@ Generation rules:
 
 ### 2.1 Rarity pool and progression gating
 
-Rarity is rolled for every **random** piece offer (a piece in slots 2–4), after its piece type, from
-the pool of the act whose stage was just cleared — the same act whose prices apply. The roll uses
-the shop seed, so it is reproducible like the rest of the stock.
+Rarity is rolled for every **random** piece offer (any piece in slots 1–4 except the recovery
+offer), after its piece type, from the pool of the act whose stage was just cleared — the same act
+whose prices apply. The roll uses the shop seed, so it is reproducible like the rest of the stock.
+The same act pools also set the rarity of each stage's spawned pawns
+([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)).
 
-| Pool (act cleared) | Ceiling | Normal | Rare | Epic | Unique | Legendary |
-|---|---|---|---|---|---|---|
-| **Act I** | **Rare** | 75 | 25 | — | — | — |
-| **Act II** | Unique | 45 | 35 | 15 | 5 | — |
-| **Act III** | Legendary | 25 | 35 | 25 | 12 | 3 |
+| Pool (act) | Ceiling | Normal | Rare | Unique | Legendary |
+|---|---|---|---|---|---|
+| **Act I** | **Rare** | 75 | 25 | — | — |
+| **Act II** | Unique | 50 | 38 | 12 | — |
+| **Act III** | Legendary | 30 | 40 | 24 | 6 |
 
 Weights are relative; `—` means weight 0, impossible. Values live in
-[`data/economy.yaml`](../data/economy.yaml) → `rarity.shopPool` and are provisional until the M6
+[`data/economy.yaml`](../data/economy.yaml) → `rarity.pool` and are provisional until the M6
 balance pass. The structural rules are not provisional:
 
-1. **The ceiling is hard.** No shop ever offers a piece above its act's ceiling — not via reroll, the
-   recovery offer, or any other path. Epic, Unique and Legendary pieces are impossible to acquire in
-   Act I.
+1. **The ceiling is hard.** Nothing in an act is above its ceiling — no shop offer, reroll,
+   recovery offer, spawned pawn or promotion result. Unique and Legendary pieces are impossible to
+   acquire in Act I.
 2. **Ceilings never go down.** A later act's ceiling is equal to or higher than an earlier act's.
-3. **Guaranteed slots are Normal.** The pawn floor (slot 1) and the recovery offer are always Normal.
-   Pity items are a floor, not a lottery.
-4. **Rerolls re-roll rarity too.** A reroll redraws type *and* tier for slots 2–4 from the same pool;
-   it cannot raise the ceiling.
-5. **No pity timer, no guarantee of a high tier.** A visit may offer only Normal pieces. Hidden
+3. **The recovery offer is Normal.** Pity items are a floor, not a lottery.
+4. **Rerolls re-roll rarity too.** A reroll redraws type *and* tier for slots 1–4 from the same pool
+   (keeping the recovery offer if it fired); it cannot raise the ceiling.
+5. **The Legendary queen is the rarest roll.** Any roll that lands on a Legendary queen — a shop
+   offer or a promotion result — keeps that tier only **20%** of the time (`rarity.retention`);
+   otherwise it becomes a Unique queen. In an Act III shop that turns a 6% Legendary chance per queen
+   offer into about 1.2%, roughly five times rarer than any other Legendary piece.
+6. **No pity timer, no guarantee of a high tier.** A visit may offer only Normal pieces. Hidden
    "bad-luck protection" would conflict with the fair-and-provable pillar; the pool is the whole truth,
    and the shop can show it (§6).
 
-The rarity tier's *effect* — and therefore whether it changes the price — is Open Decision O
-([11](11-open-decisions.md#o-rarity-effects)). Until it is decided, a piece's price depends only on
-its type and act.
+### 2.2 Prices by rarity
+
+```
+price = round(basePrice × rarityMultiplier × (1 + 0.20 × (act − 1)))
+rarityMultiplier:  Normal ×1 · Rare ×1.5 · Unique ×2 · Legendary ×3
+```
+
+| Piece (Act I base) | Normal | Rare | Unique | Legendary |
+|---|---|---|---|---|
+| Knight (8) | 8 | 12 | 16 | 24 |
+| Bishop (8) | 8 | 12 | 16 | 24 |
+| Rook (10) | 10 | 15 | 20 | 30 |
+| Queen (16) | 16 | 24 | 32 | 48 |
+
+Unique cannot appear in Act I and Legendary not before Act III, so those columns are only ever paid
+with that act's inflation on top. A tier that adds power adds cost — pillar 2. A Legendary bishop
+costs more than a Normal queen *and* deploys only once, so it is never the strictly better buy.
+The Legendary queen is the one deliberate outlier: at 48 base coins and with the rarest roll in the
+game, it is the run's most expensive and least likely item.
 
 ## 3. Guarantees
 
-### Pawn floor
+### No pawn floor
 
-Slot 1 is always a Pawn. If the player's coin balance is below the pawn price, it is offered **at
-their full balance** (minimum 1 coin). This is a floor, not a grant — it consumes everything they
-have.
-
-*Exploit assessment:* buying a pawn for 1 coin when pawns cost 3 requires having nearly banked
-nothing. The exploit's ceiling is a single pawn at a moment when the player has no other option; it
-is accepted as pity with negligible balance impact.
+Earlier designs kept a pawn in slot 1 so a broke player could always buy an action. Pawns are no
+longer sold: every stage now **spawns free pawns** for the player instead, so a broke player still
+gets extra pieces on the board every stage without spending a coin. The shop needs no floor item.
 
 ### Recovery offer
 
-If the player's **non-king deck contains fewer than `recoveryDeckThreshold` (4) pieces**, slot 2 is
-replaced by a guaranteed **Normal-rarity** replacement piece at **50% of its normal price**.
+If the player's **non-king deck contains fewer than `recoveryDeckThreshold` (4) pieces**, slot 1 is
+replaced by a guaranteed **Normal-rarity knight or bishop** at **50% of its normal price**.
 
 This is insurance against one catastrophic stage, not an ongoing subsidy: the offer disappears as
-soon as the deck is back to 4 pieces. It fires in addition to the pawn floor.
+soon as the deck is back to 4 pieces.
 
 ## 4. Purchases
 
 | Category | Item | Notes |
 |---|---|---|
-| **Piece** | Any of pawn / knight / bishop / rook / queen, at a rolled rarity (§2.1) | Creates a **new Hero Piece instance** at full durability with that rarity; must fit in capacity |
+| **Piece** | Any of knight / bishop / rook / queen, at a rolled rarity (§2.1) — never a pawn | Creates a **new Hero Piece instance** at full durability for its type and rarity; must fit in capacity |
 | **Skill** | One of the skill catalogue | Occupies a loadout slot (3 max); permanent for the run |
 | **Skill upgrade** | A skill already owned | **+1 charge** at 50% price — deepen a build, don't widen it |
 | **Repair** | +1 durability to one chosen piece | Never above that piece's max; not offered for `spent` pieces |
 | **Deck slot** | +1 capacity | Up to 14 |
-| **Reroll** | Reroll slots 2–5 | First reroll each visit free, then 2 coins |
+| **Reroll** | Reroll slots 1–5 (except a recovery offer) | First reroll each visit free, then 2 coins |
 
-Prices inflate per act by 20% ([05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)).
+Prices inflate per act by 20% and scale with rarity (§2.2,
+[05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)).
 
 ### Purchase flow
 
@@ -137,18 +157,19 @@ genuine strategic option, not a failure state, and the UI should not frame it as
 ┌──────────────────────────────────────────────────────────────────────┐
 │  CHECKBREAKER              ACT II · STAGE 2          ◈ 18 coins      │
 ├──────────────────────────────────────────────────────────────────────┤
-│  DECK (7 / 8)                           LOADOUT (2 / 3)              │
-│  ┌────┐┌────┐┌────┐┌────┐┌────┐┌────┐   ┌─────────────┐┌────────────┐│
-│  │ P  ││ P  ││ P  ││ N  ││ B  ││ R  │   │ ● Twin Step ││ ● Lockdown ││
-│  │●●● ││●●○ ││●●● ││●○  ││●●  ││●○  │   │ 3 charges   ││ 3 charges  ││
-│  └────┘└────┘└────┘└────┘└────┘└────┘   └─────────────┘└────────────┘│
+│  DECK (4 / 8)                           LOADOUT (2 / 3)              │
+│  ┌────┐┌────┐┌────┐┌────┐               ┌─────────────┐┌────────────┐│
+│  │ N  ││ B  ││ N  ││ R  │               │ ● Twin Step ││ ● Lockdown ││
+│  │ Nrm││ Nrm││ Rar││ Unq│               │ 3 charges   ││ 3 charges  ││
+│  │●○  ││●○  ││●●  ││●●  │               │             ││            ││
+│  └────┘└────┘└────┘└────┘               └─────────────┘└────────────┘│
 ├──────────────────────────────────────────────────────────────────────┤
 │  SHOP                                                                │
 │  ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐                  │
-│  │ PAWN   ││ ROOK   ││ Queen  ││ BISHOP ││ REPAIR │                  │
-│  │ Normal ││ Rare   ││ Epic   ││ Normal ││        │                  │
-│  │ ◈ 3    ││ ◈ 12   ││ ◈ 19   ││ ◈ 10   ││ ◈ 4    │                  │
-│  │ ●●●    ││ ●●     ││ ●      ││ ●●     ││ +1 pip │                  │
+│  │ KNIGHT ││ ROOK   ││ QUEEN  ││ BISHOP ││ REPAIR │                  │
+│  │ Normal ││ Rare   ││ Unique ││ Normal ││        │                  │
+│  │ ◈ 10   ││ ◈ 18   ││ ◈ 38   ││ ◈ 10   ││ ◈ 4    │                  │
+│  │ ●●     ││ ●●     ││ ●      ││ ●●     ││ +1 pip │                  │
 │  │[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   │                  │
 │  └────────┘└────────┘└────────┘└────────┘└────────┘                  │
 │  POOL Act II · up to Unique   [ Reroll ◈ 0 ]   [ Leave shop ]        │
@@ -160,7 +181,10 @@ Design notes:
 - **Deck with durability pips visible while shopping** — the purchase decision depends on deck health.
 - **Durability pips on item cards** so the player compares like with like.
 - Price of a piece the player cannot afford is shown in a muted color, never hidden.
-- **Rarity on every piece card**, as a tier name plus frame shape ([06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
+- **Rarity on every piece card and deck tile**, as a tier name (abbreviated on deck tiles) plus frame
+  shape ([06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)). Hovering a
+  card lists that tier's movement abilities.
+- **No pawn card, ever** — the deck shows no pawns either; they belong to the stage.
 - **The pool line** states the current act's ceiling ("up to Unique"); hovering it shows the weight
   table from §2.1. The player can always see what the shop *could* have offered.
 - The loadout panel shows **remaining charges** (they refresh next stage — the shop should say so on
@@ -170,7 +194,7 @@ Design notes:
 
 | Case | Resolution |
 |---|---|
-| No items affordable | Pawn floor is discounted to balance (min 1) or the leave button is the only action |
+| No items affordable | Leave is the only action; next stage's spawned pawns still arrive for free |
 | Capacity full, tries to buy a piece | Blocked with an explicit "cut a piece" chooser; cuts are permanent and confirmed |
 | All non-king pieces spent, deck effectively empty | Recovery offer fires; run continues |
 | Repair target has no damage | Repair not offered in stock generation |
@@ -180,4 +204,5 @@ Design notes:
 | Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
 | Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
 | Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |
+| Deck over capacity from a promotion | The stage-end cut chooser runs before the shop opens, so the shop always opens with a legal deck |
 | Shop opens on a lost stage | Impossible by definition — the run is over |

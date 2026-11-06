@@ -107,7 +107,17 @@ This is the signature UI and the game's main skill-expression surface.
   line that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
 - If the target leaves the king in check, the square is marked invalid with a king-safety icon.
 - The tray shows durability pips and the rarity marker (tier name + frame shape), and disables pieces
-  with `spent` status. On the board, Hero Pieces keep their rarity frame; Stage Pieces have none.
+  with `spent` status. On the board, Hero Pieces and spawned pawns keep their rarity frame; enemy
+  pieces have none.
+- Each spawned pawn always shows its promotion result ("→ Rare Knight") and the number of moves it
+  still needs, so promotion competes visibly with the coin preview.
+- Selecting a Rare+ bishop or knight highlights the extra squares its abilities reach; leap-only
+  (non-capturing) squares are marked differently from capture squares. A Legendary knight shows
+  "bonus move available" after its first move each turn.
+- A Legendary rook or queen that can multi-capture shows both targets on the line; choosing the
+  second target is a separate, explicit click, so stopping on the first is always one click away.
+  When the second square holds the king, it is marked "check" — never as a capture.
+- A Unique+ queen shows its lifeline as available or used on its deck tile.
 
 ## 4. The Run Map
 
@@ -118,7 +128,7 @@ Minimal — this is a puzzle game with a run wrapper, not a map crawl.
    ┌──┐ ┌──┐ ┌────┐  ┌──┐ ┌──┐ ┌────┐  ┌──┐ ┌──┐ ┌────┐
    │✔ │→│✔ │→│ ★  │  │✔ │→│▶ │ │ ★  │  │ ▢│ │ ▢│ │ ★  │
    └──┘ └──┘ └────┘  └──┘ └──┘ └────┘  └──┘ └──┘ └────┘
-   SEED 7F3A-2210        ◈ 18 coins        DECK 7/8
+   SEED 7F3A-2210        ◈ 18 coins        DECK 4/8
 ```
 
 Shows: act/stage progress, coins, deck size, and the **seed code** (for bug reports and sharing).
@@ -135,7 +145,9 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | Run 1, Act I stage 2 | Deployment and durability | Deck shown with pips; first deploy is prompted |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
 | Act I boss | Material domination as an alternative win | Threshold visibly marked on the HUD |
+| Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
+| First Rare+ piece acquired | That tier's ability | The piece card shows the ability sentence once; its first selection previews the new squares |
 | Act III | Everything composes | No scaffolding |
 
 Rules for teaching:
@@ -192,5 +204,6 @@ scouting.
 - ❌ A shop that pressures with a timer.
 - ❌ Sorting the deck by durability (it reshuffles under the player's hand).
 - ❌ Any screen where the coin preview is not visible.
+- ❌ A promotion result revealed only when the pawn arrives — it is always shown in advance.
 - ❌ Rarity shown by glow or by the threat/rule-breaking accent colors — rarity must never read as
   danger. Tier name plus frame shape, never color alone.
