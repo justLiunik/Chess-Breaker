@@ -5,13 +5,24 @@
   "description": "A chess-puzzle roguelike where you break one rule at a time.",
   "type": "module",
   "scripts": {
-    "validate": "node scripts/validate-content.mjs"
+    "validate": "node scripts/validate-content.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "play": "tsx scripts/play.ts"
   },
   "devDependencies": {
+    "@types/node": "^24.19.2",
     "ajv": "^8.17.1",
+    "chess.js": "1.4.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5",
     "yaml": "^2.6.1"
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
