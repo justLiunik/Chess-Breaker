@@ -1,0 +1,122 @@
+[
+  {
+    "fen": "4k3/ppp2pp1/2n5/8/2P5/5P2/8/RB2K3 b - - 0 1",
+    "best": [
+      {
+        "from": "g7",
+        "to": "g6"
+      }
+    ],
+    "score": 164,
+    "evaluate": 138,
+    "legalBlack": 19
+  },
+  {
+    "fen": "4k3/pp3ppp/2n1b3/8/3P4/2P5/3N4/R2BK3 b - - 0 1",
+    "best": [
+      {
+        "from": "e8",
+        "to": "d7"
+      }
+    ],
+    "score": 199,
+    "evaluate": 160,
+    "legalBlack": 30
+  },
+  {
+    "fen": "6k1/5ppp/3n4/2b5/8/2P1P3/1B6/R3K2N b - - 0 1",
+    "best": [
+      {
+        "from": "f7",
+        "to": "f5"
+      }
+    ],
+    "score": 47,
+    "evaluate": 62,
+    "legalBlack": 21
+  },
+  {
+    "fen": "r5k1/1p3ppp/2n1b3/8/8/2P2P2/3N4/R1B1KQ2 b - - 0 1",
+    "best": [
+      {
+        "from": "a8",
+        "to": "a1"
+      }
+    ],
+    "score": 132,
+    "evaluate": 68,
+    "legalBlack": 39
+  },
+  {
+    "fen": "2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3 b - - 0 1",
+    "best": [
+      {
+        "from": "h7",
+        "to": "h6"
+      }
+    ],
+    "score": 184,
+    "evaluate": 150,
+    "legalBlack": 30
+  },
+  {
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1",
+    "best": [
+      {
+        "from": "d7",
+        "to": "d5"
+      }
+    ],
+    "score": 146,
+    "evaluate": 40,
+    "legalBlack": 20
+  },
+  {
+    "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b - - 0 1",
+    "best": [
+      {
+        "from": "e7",
+        "to": "d6"
+      }
+    ],
+    "score": 158,
+    "evaluate": 92,
+    "legalBlack": 41
+  },
+  {
+    "fen": "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 b - - 0 10",
+    "best": [
+      {
+        "from": "h7",
+        "to": "h6"
+      }
+    ],
+    "score": 149,
+    "evaluate": 97,
+    "legalBlack": 46
+  },
+  {
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1",
+    "best": [
+      {
+        "from": "d7",
+        "to": "d5"
+      }
+    ],
+    "score": 146,
+    "evaluate": 63,
+    "legalBlack": 29
+  },
+  {
+    "fen": "2r3k1/pp3ppp/2n1b3/3p4/3P4/2NB1N2/PP3PPP/2R3K1 b - - 0 1",
+    "best": [
+      {
+        "from": "f7",
+        "to": "f6"
+      }
+    ],
+    "score": 119,
+    "evaluate": 63,
+    "legalBlack": 29
+  }
+]

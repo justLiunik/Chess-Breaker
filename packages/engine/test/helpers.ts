@@ -92,6 +92,15 @@ export const MIDGAME_FENS: string[] = [
   '2r3k1/pp3ppp/2n1b3/3p4/3P4/2NB1N2/PP3PPP/2R3K1 b - - 0 1',
 ];
 
+/** Sparse boards like real stages, Black to move: the enemy-search benchmark positions. */
+export const GAME_FENS: string[] = [
+  '4k3/ppp2pp1/2n5/8/2P5/5P2/8/RB2K3 b - - 0 1',
+  '4k3/pp3ppp/2n1b3/8/3P4/2P5/3N4/R2BK3 b - - 0 1',
+  '6k1/5ppp/3n4/2b5/8/2P1P3/1B6/R3K2N b - - 0 1',
+  'r5k1/1p3ppp/2n1b3/8/8/2P2P2/3N4/R1B1KQ2 b - - 0 1',
+  '2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3 b - - 0 1',
+];
+
 export function fenToStage(fen: string, overrides: Partial<StageState> = {}): StageState {
   const placement = fen.split(' ')[0]!;
   const pieces: Record<Square, string> = {};
