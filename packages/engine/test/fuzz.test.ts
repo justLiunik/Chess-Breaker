@@ -22,7 +22,7 @@ function kings(board: StageState['board']): { white: number; black: number } {
   return { white, black };
 }
 
-function replay(stage: StageState, queue: Action[]): number {
+function replay(stage: StageState, queue: Action[]): { made: number; board: StageState['board'] } {
   let board = stage.board;
   let made = 0;
   for (const a of queue) {
@@ -31,7 +31,7 @@ function replay(stage: StageState, queue: Action[]): number {
     board = applyPlayerMove(board, a.from, a.to, config).board;
     made++;
   }
-  return made;
+  return { made, board };
 }
 
 describe('fuzz: queue invariants', () => {
@@ -51,11 +51,13 @@ describe('fuzz: queue invariants', () => {
         const k = kings(end.board);
         expect(k).toEqual({ white: 1, black: 1 }); // I1, I3
         expect(inCheck(fromBoard(end.board), 'white')).toBe(false); // I2
-        const made = replay(stage, queue); // I4
+        const { made, board } = replay(stage, queue); // I4
+        expect(end.board).toEqual(board);
         expect(made).toBeLessThanOrEqual(credits); // I5
         expect(r.value.events.filter((e) => e.type === 'move')).toHaveLength(made);
       } else {
         refused++;
+        expect(r.error.kind).not.toBe('invariant_violation'); // I1/I3 would surface only here
       }
       if (i % COMMIT_EVERY === 0) {
         const c = commitQueue(run, stage, queue, config);

@@ -66,7 +66,7 @@ describe('commitQueue', () => {
     const v = ok(commitQueue(runOf(), stage, mv('a1', 'a2'), config));
     expect(v.events).toContainEqual({ type: 'enemy_fell_back', cursor: 0 });
     expect(v.stage.enemyPolicy.fellBack).toBe(true);
-    const again = ok(commitQueue(runOf(), { ...v.stage, phase: 'action' }, mv('a2', 'a3'), config));
+    const again = ok(commitQueue(runOf(), v.stage, mv('a2', 'a3'), config));
     expect(types(again.events)).not.toContain('enemy_fell_back');
   });
 
@@ -106,10 +106,11 @@ describe('commitQueue', () => {
   });
 
   it('does not mutate frozen inputs and passes errors through', () => {
-    const stage = stageOf({ e1: 'K', a1: 'R', e8: 'k' }, { enemyPolicy: depth1 });
+    const stage = deepFreeze(stageOf({ e1: 'K', a1: 'R', e8: 'k' }, { enemyPolicy: depth1 }));
     const run = deepFreeze(runOf());
-    ok(commitQueue(run, stage, mv('a1', 'a2'), config));
-    const bad = commitQueue(run, stage, [], config);
+    const queue = deepFreeze(mv('a1', 'a2'));
+    ok(commitQueue(run, stage, queue, config));
+    const bad = commitQueue(run, stage, deepFreeze([]), config);
     expect(bad).toEqual({ ok: false, error: { kind: 'empty_queue' } });
   });
 });

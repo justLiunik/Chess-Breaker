@@ -73,10 +73,10 @@ export function commitQueue(
 
   // R5: the enemy replies.
   const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
-  if (picked.move) {
+  const mover = picked.move ? next.board[picked.move.from] : undefined;
+  if (picked.move && mover) {
     const { from, to } = picked.move;
     const board = { ...next.board };
-    const mover = board[from]!;
     delete board[from];
     events.push({ type: 'enemy_move', from, to });
     const taken = board[to];
