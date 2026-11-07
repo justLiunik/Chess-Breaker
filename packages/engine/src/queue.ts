@@ -25,9 +25,11 @@ export function applyPlayerMove(
     });
   }
 
-  if (mover.pieceType === 'pawn' && mover.color === 'white' && to.endsWith('8') && mover.promotesTo) {
+  if (mover.pieceType === 'pawn' && mover.color === 'white' && to.endsWith('8')) {
     delete next[to];
-    events.push({ type: 'pawn_promoted', square: to, promotesTo: mover.promotesTo });
+    if (mover.promotesTo) {
+      events.push({ type: 'pawn_promoted', square: to, promotesTo: mover.promotesTo });
+    }
   } else {
     next[to] = mover;
   }

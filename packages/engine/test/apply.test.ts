@@ -53,4 +53,20 @@ describe('applyPlayerMove', () => {
     expect(r.events.map((e) => e.type)).toEqual(['move', 'capture', 'pawn_promoted']);
     expect(r.salvage).toBe(1);
   });
+
+  it('white pawn without promotesTo still leaves the board, move event only', () => {
+    const s = stageOf({ e1: 'K', c7: 'P', h8: 'k' });
+    const bare = { ...s.board, c7: { pieceType: 'pawn' as const, color: 'white' as const } };
+    const r = applyPlayerMove(bare, 'c7', 'c8', config);
+    expect(r.board['c8']).toBeUndefined();
+    expect(r.events.map((e) => e.type)).toEqual(['move']);
+  });
+
+  it('salvage disabled: capture event still emitted with salvage 0', () => {
+    const s = stageOf({ e1: 'K', a1: 'R', a5: 'q', h8: 'k' });
+    const off = { ...config, economy: { ...config.economy, salvage: { enabled: false, divisor: 3 } } };
+    const r = applyPlayerMove(s.board, 'a1', 'a5', off);
+    expect(r.salvage).toBe(0);
+    expect(r.events[1]).toMatchObject({ type: 'capture', salvage: 0 });
+  });
 });
