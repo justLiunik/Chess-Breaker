@@ -88,20 +88,24 @@ by making stage selection a meta-strategy, and multiplies template validation su
 
 ## H. Monetization
 
-**Question:** premium, free-with-cosmetics, or ad-supported web?
-**Default:** undefined. No monetization hooks are built into the architecture — no currency other
-than coins, no timers, no ad slots.
-**Constraint:** any future model must not gate durability, repairs, or turn limits. Selling
-durability would directly contradict pillar 2.
-**Trigger:** before any public build.
+**Status:** **decided — none.** Checkbreaker is a personal, non-commercial project. There is no
+monetization, and no monetization hooks are built into the architecture — no currency other than
+coins, no timers, no ad slots.
+**Constraint if this ever changes:** any model must not gate durability, repairs, or turn limits.
+Selling durability would directly contradict pillar 2. A public or commercial release would also
+reopen the Stockfish licence question ([09 §1](09-technical-architecture.md#stockfish-as-a-design-tool-offline-only))
+and decision I.
+**Trigger:** only if the project is ever made public or commercial.
 
 ---
 
 ## I. Working title & branding
 
 **Question:** is "Checkbreaker" usable?
-**Default:** provisional working title used throughout the docs.
-**Trigger:** before storefront or domain registration; requires a trademark search.
+**Default:** provisional working title used throughout the docs. For a personal, non-commercial
+project the name needs no clearance.
+**Trigger:** only before a public release, storefront, or domain registration; then it requires a
+trademark search.
 
 ---
 

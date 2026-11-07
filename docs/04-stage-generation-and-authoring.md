@@ -60,14 +60,28 @@ preconditions:
   - spawned_pawns_placed
 ```
 
-Templates never specify the player's deck army — that comes from the deck. Templates never specify
-exact squares — those are generated within `enemyZone` and `spawnedPawns.ranks`. Templates never
+Templates never specify the player's deck army — that comes from the deck. A normal template never
+specifies exact squares — those are generated within `enemyZone` and `spawnedPawns.ranks`. Templates never
 specify **rarity**: enemy pieces are locked to Normal, and spawned pawns roll theirs from the act's
 rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
 further away makes it a costly detour from the coin preview. The validator rejects a template whose
 lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone`.
+
+**Fixed (set-piece) templates.** A template with `placement: fixed` replaces `enemyArmy` and
+`enemyZone` with `fixedEnemy`, a hand-written square for every enemy piece, king included. Use it
+for the few moments where an authored position matters more than variety — the run-1 tutorial stage
+and signature bosses — usually paired with a `scripted` enemy. Everything else stays generated: the
+opening line, spawned pawns, rarities, and the solver check against the player's actual deck. A fixed
+template that the deck cannot solve fails like any other and falls through to the next template
+(§3). Example: `tpl-act1-first-steps`.
+
+**Why mostly generated, not hand-made.** The player's deck differs every run (rarities, promotions,
+merges), so a fixed puzzle can be impossible for one deck and trivial for another, and fixed boards
+are memorized after a few runs. Templates keep the encounter's *shape* authored while the solver
+proves each *instance* fair. Stockfish may help author templates offline, but it cannot validate a
+stage: it does not know these rules ([09 §1](09-technical-architecture.md#stockfish-as-a-design-tool-offline-only)).
 
 Template authoring is a **design** activity, not a content grind: a template is ~15 lines and yields
 a large family of stages.
@@ -81,8 +95,8 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 |---|---|---|
 | **G0** | Derive seed: `hash(runSeed, actIndex, stageIndex)` | — |
 | **G1** | Select template: filter by act + tier, weighted; exclude templates used in the previous stage of the same act where possible | No template → engine bug (every act/tier must have ≥2 templates) |
-| **G2** | Roll enemy army from `enemyArmy` ranges. Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
-| **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start) | Retry placement (max 50 tries) → regenerate |
+| **G2** | Roll enemy army from `enemyArmy` ranges (a fixed template takes `fixedEnemy` as-is). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
+| **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start); skipped for a fixed template | Retry placement (max 50 tries) → regenerate |
 | **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks`. These are Hero Pieces and keep their own rarity | Regenerate |
 | **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
 | **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
@@ -135,8 +149,14 @@ rolled at generation, the solver sees exactly what the player sees.
   multiplicative factor (bounded by charges remaining). Rare+ knights and bishops widen per-piece
   branching, and a Legendary knight roughly squares its own; these are the first places to look if
   solver budgets are exceeded.
-- **Enemy replies** are enumerated for `best_move` policy deterministically at the template's depth,
-  or single-line for `scripted`.
+- **Enemy replies are not branched.** The enemy is a deterministic function
+  (`enemyMove`, [02 §8.1](02-rules-framework.md#81-enemy-ai)), so after each candidate queue the solver
+  computes the *one* reply the enemy will actually play — including scripted lines and their fallback.
+  The solver is therefore a **single-agent search** over the player's queues, far cheaper than a
+  two-sided minimax, and its prediction always matches the real game.
+- **Enemy replies are memoized** per position (`generation.memoizeEnemyReplies`): the same position
+  never runs the enemy's search twice. Without this, an enemy search at every solver node would be
+  the dominant cost.
 
 ### Budgets and acceptance
 

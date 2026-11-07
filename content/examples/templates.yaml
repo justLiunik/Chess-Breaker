@@ -44,6 +44,45 @@ templates:
       slack to learn deployment and the turn counter without the stage being a
       free win. Depth-2 policy punishes obvious hangs only.
 
+  - id: tpl-act1-first-steps
+    title: First Steps
+    act: 1
+    tier: normal
+    turnLimit: 8
+    openingPlacements: 3
+    placement: fixed
+    fixedEnemy:
+      e8: king
+      a7: pawn
+      b7: pawn
+      c7: pawn
+      f7: pawn
+      g7: pawn
+      c6: knight
+    spawnedPawns:
+      count: [2, 2]
+      ranks: [3, 4]
+    deploymentRanks: [1, 2]
+    deploymentsPerTurn: 1
+    focusPool: 3
+    enemyPolicy:
+      type: scripted
+      line: [c6e5, e5c4, c4b6]
+      fallbackDepth: 2
+    preconditions:
+      - king_on_board
+      - no_precheck
+      - no_immediate_mate
+      - deployment_squares_available
+      - enemy_value_in_band
+      - spawned_pawns_placed
+    designNote: >-
+      Tutorial set piece for run 1, Act I stage 1 (docs/08 §5). The enemy army
+      is hand-placed and the knight follows a short script; if the player
+      captures it or blocks its path, the enemy falls back to a depth-2
+      best_move. The solver still validates the stage against the player's
+      actual deck before it is shown.
+
   - id: tpl-act1-boss-gatehouse
     title: The Gatehouse
     act: 1

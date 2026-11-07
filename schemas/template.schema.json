@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://checkbreaker.dev/schemas/template.schema.json",
   "title": "StageTemplate",
-  "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's deck army (that comes from the deck), exact squares (that is generated), or any rarity. See docs/04-stage-generation-and-authoring.md.",
+  "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's deck army (that comes from the deck) or any rarity. Enemy squares are generated, except in a placement: fixed template, which hand-places the enemy army for set-piece stages. See docs/04-stage-generation-and-authoring.md.",
   "type": "object",
   "required": [
     "id", "title", "act", "tier", "turnLimit",
-    "openingPlacements", "enemyArmy", "enemyZone", "spawnedPawns", "deploymentRanks",
+    "openingPlacements", "spawnedPawns", "deploymentRanks",
     "deploymentsPerTurn", "focusPool", "enemyPolicy", "preconditions"
   ],
   "additionalProperties": false,
@@ -34,6 +34,20 @@
         "rook": { "$ref": "#/$defs/range" },
         "queen": { "$ref": "#/$defs/range" }
       }
+    },
+    "placement": {
+      "enum": ["generated", "fixed"],
+      "default": "generated",
+      "description": "generated: enemyArmy is rolled and placed in enemyZone. fixed: fixedEnemy gives every enemy square by hand (tutorial and set-piece stages); the solver still validates it against the player's actual deck (docs/04 §2)."
+    },
+    "fixedEnemy": {
+      "type": "object",
+      "description": "placement: fixed only. Every enemy piece, king included, by square.",
+      "minProperties": 2,
+      "patternProperties": {
+        "^[a-h][1-8]$": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] }
+      },
+      "additionalProperties": false
     },
     "enemyZone": {
       "type": "array",
@@ -107,8 +121,14 @@
         "seed": { "type": "string" },
         "line": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Required when type is 'scripted'."
+          "items": { "type": "string", "pattern": "^[a-h][1-8][a-h][1-8]$" },
+          "description": "Required when type is 'scripted'. Enemy moves as from+to squares, e.g. 'e8e7'."
+        },
+        "fallbackDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "description": "best_move depth used once a scripted line breaks or runs out (docs/02 §8.1). Defaults to enemyAI.search.defaultFallbackDepth."
         }
       },
       "allOf": [
@@ -118,5 +138,19 @@
         }
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "$comment": "Generated templates roll and place their enemy; fixed templates hand-place it.",
+      "if": { "properties": { "placement": { "const": "fixed" } }, "required": ["placement"] },
+      "then": {
+        "required": ["fixedEnemy"],
+        "not": { "anyOf": [{ "required": ["enemyArmy"] }, { "required": ["enemyZone"] }] }
+      },
+      "else": {
+        "required": ["enemyArmy", "enemyZone"],
+        "not": { "required": ["fixedEnemy"] }
+      }
+    }
+  ]
 }

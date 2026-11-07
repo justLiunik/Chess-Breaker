@@ -331,12 +331,73 @@ and the turn counter is the only pressure the player has to read.
   so the enemy never uses rarity abilities. Enemy pawns that reach rank 1 promote to a Normal queen.
 - The enemy takes exactly **one standard move** per turn.
 - The enemy's policy is one of:
-  - `best_move` — seeded, fixed-depth minimax with stable move ordering. Deterministic for a given
+  - `best_move` — fixed-depth alpha-beta minimax with a seeded tie-break (§8.1). Deterministic for a given
     seed and position.
   - `scripted` — a fixed authored line, used for teaching and boss stages.
+- **The enemy AI is our own code.** `best_move` is a small minimax in `packages/engine`, written
+  against *these* rules — multi-action player turns, rarity abilities, stalemate-passes, the turn
+  limit. No external chess engine plays the enemy: a standard engine would misread every one of those
+  rules, and could not be called the hundreds of thousands of times the solver needs. Stockfish has a
+  role only as an offline design tool ([09 §1](09-technical-architecture.md#1-stack)).
 - **Stalemated enemy passes.** If the enemy has no legal move and is *not* in check, it does nothing
   and the turn proceeds normally. The player is never awarded a stalemate draw and never forced into
   one.
+
+### 8.1 Enemy AI
+
+The enemy is one pure function, `enemyMove(stage, seed) → move | pass`, used unchanged by the engine,
+the solver and replay. Same position + same seed → same move, always. Every constant below lives in
+[`data/economy.yaml`](../data/economy.yaml) → `enemyAI`.
+
+**What the enemy wants.** The enemy "wins" when the player runs out of turns or is mated, so its job
+is to **defend first and punish mistakes**: survive the clock, keep its king safe, take the player's
+pieces when that is safe, and mate the player's king whenever it can. It does not launch risky
+attacks.
+
+**Search.**
+
+| Element | Rule |
+|---|---|
+| Algorithm | Alpha-beta minimax with **iterative deepening** (depth 1, 2, … up to the policy depth) and a deterministic **transposition table** |
+| Depth | The template's `enemyPolicy.depth`: Act I 2, Act II–III 3, bosses 4 ([04 §6](04-stage-generation-and-authoring.md#6-difficulty-curve)) |
+| One ply | One enemy move, or one player reply |
+| The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine deploys, skills, or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
+| Quiescence | At the horizon, keep searching **captures only**, at most 2 more plies, so the enemy never hangs a piece just past its depth |
+| The clock | The search knows how many turns the player has left. A line where the player runs out of turns is a win for the enemy |
+
+The enemy's model of the player is deliberately simpler than the player. The solver is not: it
+searches the player's full action set ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)),
+so every stage stays provably clearable however the enemy misjudges the player.
+
+**Evaluation** — scores from the enemy's point of view; higher is better for the enemy.
+
+| Outcome (always outranks any position) | Score |
+|---|---|
+| Player king mated | +100,000, minus plies to reach it (sooner is better) |
+| Player out of turns | +50,000 |
+| Enemy king mated | −100,000, plus plies to reach it (an unavoidable mate is delayed as long as possible) |
+
+| Positional term | Weight |
+|---|---|
+| Each legal move of the enemy king (escape square) | +30 |
+| Each square next to the enemy king that the player attacks | −25 |
+| Enemy king in check | −60 |
+| Material: enemy minus player on-board value (P1 N3 B3 R5 Q9) | ±10 per point |
+| Each legal enemy move (mobility) | +2 |
+
+King safety outweighs material — one escape square is worth three pawns — so the enemy gives up a
+pawn to keep its king mobile, but grabs a piece the moment it is free. "Attacked" uses the player's
+real attack map, rarity abilities included (§2.3).
+
+**Tie-break.** Moves with exactly equal scores are first ordered stably (captures, then checks, then
+by from- and to-square), and one is then picked with `hash(stageSeed, turnsUsed)`. Runs differ;
+replays do not.
+
+**Scripted enemies.** A `scripted` policy plays its `line` move by move, tracking its position in
+`StageState.enemyPolicy.cursor`. If the next scripted move is illegal — its piece was captured, the
+path is blocked, or it would leave the enemy king in check — or the line has run out, the enemy
+**falls back permanently** to `best_move` at the template's `fallbackDepth` (default 3) for the rest
+of the stage, and `fellBack` is set. A script never "skips ahead" to a later move.
 
 ## 9. Legality invariants
 

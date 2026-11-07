@@ -47,7 +47,17 @@
         "type": { "enum": ["best_move", "scripted"] },
         "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
         "seed": { "type": "string" },
-        "line": { "type": "array", "items": { "type": "string" } }
+        "line": { "type": "array", "items": { "type": "string" } },
+        "fallbackDepth": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "scripted only: index of the next move in line."
+        },
+        "fellBack": {
+          "type": "boolean",
+          "description": "scripted only: true once the line broke or ran out and the enemy switched to best_move for the rest of the stage."
+        }
       }
     },
     "status": { "enum": ["active", "won", "lost"] },

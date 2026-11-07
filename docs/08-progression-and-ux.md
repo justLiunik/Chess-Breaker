@@ -140,7 +140,7 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 
 | Moment | Teaching | Mechanism |
 |---|---|---|
-| Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Scripted enemy; only 4 pieces on the board; tooltip on the coin preview |
+| Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
 | Run 1, Act I stage 2 | Deployment and durability | Deck shown with pips; first deploy is prompted |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
 | Act I boss | Mating under turn pressure | One turn less than the rest of Act I; the coin preview's decay is highlighted once |

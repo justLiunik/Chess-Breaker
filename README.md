@@ -14,6 +14,8 @@ turn, turn a bishop into a queen, freeze an enemy piece. They are scarce and the
 
 ## Status
 
+Checkbreaker is a **personal, non-commercial project**.
+
 **Milestone M0 — Design Foundation.** This repository currently contains design documents, JSON
 Schemas, tuning data, and example content. There is no engine or UI code yet; see
 [`docs/10-roadmap-and-milestones.md`](docs/10-roadmap-and-milestones.md) for what comes next.

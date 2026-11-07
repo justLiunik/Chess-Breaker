@@ -159,6 +159,28 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
     maxValue += hi * v;
   }
 
+  // Fixed templates hand-place the enemy: the value is exact, and the board
+  // must be a legal set piece (one king, clear of the player's ranks).
+  if (t.placement === 'fixed') {
+    const entries = Object.entries(t.fixedEnemy ?? {});
+    const kings = entries.filter(([, type]) => type === 'king');
+    if (kings.length !== 1) fail(`${t.id}: fixedEnemy must contain exactly one king, found ${kings.length}`);
+    const playerRanks = new Set([...(t.deploymentRanks ?? []), ...(t.spawnedPawns?.ranks ?? [])]);
+    for (const [square, type] of entries) {
+      if (playerRanks.has(Number(square[1]))) fail(`${t.id}: fixed enemy ${type} on ${square} sits on a player deployment/spawn rank`);
+      if (type !== 'king') {
+        minValue += valueOf(type) ?? 0;
+        maxValue += valueOf(type) ?? 0;
+      }
+    }
+    if (t.enemyPolicy?.type === 'scripted') {
+      const first = t.enemyPolicy.line?.[0];
+      if (first && !t.fixedEnemy?.[first.slice(0, 2)]) {
+        fail(`${t.id}: scripted line starts with ${first}, but no enemy piece stands on ${first.slice(0, 2)}`);
+      }
+    }
+  }
+
   // The enemy king is always present and worth 0, but it counts as a piece.
   if (minValue <= 0) fail(`${t.id}: enemy army has no material value`);
 
@@ -369,6 +391,43 @@ const abilitiesFor = (type, tier) => {
   if (problems === 0) ok('economy.yaml: promotion results are deck pieces, clamped to the act ceiling');
 }
 const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
+
+// Enemy AI (docs/02 §8.1): terminal scores must dwarf any positional score,
+// so the enemy never trades a forced outcome for a slightly better position.
+{
+  const ai = economy.enemyAI ?? {};
+  const w = ai.weights ?? {};
+  const term = ai.terminal ?? {};
+  let problems = 0;
+  for (const key of ['kingEscapeSquare', 'kingZoneAttacked', 'kingInCheck', 'materialPerPoint', 'mobilityPerMove']) {
+    if (typeof w[key] !== 'number') {
+      fail(`economy.yaml: enemyAI.weights.${key} is missing`);
+      problems += 1;
+    }
+  }
+  // Generous bound on |positional score|: 8 escape squares, 8 attacked zone
+  // squares, check, 39 points of material each way, ~120 legal moves.
+  const bound =
+    8 * Math.abs(w.kingEscapeSquare ?? 0) + 8 * Math.abs(w.kingZoneAttacked ?? 0) +
+    Math.abs(w.kingInCheck ?? 0) + 2 * 39 * Math.abs(w.materialPerPoint ?? 0) + 120 * Math.abs(w.mobilityPerMove ?? 0);
+  if (!(term.playerMated > term.playerOutOfTurns && term.playerOutOfTurns > 10 * bound)) {
+    fail(`economy.yaml: enemyAI.terminal must satisfy playerMated > playerOutOfTurns > 10 × positional bound (${bound})`);
+    problems += 1;
+  }
+  if (term.enemyMated !== -term.playerMated) {
+    fail('economy.yaml: enemyAI.terminal.enemyMated must be the negative of playerMated');
+    problems += 1;
+  }
+  if (!(w.kingEscapeSquare > 0 && w.kingZoneAttacked < 0 && w.kingInCheck < 0 && w.materialPerPoint > 0)) {
+    fail('economy.yaml: enemyAI.weights signs are wrong (escape squares and material good; attacked zone and check bad)');
+    problems += 1;
+  }
+  if (!(Number.isInteger(ai.search?.quiescence?.maxDepth) && ai.search.quiescence.maxDepth >= 0)) {
+    fail('economy.yaml: enemyAI.search.quiescence.maxDepth must be a non-negative integer');
+    problems += 1;
+  }
+  if (problems === 0) ok(`economy.yaml: enemy AI terminal scores outrank positional bound ${bound}`);
+}
 
 // Base reward and merge configuration (docs/05 §2, docs/06 §5).
 {

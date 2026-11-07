@@ -24,6 +24,33 @@ in one sitting is a liability, and the rules here are deliberately non-standard 
 party chess library would fight the design (deferred moves, transform durations, deferred check
 validation). Movement generation is ~200 lines.
 
+### Stockfish as a design tool (offline only)
+
+The enemy AI is our own minimax ([02 §8](02-rules-framework.md#8-enemy-behavior)). Stockfish — or
+Fairy-Stockfish, which accepts custom pieces — may be used **only as an external helper for the
+designer**:
+
+| Allowed use | Why it helps |
+|---|---|
+| Sanity-checking a template's sample positions ("is this mate reachable at all in normal chess?") | A fast second opinion before the M3 solver runs |
+| Drafting `scripted` lines for teaching and boss stages | Finds strong, natural-looking defensive moves to write into the script |
+| Spotting positions that are trivially lost or won for the enemy | Catches bad templates early |
+
+Rules for using it:
+
+- **Never shipped and never imported.** It runs as a separate program (UCI over the command line)
+  from a dev script or by hand. `packages/engine`, `packages/gen` and `apps/web` must not depend on
+  it, and it is not vendored into the repository.
+- **Advisory only.** Stockfish plays standard chess: one move per side, no rarity abilities, no
+  multi-action turns, no turn limit. Its verdict is a hint; the M3 solver, which uses the game's own
+  rules, is the only authority on whether a stage is solvable.
+- **Scripted lines are re-checked.** A line drafted with Stockfish must replay legally in our engine
+  before it goes into a template.
+- **Licence.** Stockfish is GPLv3. Using it as a separate tool on the designer's machine, without
+  distributing it with the game, keeps the game's own code free of that obligation. This is a
+  personal, non-commercial project ([11 H](11-open-decisions.md#h-monetization)), so the question only
+  returns if the game is ever published.
+
 ## 2. Repository layout
 
 ```
@@ -192,6 +219,7 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | `engine/queue` | Sequential cost accounting, simulate/apply | Decide win conditions |
 | `engine/rules` | End-of-turn order R1–R5, stage end evaluation | Render or animate |
 | `engine/skills` | Primitive interpretation, modifier stack, expiry | Add per-skill special cases |
+| `engine/enemy` | `enemyMove(stage, seed)`: alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `gen` | Templates, generation pipeline, solver | Be imported by the web app |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
@@ -240,6 +268,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Generation | 10k-stage solvability and precondition suite ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)) |
 | Content | `npm run validate` — schema conformance of every content file |
 | Replay | Golden run files: fixed seed + recorded queues must reproduce identical outcomes |
+| Enemy AI | Golden positions: same position + seed → same move; mate-in-1 for the enemy is always taken; an unavoidable enemy mate is delayed as long as possible; quiescence never hangs a piece just past the horizon; scripted line → fallback when its move turns illegal or the line ends; transposition table on/off gives identical moves |
 
 ## 10. Performance notes
 

@@ -41,6 +41,9 @@ sequential cost accounting, end-of-turn resolution R1–R5, stage end evaluation
 - `Action` types `MOVE` only (deploy and skills stubbed behind the same interface).
 - `simulate`/`apply` split and the `CommitError` union.
 - Invariants I1–I5, I11 enforced and tested.
+- `engine/enemy`: the enemy AI of `docs/02 §8.1` — alpha-beta with iterative deepening, transposition
+  table, capture quiescence, evaluation weights from `economy.yaml`, seeded tie-break, scripted lines
+  with fallback.
 
 **Acceptance criteria**
 - [ ] Perft-style move-generation suite passes for standard positions (castling/en-passant excluded).
@@ -48,6 +51,8 @@ sequential cost accounting, end-of-turn resolution R1–R5, stage end evaluation
 - [ ] Fuzz test over 10,000 random legal-shaped queues never violates I1–I5.
 - [ ] Preview/execution parity property test passes.
 - [ ] Zero runtime dependencies in `packages/engine`.
+- [ ] Enemy AI golden-position suite passes (docs/09 §9), and a depth-4 enemy move takes < 50 ms
+      in the browser on a mid-range laptop.
 - [ ] Deep-frozen state in tests: no mutation anywhere.
 
 **Risks:** deferred check validation is unusual; the temptation to "fix" it by validating mid-queue
@@ -215,12 +220,13 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 |---|---|---|---|---|
 | Skills trivialize stages | High | High | Charge scarcity, action-priced deployment, solver validation, boss skills | M2, M6 |
 | Death spiral unfun | Medium | High | Spawned pawns, promotion, recovery offer, salvage, bank & skip | M4 |
-| Solver too slow | Medium | Medium | Template narrowing, caching, offline archetypes | M3 |
+| Solver too slow | Medium | Medium | Single-agent search (enemy is deterministic), memoized enemy replies, template narrowing, caching, offline archetypes | M3 |
+| Enemy blind to multi-action turns looks dumb | Medium | Low | Intended (skills stay surprising); if playtests object, add a threat-awareness term for charged skills | M6 |
 | Queue builder unusable | Medium | High | Preview-first design, keyboard parity, early playtests | M5 |
 | Economy untunable without telemetry | High | Medium | Headless bot as tuning harness | M4, M6 |
 | Deferred-validation rule "fixed" by a contributor | Medium | Critical | Documented in `docs/02` as core, covered by tests | M1 |
 | Content volume assumptions wrong | Low | Medium | Templates, not levels, scale content | M3 |
-| Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09` | M1 |
+| Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09`; Stockfish allowed only as an offline, unshipped design tool | M1 |
 | Rarity power creep breaks the durability trade | Medium | High | Price multipliers; Legendary bishop durability 1; Legendary queen retention 0.2; act-gated ceilings; decision O constraints | M2, M4, M6 |
 | Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
 | Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune turn limits and enemy bands first in M6 | M3, M6 |
