@@ -1,10 +1,23 @@
 import type { EngineConfig, PieceType } from '../types';
 import type { Move } from '../movegen';
-import { makeMove, pseudoMoves, unmakeMove } from '../movegen';
-import { inCheck, legalMoves } from '../legality';
-import { KING } from '../position';
-import { evaluate } from './evaluate';
-import { zobristKey } from './zobrist';
+import * as movegen from '../movegen';
+import type { Safety } from '../legality';
+import * as legality from '../legality';
+import * as position from '../position';
+import type { EvalTable } from './evaluate';
+import * as evaluation from './evaluate';
+import * as zobrist from './zobrist';
+
+// Imported bindings are copied into module constants once: vitest's module runner turns every use
+// of an imported binding into a getter call, which made the search's hot loops ~1.8x slower under
+// test than under plain Node.
+const {
+  attackedAfterMove, attackedBy, makeMove, promotionOf, targetsInto, unmakeMove,
+} = movegen;
+const { analyse, inCheck, legalMoves, legalMovesInPlace, newSafety, safeMove } = legality;
+const { KING, PAWN } = position;
+const { evalTable, evaluateInPlace } = evaluation;
+const { zobristKey } = zobrist;
 
 type Bound = 'exact' | 'lower' | 'upper';
 type Entry = { depth: number; score: number; bound: Bound; best: Move | null };
@@ -17,51 +30,106 @@ const TYPE_OF_CODE: PieceType[] = ['pawn', 'pawn', 'knight', 'bishop', 'rook', '
 
 interface Ctx {
   b: Int8Array;
-  config: EngineConfig;
+  weights: EvalTable;
   tt: Map<number, Entry> | null;
   /**
-   * MVV/LVA value per absolute piece code. The king's attacker value is +inf, so a king capture
-   * sorts after every other attacker of an equally valuable victim.
+   * MVV/LVA rank (see ranks) per absolute piece code. The king's attacker value is +inf, so a king
+   * capture sorts after every other attacker of an equally valuable victim.
    */
-  victim: number[];
-  attacker: number[];
+  victimRank: Int32Array;
+  attackerRank: Int32Array;
   qmax: number;
   playerMated: number;
   playerOutOfTurns: number;
   enemyMated: number;
+  /** Legality scratch per ply, so a node keeps its own across its children. */
+  safety: Safety[];
+  /** Move sort keys per ply, so a node keeps its own across its children. */
+  keys: Int32Array[];
 }
+
+function safetyAt(ctx: Ctx, ply: number): Safety {
+  while (ctx.safety.length <= ply) ctx.safety.push(newSafety());
+  return ctx.safety[ply]!;
+}
+
+/** Target scratch for quiesce, consumed before any child node runs. */
+const QBUF = new Int8Array(32);
 
 const sameMove = (a: Move, m: Move): boolean =>
   a.from === m.from && a.to === m.to && a.promotion === m.promotion;
 
 /**
+ * The rank of each entry of `values` among its distinct values (0 = smallest). Comparing ranks
+ * orders exactly as comparing the values does, so MVV/LVA can be packed into an integer key.
+ */
+function ranks(values: number[]): Int32Array {
+  const distinct = [...new Set(values)].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+  return Int32Array.from(values, (v) => distinct.indexOf(v));
+}
+
+/**
+ * Writes each move's sort key into `keys`; a higher key sorts first. The key packs, from the most
+ * significant field down: `first` (the TT move), capture, victim rank (higher first), attacker rank
+ * (lower first), check, from-index (lower first), to-index (lower first) - the order of orderMoves.
+ * From and to identify a move, so no two keys are equal.
+ */
+function keyMoves(
+  ctx: Ctx, moves: Move[], blackToMove: boolean, first: Move | null, keys: Int32Array,
+): void {
+  const b = ctx.b;
+  // The mover never captures a king, so the opponent's king square (as inCheck finds it) is fixed.
+  const oppKing = b.indexOf(blackToMove ? KING : -KING);
+  const s = blackToMove ? -1 : 1;
+  // Unless the opponent is already in check, only what a move changes can give check.
+  const pre = oppKing >= 0 && attackedBy(b, oppKing, s);
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i]!;
+    let key = ((63 - m.from) << 6) | (63 - m.to);
+    if (first !== null && sameMove(first, m)) key |= 1 << 22;
+    if (m.captured !== 0) {
+      const a = ctx.attackerRank[Math.abs(b[m.from]!)]!;
+      key |= (1 << 21) | (ctx.victimRank[Math.abs(m.captured)]! << 18) | ((7 - a) << 15);
+    }
+    if (oppKing >= 0) {
+      makeMove(b, m);
+      const chk = pre ? attackedBy(b, oppKing, s) : attackedAfterMove(b, oppKing, s, m.from, m.to);
+      unmakeMove(b, m);
+      if (chk) key |= 1 << 14;
+    }
+    keys[i] = key;
+  }
+}
+
+/** Moves the highest-keyed of `moves[i..]` into slot `i` (swapping keys along). */
+function pickNext(moves: Move[], keys: Int32Array, i: number): void {
+  let best = i;
+  for (let j = i + 1; j < moves.length; j++) if (keys[j]! > keys[best]!) best = j;
+  if (best === i) return;
+  const m = moves[i]!;
+  moves[i] = moves[best]!;
+  moves[best] = m;
+  const k = keys[i]!;
+  keys[i] = keys[best]!;
+  keys[best] = k;
+}
+
+/** Sort-key scratch for the node at `ply`, with room for `n` moves. */
+function keysAt(ctx: Ctx, ply: number, n: number): Int32Array {
+  while (ctx.keys.length <= ply) ctx.keys.push(new Int32Array(64));
+  if (ctx.keys[ply]!.length < n) ctx.keys[ply] = new Int32Array(n);
+  return ctx.keys[ply]!;
+}
+
+/**
  * Sorts `moves` in place: `first` (the TT move) if present, then captures by most valuable victim /
- * least valuable attacker, then checks, then from-index, then to-index.
+ * least valuable attacker, then checks, then from-index, then to-index. Nodes that may cut off early
+ * use keyMoves and pickNext directly, which yields the same order one move at a time.
  */
 function orderMoves(ctx: Ctx, moves: Move[], blackToMove: boolean, first: Move | null): void {
-  const n = moves.length;
-  if (n < 2) return;
-  const b = ctx.b;
-  const opponent = blackToMove ? 'white' : 'black';
-  const keyed = new Array<{ m: Move; tt: number; cap: number; v: number; a: number; chk: number }>(n);
-  for (let i = 0; i < n; i++) {
-    const m = moves[i]!;
-    makeMove(b, m);
-    const chk = inCheck(b, opponent) ? 1 : 0;
-    unmakeMove(b, m);
-    const cap = m.captured !== 0 ? 1 : 0;
-    keyed[i] = {
-      m,
-      tt: first !== null && sameMove(first, m) ? 1 : 0,
-      cap,
-      v: cap ? ctx.victim[Math.abs(m.captured)]! : 0,
-      a: cap ? ctx.attacker[Math.abs(b[m.from]!)]! : 0,
-      chk,
-    };
-  }
-  keyed.sort((x, y) => (y.tt - x.tt) || (y.cap - x.cap) || (y.v - x.v) || (x.a - y.a)
-    || (y.chk - x.chk) || (x.m.from - y.m.from) || (x.m.to - y.m.to));
-  for (let i = 0; i < n; i++) moves[i] = keyed[i]!.m;
+  const keys = new Int32Array(moves.length);
+  keyMoves(ctx, moves, blackToMove, first, keys);
+  for (let i = 0; i < moves.length; i++) pickNext(moves, keys, i);
 }
 
 /**
@@ -77,18 +145,11 @@ function terminal(ctx: Ctx, blackToMove: boolean, hasMove: boolean, ply: number,
   return null;
 }
 
-/** Whether pseudo-legal `m` leaves the mover's king safe. */
-function isLegal(b: Int8Array, m: Move, color: 'white' | 'black'): boolean {
-  makeMove(b, m);
-  const ok = !inCheck(b, color);
-  unmakeMove(b, m);
-  return ok;
-}
-
 /**
  * Quiescence: terminal checks, then stand pat on `evaluate`, then legal captures only, for both
- * sides, for at most `qleft` more plies. Legality is tested lazily on pseudo-legal moves, since most
- * nodes need only "is there any legal move" before standing pat.
+ * sides, for at most `qleft` more plies. Legality is tested lazily, target by target, since most
+ * nodes need only "is there any legal move" before standing pat; the captures are then built in
+ * pseudoMoves order for orderMoves to sort.
  */
 function quiesce(
   ctx: Ctx, blackToMove: boolean, alpha: number, beta: number, ply: number, turns: number,
@@ -96,16 +157,21 @@ function quiesce(
 ): number {
   if (!blackToMove && turns <= 0) return ctx.playerOutOfTurns;
   const b = ctx.b;
-  const color = blackToMove ? 'black' : 'white';
-  const pseudo = pseudoMoves(b, color);
+  const side = blackToMove ? -1 : 1;
+  const sf = safetyAt(ctx, ply);
+  analyse(b, side, sf);
   let hasMove = false;
-  for (let i = 0; i < pseudo.length; i++) {
-    if (isLegal(b, pseudo[i]!, color)) { hasMove = true; break; }
+  for (let from = 0; from < 64 && !hasMove; from++) {
+    if (b[from]! * side <= 0) continue;
+    const n = targetsInto(b, from, QBUF);
+    for (let i = 0; i < n; i++) {
+      if (safeMove(b, sf, side, from, QBUF[i]!)) { hasMove = true; break; }
+    }
   }
   const t = terminal(ctx, blackToMove, hasMove, ply, turns);
   if (t !== null) return t;
 
-  const stand = evaluate(b, ctx.config);
+  const stand = evaluateInPlace(b, ctx.weights);
   if (qleft <= 0) return stand;
   if (blackToMove) {
     if (stand >= beta) return stand;
@@ -115,16 +181,28 @@ function quiesce(
     if (stand < beta) beta = stand;
   }
   const captures: Move[] = [];
-  for (let i = 0; i < pseudo.length; i++) {
-    const m = pseudo[i]!;
-    if (m.captured !== 0 && isLegal(b, m, color)) captures.push(m);
+  for (let from = 0; from < 64; from++) {
+    const code = b[from]!;
+    if (code * side <= 0) continue;
+    const n = targetsInto(b, from, QBUF);
+    for (let i = 0; i < n; i++) {
+      const to = QBUF[i]!;
+      const captured = b[to]!;
+      if (captured === 0 || !safeMove(b, sf, side, from, to)) continue;
+      captures.push({
+        from, to, captured, promotion: code === PAWN * side ? promotionOf(side, to) : null,
+      });
+    }
   }
   if (captures.length === 0) return stand;
-  orderMoves(ctx, captures, blackToMove, null);
+  const keys = keysAt(ctx, ply, captures.length);
+  keyMoves(ctx, captures, blackToMove, null, keys);
 
   const nextTurns = blackToMove ? turns : turns - 1;
   let best = stand;
-  for (const m of captures) {
+  for (let i = 0; i < captures.length; i++) {
+    pickNext(captures, keys, i);
+    const m = captures[i]!;
     makeMove(b, m);
     const s = quiesce(ctx, !blackToMove, alpha, beta, ply + 1, nextTurns, qleft - 1);
     unmakeMove(b, m);
@@ -155,7 +233,7 @@ function search(
   if (depth <= 0) return quiesce(ctx, blackToMove, alpha, beta, ply, turns, ctx.qmax);
   if (!blackToMove && turns <= 0) return ctx.playerOutOfTurns;
   const b = ctx.b;
-  const moves = legalMoves(b, blackToMove ? 'black' : 'white');
+  const moves = legalMovesInPlace(b, blackToMove ? 'black' : 'white', [], safetyAt(ctx, ply));
   const t = terminal(ctx, blackToMove, moves.length > 0, ply, turns);
   if (t !== null) return t;
 
@@ -176,13 +254,16 @@ function search(
     }
   }
 
-  orderMoves(ctx, moves, blackToMove, ttBest);
+  const keys = keysAt(ctx, ply, moves.length);
+  keyMoves(ctx, moves, blackToMove, ttBest, keys);
   const alpha0 = alpha;
   const beta0 = beta;
   const nextTurns = blackToMove ? turns : turns - 1;
   let best = blackToMove ? -INF : INF;
   let bestMove: Move | null = null;
-  for (const m of moves) {
+  for (let i = 0; i < moves.length; i++) {
+    pickNext(moves, keys, i);
+    const m = moves[i]!;
     makeMove(b, m);
     const s = search(ctx, !blackToMove, depth - 1, alpha, beta, ply + 1, nextTurns);
     unmakeMove(b, m);
@@ -231,14 +312,16 @@ export function scoreRootMoves(
   const term = config.enemyAI.terminal;
   const ctx: Ctx = {
     b,
-    config,
+    weights: evalTable(config),
     tt: useTT ? new Map<number, Entry>() : null,
-    victim,
-    attacker,
+    victimRank: ranks(victim),
+    attackerRank: ranks(attacker),
     qmax: config.enemyAI.search.quiescenceMaxDepth,
     playerMated: term.playerMated,
     playerOutOfTurns: term.playerOutOfTurns,
     enemyMated: term.enemyMated,
+    safety: [],
+    keys: [],
   };
 
   orderMoves(ctx, moves, true, null);
