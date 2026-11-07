@@ -45,9 +45,12 @@ describe('commitQueue', () => {
     expect(v.stage.board.b1).toEqual({ pieceType: 'queen', color: 'black' });
     expect(v.events).toContainEqual({ type: 'enemy_promoted', square: 'b1' });
     const cap = ok(commitQueue(runOf({ coins: 7 }), stageOf(
-      { g3: 'K', a1: 'R', e8: 'k', c8: 'r' }, { enemyPolicy: scripted(['c8c1']) }), mv('a1', 'a2'), config));
+      { g3: 'K', a1: 'R', e8: 'k', c8: 'r', c1: 'B' }, { enemyPolicy: scripted(['c8c1']) }), mv('a1', 'a2'), config));
     expect(cap.run.coins).toBe(7);
     expect(cap.stage.board.c1).toEqual({ pieceType: 'rook', color: 'black' });
+    expect(cap.events).toContainEqual({
+      type: 'capture', square: 'c1', pieceType: 'bishop', color: 'white', salvage: 0,
+    });
   });
 
   it('reports a White capture by the enemy with salvage 0', () => {
