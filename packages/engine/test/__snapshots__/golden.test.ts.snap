@@ -1,0 +1,3064 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden commitQueue scenarios > capture with salvage 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a7",
+        "type": "move",
+      },
+      {
+        "color": "black",
+        "pieceType": "knight",
+        "salvage": 1,
+        "square": "a7",
+        "type": "capture",
+      },
+      {
+        "from": "e8",
+        "to": "d8",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 1,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a7": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "d8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > check event on Black 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "king": "black",
+        "square": "e8",
+        "type": "check",
+      },
+      {
+        "from": "e8",
+        "to": "e7",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > check event on White after R5 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "h1",
+        "pieceType": "rook",
+        "to": "h2",
+        "type": "move",
+      },
+      {
+        "from": "a8",
+        "to": "f8",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+      {
+        "king": "white",
+        "square": "f1",
+        "type": "check",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "f1": {
+          "color": "white",
+          "instanceId": "p_king_f1",
+          "pieceType": "king",
+        },
+        "f8": {
+          "color": "black",
+          "pieceType": "rook",
+        },
+        "g8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "h2": {
+          "color": "white",
+          "instanceId": "p_rook_h1",
+          "pieceType": "rook",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "a8f8",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > checkmate win Act I 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": {
+      "base": 4,
+      "coins": 16,
+      "turnBonus": 12,
+    },
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "award": {
+          "base": 4,
+          "coins": 16,
+          "turnBonus": 12,
+        },
+        "type": "stage_won",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 16,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "checkmate",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "won",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 2,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > checkmate win Act I boss 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": {
+      "base": 6,
+      "coins": 6,
+      "turnBonus": 0,
+    },
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "award": {
+          "base": 6,
+          "coins": 6,
+          "turnBonus": 0,
+        },
+        "type": "stage_won",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 6,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 2,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "checkmate",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "won",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 7,
+      "turnsUsed": 7,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > checkmate win Act II 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": {
+      "base": 6,
+      "coins": 21,
+      "turnBonus": 15,
+    },
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "award": {
+          "base": 6,
+          "coins": 21,
+          "turnBonus": 15,
+        },
+        "type": "stage_won",
+      },
+    ],
+    "run": {
+      "actIndex": 1,
+      "coins": 21,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "checkmate",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "won",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 6,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > deferred check through an attacked square 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "g1",
+        "pieceType": "king",
+        "to": "h1",
+        "type": "move",
+      },
+      {
+        "color": "white",
+        "from": "h1",
+        "pieceType": "king",
+        "to": "g1",
+        "type": "move",
+      },
+      {
+        "from": "a8",
+        "to": "b7",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "b7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "g1": {
+          "color": "white",
+          "instanceId": "p_king_g1",
+          "pieceType": "king",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "rook",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a3",
+        "type": "move",
+      },
+      {
+        "from": "a8",
+        "to": "a3",
+        "type": "enemy_move",
+      },
+      {
+        "color": "white",
+        "pieceType": "rook",
+        "salvage": 0,
+        "square": "a3",
+        "type": "capture",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a3": {
+          "color": "black",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "a8a3",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > enemy pawn promotion 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "g3",
+        "pieceType": "king",
+        "to": "g4",
+        "type": "move",
+      },
+      {
+        "from": "b2",
+        "to": "b1",
+        "type": "enemy_move",
+      },
+      {
+        "square": "b1",
+        "type": "enemy_promoted",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "b1": {
+          "color": "black",
+          "pieceType": "queen",
+        },
+        "e8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "g4": {
+          "color": "white",
+          "instanceId": "p_king_g3",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "b2b1",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > enemy stalemated 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "b6",
+        "pieceType": "bishop",
+        "to": "a7",
+        "type": "move",
+      },
+      {
+        "color": "black",
+        "pieceType": "pawn",
+        "salvage": 0,
+        "square": "a7",
+        "type": "capture",
+      },
+      {
+        "endReason": "enemy_stalemated",
+        "type": "stage_lost",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a7": {
+          "color": "white",
+          "instanceId": "p_bishop_b6",
+          "pieceType": "bishop",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "f7": {
+          "color": "white",
+          "instanceId": "p_queen_f7",
+          "pieceType": "queen",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "enemy_stalemated",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "lost",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > err credits_exceeded 1`] = `
+{
+  "error": {
+    "atStep": 1,
+    "kind": "credits_exceeded",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err empty_queue 1`] = `
+{
+  "error": {
+    "kind": "empty_queue",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err illegal_move king_square 1`] = `
+{
+  "error": {
+    "atStep": 0,
+    "from": "h1",
+    "kind": "illegal_move",
+    "reason": "king_square",
+    "to": "h8",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err illegal_move no_piece 1`] = `
+{
+  "error": {
+    "atStep": 0,
+    "from": "c3",
+    "kind": "illegal_move",
+    "reason": "no_piece",
+    "to": "c4",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err invariant_violation without a White king 1`] = `
+{
+  "error": {
+    "detail": "white king removed",
+    "invariant": "I3",
+    "kind": "invariant_violation",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err king_in_check_at_end 1`] = `
+{
+  "error": {
+    "checkers": [
+      "h8",
+    ],
+    "kind": "king_in_check_at_end",
+    "square": "h1",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err stage_not_active 1`] = `
+{
+  "error": {
+    "kind": "stage_not_active",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err unsupported_action 1`] = `
+{
+  "error": {
+    "actionType": "ACTIVATE_SKILL",
+    "atStep": 1,
+    "kind": "unsupported_action",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > err wrong_phase 1`] = `
+{
+  "error": {
+    "expected": "action",
+    "kind": "wrong_phase",
+  },
+  "ok": false,
+}
+`;
+
+exports[`golden commitQueue scenarios > mate on the final turn (base only) 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": {
+      "base": 4,
+      "coins": 4,
+      "turnBonus": 0,
+    },
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "award": {
+          "base": 4,
+          "coins": 4,
+          "turnBonus": 0,
+        },
+        "type": "stage_won",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 4,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "h8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "checkmate",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "won",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 8,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > out of turns 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "h1",
+        "pieceType": "rook",
+        "to": "h2",
+        "type": "move",
+      },
+      {
+        "endReason": "out_of_turns",
+        "type": "stage_lost",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "h2": {
+          "color": "white",
+          "instanceId": "p_rook_h1",
+          "pieceType": "rook",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "out_of_turns",
+      "enemyPolicy": {
+        "depth": 2,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 0,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "lost",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 8,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a7",
+        "pieceType": "pawn",
+        "to": "a8",
+        "type": "move",
+      },
+      {
+        "promotesTo": {
+          "pieceType": "knight",
+          "rarity": "normal",
+        },
+        "square": "a8",
+        "type": "pawn_promoted",
+      },
+      {
+        "from": "e8",
+        "to": "e7",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > player mated after R5 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "h1",
+        "pieceType": "king",
+        "to": "g1",
+        "type": "move",
+      },
+      {
+        "from": "a8",
+        "to": "a1",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+      {
+        "king": "white",
+        "square": "g1",
+        "type": "check",
+      },
+      {
+        "endReason": "player_mated",
+        "type": "stage_lost",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a1": {
+          "color": "black",
+          "pieceType": "rook",
+        },
+        "b2": {
+          "color": "black",
+          "pieceType": "rook",
+        },
+        "e8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "g1": {
+          "color": "white",
+          "instanceId": "p_king_h1",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "player_mated",
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "a8a1",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "lost",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > player stalemated after R5 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "h2",
+        "pieceType": "king",
+        "to": "h1",
+        "type": "move",
+      },
+      {
+        "from": "g8",
+        "to": "g3",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+      {
+        "endReason": "player_stalemated",
+        "type": "stage_lost",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "e8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "g3": {
+          "color": "black",
+          "pieceType": "queen",
+        },
+        "h1": {
+          "color": "white",
+          "instanceId": "p_king_h2",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "endReason": "player_stalemated",
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "g8g3",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "lost",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > quiet turn 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a2",
+        "type": "move",
+      },
+      {
+        "from": "e8",
+        "to": "e7",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a2": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a2",
+        "type": "move",
+      },
+      {
+        "from": "e8",
+        "to": "e7",
+        "type": "enemy_move",
+      },
+      {
+        "cursor": 3,
+        "type": "enemy_fell_back",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a2": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "a7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "b7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "c6": {
+          "color": "black",
+          "pieceType": "knight",
+        },
+        "c7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "f7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 3,
+        "fallbackDepth": 1,
+        "fellBack": true,
+        "line": [
+          "c6e5",
+          "e5c4",
+          "c4b6",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a2",
+        "type": "move",
+      },
+      {
+        "from": "e8",
+        "to": "e7",
+        "type": "enemy_move",
+      },
+      {
+        "cursor": 0,
+        "type": "enemy_fell_back",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a2": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "a7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "b7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "c6": {
+          "color": "black",
+          "pieceType": "knight",
+        },
+        "c7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "f7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 0,
+        "fallbackDepth": 1,
+        "fellBack": true,
+        "line": [
+          "c6c7",
+          "e5c4",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > scripted move played 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a2",
+        "type": "move",
+      },
+      {
+        "from": "c6",
+        "to": "e5",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "a2": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "a7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "b7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "c7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "e5": {
+          "color": "black",
+          "pieceType": "knight",
+        },
+        "e8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "f7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "pawn",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "cursor": 1,
+        "fallbackDepth": 1,
+        "line": [
+          "c6e5",
+          "e5c4",
+          "c4b6",
+        ],
+        "type": "scripted",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "a1",
+        "pieceType": "rook",
+        "to": "a7",
+        "type": "move",
+      },
+      {
+        "color": "black",
+        "pieceType": "knight",
+        "salvage": 1,
+        "square": "a7",
+        "type": "capture",
+      },
+      {
+        "color": "white",
+        "from": "a7",
+        "pieceType": "rook",
+        "to": "b7",
+        "type": "move",
+      },
+      {
+        "color": "black",
+        "pieceType": "rook",
+        "salvage": 1,
+        "square": "b7",
+        "type": "capture",
+      },
+      {
+        "from": "e8",
+        "to": "d8",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 2,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "b7": {
+          "color": "white",
+          "instanceId": "p_rook_a1",
+          "pieceType": "rook",
+        },
+        "d8": {
+          "color": "black",
+          "pieceType": "king",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
+
+exports[`golden commitQueue scenarios > vanishing check 1`] = `
+{
+  "ok": true,
+  "value": {
+    "award": null,
+    "events": [
+      {
+        "color": "white",
+        "from": "b1",
+        "pieceType": "rook",
+        "to": "b8",
+        "type": "move",
+      },
+      {
+        "color": "white",
+        "from": "b8",
+        "pieceType": "rook",
+        "to": "b1",
+        "type": "move",
+      },
+      {
+        "from": "h8",
+        "to": "g7",
+        "type": "enemy_move",
+      },
+      {
+        "turn": 2,
+        "type": "turn_started",
+      },
+    ],
+    "run": {
+      "actIndex": 0,
+      "coins": 0,
+      "deck": [
+        {
+          "acquiredAtStage": 0,
+          "durability": null,
+          "durabilityMax": null,
+          "instanceId": "p_king_01",
+          "origin": "starter",
+          "pieceType": "king",
+          "rarity": null,
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_02",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_knight_03",
+          "origin": "starter",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_04",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_bishop_05",
+          "origin": "starter",
+          "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+      ],
+      "deckCapacity": 8,
+      "history": [],
+      "loadout": [],
+      "rngCursor": 0,
+      "seed": "7F3A-2210",
+      "stageIndex": 0,
+      "status": "in_progress",
+      "version": 1,
+    },
+    "stage": {
+      "board": {
+        "b1": {
+          "color": "white",
+          "instanceId": "p_rook_b1",
+          "pieceType": "rook",
+        },
+        "e1": {
+          "color": "white",
+          "instanceId": "p_king_e1",
+          "pieceType": "king",
+        },
+        "g7": {
+          "color": "black",
+          "pieceType": "king",
+        },
+      },
+      "deploymentRanks": [
+        1,
+        2,
+      ],
+      "enemyPolicy": {
+        "depth": 1,
+        "type": "best_move",
+      },
+      "focus": 3,
+      "focusPool": 3,
+      "modifiers": [],
+      "moveCredits": 1,
+      "phase": "action",
+      "playerColor": "white",
+      "stageSeed": "9C41-0B77",
+      "status": "active",
+      "summonLimit": 3,
+      "templateId": "tpl-act1-open-field",
+      "turnLimit": 8,
+      "turnsUsed": 1,
+    },
+  },
+}
+`;
