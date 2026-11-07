@@ -4,18 +4,17 @@ import { legalMoves } from '../legality';
 import { isSquare, toIndex, toSquare } from '../square';
 import { scoreRootMoves } from './search';
 
-type Pick = { move: { from: Square; to: Square }; policy: EnemyPolicy };
+type Pick = { move: { from: Square; to: Square } | null; policy: EnemyPolicy };
 
 function searchMove(
   stage: StageState, seed: number, depth: number, policy: EnemyPolicy, config: EngineConfig,
 ): Pick {
   const b = fromBoard(stage.board);
   const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config);
-  if (scored.length === 0) throw new Error('enemyMove: Black has no legal move');
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
   const tied = scored.filter((r) => r.score === best);
-  const m = tied[seed % tied.length]!.move;
+  const m = tied[(seed >>> 0) % tied.length]!.move;
   return { move: { from: toSquare(m.from), to: toSquare(m.to) }, policy };
 }
 
@@ -25,6 +24,7 @@ function searchMove(
  */
 export function enemyMove(stage: StageState, seed: number, config: EngineConfig): Pick {
   const policy = stage.enemyPolicy;
+  if (legalMoves(fromBoard(stage.board), 'black').length === 0) return { move: null, policy: { ...policy } };
   const fallbackDepth = config.enemyAI.search.defaultFallbackDepth;
 
   if (policy.type === 'scripted' && !policy.fellBack) {

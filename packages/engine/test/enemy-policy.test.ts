@@ -12,7 +12,7 @@ const tied = (stage: ReturnType<typeof stageOf>, depth: number): string[] => {
   const best = Math.max(...res.map((r) => r.score));
   return res.filter((r) => r.score === best).map((r) => `${toSquare(r.move.from)}${toSquare(r.move.to)}`);
 };
-const str = (m: { from: string; to: string }) => `${m.from}${m.to}`;
+const str = (m: { from: string; to: string } | null) => `${m!.from}${m!.to}`;
 
 const SPARSE = stageOf({ e8: 'k', e1: 'K', a1: 'R' }, { enemyPolicy: { type: 'best_move', depth: 1 } });
 
@@ -66,7 +66,9 @@ describe('enemyMove', () => {
     const stage = stageOf(FIRST_STEPS, {
       enemyPolicy: { type: 'scripted', line: ['c6e5'], cursor: 1, fallbackDepth: 2 },
     });
+    const ref = enemyMove({ ...stage, enemyPolicy: { type: 'best_move', depth: 2 } }, 2, config);
     const r = enemyMove(stage, 2, config);
+    expect(r.move).toEqual(ref.move);
     expect(r.policy.fellBack).toBe(true);
     expect(r.policy.cursor).toBe(1);
   });
@@ -74,6 +76,27 @@ describe('enemyMove', () => {
   it('defaults the depth from config', () => {
     const stage = stageOf(FIRST_STEPS, { enemyPolicy: { type: 'best_move' } });
     expect(config.enemyAI.search.defaultFallbackDepth).toBeLessThanOrEqual(3);
-    expect(enemyMove(stage, 0, config).move).toBeTruthy();
+    const ref = stageOf(FIRST_STEPS, {
+      enemyPolicy: { type: 'best_move', depth: config.enemyAI.search.defaultFallbackDepth },
+    });
+    expect(enemyMove(stage, 0, config).move).toEqual(enemyMove(ref, 0, config).move);
+  });
+
+  it('returns no move, without throwing, when Black has none', () => {
+    const boxed = { h8: 'k', g6: 'K', f7: 'Q' };
+    const best = stageOf(boxed);
+    expect(enemyMove(best, 3, config)).toEqual({ move: null, policy: best.enemyPolicy });
+    const scripted = stageOf(boxed, { enemyPolicy: { type: 'scripted', line: ['h8g8'] } });
+    const r = enemyMove(scripted, 3, config);
+    expect(r.move).toBeNull();
+    expect(r.policy.fellBack).toBeFalsy();
+  });
+
+  it('accepts negative and NaN seeds', () => {
+    for (const seed of [-1, Number.NaN]) {
+      const m = enemyMove(SPARSE, seed, config).move;
+      expect(m).not.toBeNull();
+      expect(tied(SPARSE, 1)).toContain(str(m!));
+    }
   });
 });
