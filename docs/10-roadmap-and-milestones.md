@@ -49,14 +49,16 @@ no Deployment phase: M1 tests start from stages already in `phase: action`.
   with fallback.
 
 **Acceptance criteria**
-- [ ] Perft-style move-generation suite passes for standard positions (castling/en-passant excluded).
-- [ ] Golden queue tests: 30 recorded queues reproduce exact states and event streams.
-- [ ] Fuzz test over 10,000 random legal-shaped queues never violates I1–I5.
-- [ ] Preview/execution parity property test passes.
-- [ ] Zero runtime dependencies in `packages/engine`.
-- [ ] Enemy AI golden-position suite passes (docs/09 §9), and a depth-4 enemy move takes < 50 ms
-      in the browser on a mid-range laptop.
-- [ ] Deep-frozen state in tests: no mutation anywhere.
+- [x] Perft-style move-generation suite passes for standard positions (castling/en-passant excluded).
+- [x] Golden queue tests: 30 recorded queues reproduce exact states and event streams.
+- [x] Fuzz test over 10,000 random legal-shaped queues never violates I1–I5.
+- [x] Preview/execution parity property test passes.
+- [x] Zero runtime dependencies in `packages/engine`.
+- [x] Enemy AI golden-position suite passes (docs/09 §9), and a depth-4 enemy move takes < 50 ms
+      in Node (`npm run bench`, sparse stage-like positions).
+- [ ] The same depth-4 < 50 ms check in the browser on a mid-range laptop — **open until M5**, the
+      first milestone with a UI; M1 measures in Node only.
+- [x] Deep-frozen state in tests: no mutation anywhere.
 
 **Risks:** deferred check validation is unusual; the temptation to "fix" it by validating mid-queue
 must be resisted — that would silently delete the game's core mechanic.

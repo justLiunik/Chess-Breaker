@@ -24,6 +24,9 @@ in one sitting is a liability, and the rules here are deliberately non-standard 
 party chess library would fight the design (deferred moves, transform durations, deferred check
 validation). Movement generation is ~200 lines.
 
+`chess.js` appears only as a **dev-only perft reference** in the engine's tests (M1): it checks our
+move generation on positions where the rules agree, never at runtime and never in a bundle.
+
 ### Stockfish as a design tool (offline only)
 
 The enemy AI is our own minimax ([02 §8](02-rules-framework.md#8-enemy-behavior)). Stockfish — or
@@ -54,8 +57,8 @@ Rules for using it:
 ## 2. Repository layout
 
 ```
-package.json                npm workspaces root (the `workspaces` field is added in M1,
-                            when packages/ and apps/ first exist)
+package.json                npm workspaces root (`"workspaces": ["packages/*"]` from M1;
+                            `apps/*` joins when apps/web exists in M5)
 data/
   economy.yaml              ALL tuning constants (single source of truth)
 schemas/
@@ -70,11 +73,13 @@ content/
 packages/
   engine/                   Pure TS: board, moves, queue resolution, evaluation
   content/                  Loads + validates data, exports typed definitions
+                            (M1: `loadEngineConfig()` for data/economy.yaml only)
   gen/                      Stage generation + solver (M3)
 apps/
   web/                      React UI
 scripts/
   validate-content.mjs      ajv validation of content/ against schemas/
+  play.ts                   Terminal playground over the engine (`npm run play`, M1)
 docs/                       Design documents 00–11
 ```
 
@@ -173,11 +178,30 @@ commitQueue(
   run: RunState,
   stage: StageState,
   queue: Action[],
+  config: EngineConfig,
 ): Result<
-  { run: RunState; stage: StageState; events: GameEvent[]; award: { coins: number; reason: string } },
+  { run: RunState; stage: StageState; events: GameEvent[]; award: Award | null },
   CommitError
 >
+
+type Award = { coins: number; base: number; turnBonus: number };   // null unless the stage was won
 ```
+
+Every engine function takes `config: EngineConfig` (from `loadEngineConfig()`) as its last argument;
+no tuning number lives in engine code. M1 also exports:
+
+```ts
+simulate(run, stage, queue, config)        // same Result as commitQueue, without the enemy reply
+enemyMove(stage, seed: number, config): {
+  move: { from: Square; to: Square } | null,   // null when Black has no legal move
+  policy: EnemyPolicy,                         // scripted cursor / fellBack advanced
+}
+legalPlayerMoves(stage, from): Square[]
+hasLegalQueue(stage, config): boolean
+```
+
+`simulate` runs R1–R4 (the player's queue and stage-end evaluation); `commitQueue` is `simulate`
+plus R5, the enemy's reply and the start of the next turn.
 
 Guarantees:
 - **Pure.** No I/O, no `Date.now()`, no `Math.random()`. Same inputs → deep-equal outputs.
@@ -198,14 +222,23 @@ type CommitError =
   | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
   | { kind: 'credits_exceeded'; atStep: number }
   | { kind: 'empty_queue' }                                   // no MOVE in the queue: there is no pass
-  | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: string }
+  | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
   | { kind: 'stage_not_active' }
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   // startStage only:
   | { kind: 'durability_unavailable'; instanceId: string }
   | { kind: 'invalid_deployment'; to: Square; reason: string }    // occupied, off-rank, or King missing
-  | { kind: 'summon_limit_exceeded'; limit: number; placed: number };
+  | { kind: 'summon_limit_exceeded'; limit: number; placed: number }
+  // M1 only (removed in M2, when skills exist):
+  | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
+  // R2 safety net; a bug if it ever fires:
+  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
+
+type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
 ```
+
+M1 produces only the first group plus `unsupported_action` and `invariant_violation`; the
+`startStage`-only kinds arrive in M2.
 
 ## 5. Determinism and RNG
 
@@ -291,6 +324,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Generation | 10k-stage solvability and precondition suite ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)) |
 | Content | `npm run validate` — schema conformance of every content file |
 | Replay | Golden run files: fixed seed + recorded queues must reproduce identical outcomes |
+| Enemy speed | `npm run bench`: depth-4 median < 50 ms on sparse, stage-like positions (Node in M1; re-measured in the browser in M5). Kept out of `npm test` so timing never flakes a normal run |
 | Enemy AI | Golden positions: same position + seed → same move; mate-in-1 for the enemy is always taken; an unavoidable enemy mate is delayed as long as possible; quiescence never hangs a piece just past the horizon; scripted line → fallback when its move turns illegal or the line ends; transposition table on/off gives identical moves |
 
 ## 10. Performance notes
@@ -306,7 +340,10 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Script | Does | Status |
 |---|---|---|
 | `npm run validate` | Schema-validate everything in `content/` | **M0** |
-| `npm test` | Vitest across workspaces | M1 |
+| `npm test` | Vitest across workspaces (excludes the benchmark) | **M1** |
+| `npm run bench` | Enemy depth-4 timing benchmark, run on its own | **M1** |
+| `npm run typecheck` | `tsc` over packages and scripts | **M1** |
+| `npm run play` | Terminal playground: one Act I stage against the enemy | **M1** |
 | `npm run dev` | Vite dev server for `apps/web` | M5 |
 | `npm run build` | Production build | M5 |
 | `npm run gen:report` | Template health report from the solver | M3 |
