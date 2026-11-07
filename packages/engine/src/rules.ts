@@ -1,0 +1,54 @@
+import type {
+  Action, Award, CommitError, EngineConfig, GameEvent, Result, RunState, StageState,
+} from './types';
+import { inCheck, legalMoves } from './legality';
+import { KING, fromBoard } from './position';
+import { toSquare } from './square';
+import { resolveQueue } from './queue';
+
+export function simulate(
+  run: RunState,
+  stage: StageState,
+  queue: Action[],
+  config: EngineConfig,
+): Result<{ run: RunState; stage: StageState; events: GameEvent[]; award: Award | null }, CommitError> {
+  const resolved = resolveQueue(run, stage, queue, config);
+  if (!resolved.ok) return resolved;
+  const events = [...resolved.value.events];
+  let nextRun = resolved.value.run;
+  let next: StageState = resolved.value.stage;
+
+  // R3: evaluate Black's position.
+  const b = fromBoard(next.board);
+  const checked = inCheck(b, 'black');
+  let award: Award | null = null;
+  if (legalMoves(b, 'black').length === 0) {
+    if (checked) {
+      next = { ...next, status: 'won', endReason: 'checkmate' };
+    } else {
+      next = { ...next, status: 'lost', endReason: 'enemy_stalemated' };
+    }
+  } else if (checked) {
+    events.push({ type: 'check', king: 'black', square: toSquare(b.indexOf(-KING)) });
+  }
+
+  // R4: the turn is spent.
+  next = { ...next, turnsUsed: next.turnsUsed + 1 };
+  if (next.status === 'active' && next.turnsUsed === next.turnLimit) {
+    next = { ...next, status: 'lost', endReason: 'out_of_turns' };
+  }
+
+  if (next.status === 'won') {
+    const act = `act${run.actIndex + 1}` as 'act1' | 'act2' | 'act3';
+    const { baseReward, coinRate } = config.economy;
+    const base = Math.round(baseReward[act] * (run.stageIndex === 2 ? baseReward.bossMultiplier : 1));
+    const turnBonus = (next.turnLimit - next.turnsUsed) * coinRate[act];
+    award = { coins: base + turnBonus, base, turnBonus };
+    nextRun = { ...nextRun, coins: nextRun.coins + award.coins };
+    events.push({ type: 'stage_won', award });
+  } else if (next.status === 'lost') {
+    events.push({ type: 'stage_lost', endReason: next.endReason! });
+  }
+
+  return { ok: true, value: { run: nextRun, stage: next, events, award } };
+}
