@@ -83,3 +83,25 @@ export function runOf(overrides: Partial<RunState> = {}): RunState {
     ...overrides,
   } as RunState);
 }
+
+export const MIDGAME_FENS: string[] = [
+  'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1',
+  'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b - - 0 1',
+  'r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 b - - 0 10',
+  'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b - - 0 1',
+  '2r3k1/pp3ppp/2n1b3/3p4/3P4/2NB1N2/PP3PPP/2R3K1 b - - 0 1',
+];
+
+export function fenToStage(fen: string, overrides: Partial<StageState> = {}): StageState {
+  const placement = fen.split(' ')[0]!;
+  const pieces: Record<Square, string> = {};
+  placement.split('/').forEach((row, i) => {
+    const rank = 8 - i;
+    let file = 0;
+    for (const ch of row) {
+      if (/[1-8]/.test(ch)) file += Number(ch);
+      else pieces[`${'abcdefgh'[file]}${rank}`] = ch, file++;
+    }
+  });
+  return stageOf(pieces, overrides);
+}
