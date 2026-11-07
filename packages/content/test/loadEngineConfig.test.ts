@@ -25,7 +25,8 @@ describe('loadEngineConfig', () => {
   it('throws a named error when a section is missing', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cb-'));
     const real = readFileSync(join(import.meta.dirname, '../../../data/economy.yaml'), 'utf8');
-    const stripped = real.replace(/^enemyAI:[\s\S]*?^(?=# -{10,}\n# Skills)/m, '');
+    const stripped = real.replace(/^enemyAI:[\s\S]*?^(?=# -{10,}\r?\n# Skills)/m, '');
+    expect(stripped).not.toContain('\nenemyAI:'); // the strip must actually remove the section
     const p = join(dir, 'economy.yaml');
     writeFileSync(p, stripped);
     expect(() => loadEngineConfig(p)).toThrow(/enemyAI/);
