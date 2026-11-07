@@ -95,8 +95,10 @@ How to tell them apart on a board: a Hero Piece carries an `instanceId` that poi
 are never added to the deck. The one bridge between the two is **promotion**: a spawned pawn that
 reaches rank 8 is replaced by a brand-new Hero Piece ([02 §2.2](02-rules-framework.md#22-promotion)).
 
-**Opening-line pieces are Hero Pieces.** They are drawn from the deck ([02 §5](02-rules-framework.md#5-deployment))
-and keep their own rarity; "placed at stage start" does not make a piece a Stage Piece.
+**Summoned pieces are Hero Pieces.** They come from the deck in the Deployment phase
+([02 §5](02-rules-framework.md#5-deployment)) and keep their own rarity; "placed before turn 1" does
+not make a piece a Stage Piece. Spawned pawns are the reverse: also on the board before turn 1, but
+placed by the stage, so they are Stage Pieces.
 
 ### 4.2 Rarity tiers
 
@@ -138,8 +140,8 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 | Queen | Rare leaps allies (no capture on a leap) · Unique gains a once-per-run lifeline · Legendary captures after a leap and multi-captures on any move ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Every type | Shop price ×1 / ×1.5 / ×2 / ×3 ([05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)) |
 
-What rarity never changes: chess material value (salvage), the cost of deploying (1 credit
-+ 1 durability), or repairs. Permadeath has exactly one exception: the Unique+ queen's once-per-run
+What rarity never changes: chess material value (salvage), the cost of summoning (1 durability,
+one slot of the summon limit), or repairs. Permadeath has exactly one exception: the Unique+ queen's once-per-run
 lifeline (§6).
 
 ### 4.5 Merging
@@ -177,8 +179,8 @@ shop has not offered.
                     │              in_deck                     │
                     │   durability: n  (n ≥ 1)                 │
                     └───────────────┬──────────────────────────┘
-                                    │ DEPLOY  (cost: 1 move credit
-                                    │          + 1 durability)
+                                    │ SUMMON at Start  (Deployment phase;
+                                    │   cost: 1 durability)
                                     ▼
                     ┌──────────────────────────────────────────┐
                     │              deployed                    │
@@ -196,11 +198,12 @@ shop has not offered.
 
 **Rules**
 
-1. Deploying decrements durability by exactly 1 and requires durability ≥ 1.
-2. A deployed piece that survives returns to the deck with its reduced durability.
+1. Summoning decrements durability by exactly 1 and requires durability ≥ 1. It is paid when Start
+   commits the deployment, never earlier; a piece left in the deck pays nothing.
+2. A summoned piece that survives returns to the deck with its reduced durability.
 3. **A piece whose durability reaches 0 is marked `spent`.** It remains on the board for the rest of
    the stage (it is still a piece!) but is **removed from the deck at stage end**. It cannot be
-   deployed again, repaired, or used next stage.
+   summoned again, repaired, or used next stage.
 4. **A captured piece is destroyed immediately and permanently.** It leaves the run. No repair
    effect, shop, or skill can recover it. Only a *new instance* of the same type can be bought. The
    single exception is a Unique or Legendary queen's **lifeline**: once per run, the captured queen
@@ -218,21 +221,21 @@ economy and teaches the same lesson.
 
 | Event | Effect on the run |
 |---|---|
-| Player piece captured while deployed | Instance destroyed; removed from deck permanently (except a Unique+ queen with its lifeline unused) |
-| Player piece captured as part of the opening line | **Same** — the opening line is drawn from the deck |
+| Player piece captured on the board | Instance destroyed; removed from deck permanently (except a Unique+ queen with its lifeline unused) |
+| Piece left in the deck this stage | Cannot be captured — only summoned pieces are at risk |
 | Enemy piece captured | Salvage coins (`floor(value/3)`); no effect on the enemy deck (there isn't one) |
 | Player king "captured" | Impossible — checkmate ends the stage instead |
 
-**The opening line is drawn from the deck, so it is not safe.** The only difference between an
-opening-line piece and a deployed piece is who chose the square. Both persist, both carry durability,
-both die permanently. This closes the "free cannon fodder" loophole that would otherwise let a player
-avoid all risk by never deploying.
+**Every piece on the board was chosen, so every risk was chosen.** There is no free army: the only
+pieces that cost nothing to have on the board are the King (which cannot die) and the stage's spawned
+pawns (which leave nothing behind). Everything else was summoned, paid durability, and can die
+permanently. Bringing less is always safe and always slower.
 
 ## 7. The King
 
 | Property | Rule |
 |---|---|
-| Presence | Guaranteed in the deck; always placed in the opening line |
+| Presence | Guaranteed in the deck; always placed by the player in the Deployment phase, free and outside the summon limit |
 | Capacity | Occupies no deck slot |
 | Durability | Infinite; never decremented, never spent |
 | Rarity | None — `null`, outside the rarity system (§4) |
@@ -242,19 +245,20 @@ avoid all risk by never deploying.
 
 The King is the run's anchor. Because it can never be lost, the player can never reach an unwinnable
 state caused by an empty deck — only one caused by their own play. This is a load-bearing guarantee:
-it is what lets the game promise "the opening line plus the stage's spawned pawns mean you are never
-forced to lose."
+it is what lets the game promise "the King, the stage's spawned pawns and a solver-checked board mean
+you are never forced to lose."
 
 ## 8. Guardrails
 
 | Lever | Rule | Prevented failure |
 |---|---|---|
 | **King immunity** | King never lost | Deck emptied entirely |
-| **Opening line** | Always drawn from the remaining deck | Stage starts with no army |
+| **King + spawned pawns** | The King is always placed, and every stage spawns pawns | Stage starts with no army |
+| **Summon choice** | Pieces left in the deck spend no durability and cannot die | A fragile deck forced into every fight |
 | **Spawned pawns** | Every stage gives the player free pawns, whatever the deck holds | Broke and piece-less |
 | **Recovery offer** | Pieces lost in the last stage and non-king deck < 4 → one discounted replacement guaranteed | Post-catastrophe death spiral |
 | **Salvage** | Captures pay coins | Attrition has no counter-income |
-| **Telegraphing** | UI warns when a deployment target is attacked | Losing pieces to invisible threats |
+| **Telegraphing** | UI warns when a deployment square is attacked | Losing pieces to invisible threats |
 
 ## 9. Communication rules (UI contract)
 
@@ -262,11 +266,11 @@ Durability must be readable without opening a panel.
 
 1. **Durability pips** on every deck tile — filled for remaining, hollow for spent. Never a bare
    number alone: the pips are the primary read.
-2. **Deploy hover** shows `durability 2 → 1`, not just `1`.
-3. **Spent warning:** deploying a piece whose durability would reach 0 shows a persistent
-   "last deployment — removed after this stage" marker on the confirm.
-4. **Capture telegraph:** if the deployment target square is attacked by an enemy piece, the target
-   is marked with the threat and the capture line is previewed. This is information the player could
+2. **Summon hover** shows `durability 2 → 1`, not just `1`.
+3. **Spent warning:** summoning a piece whose durability would reach 0 shows a persistent
+   "last deployment — removed after this stage" marker on the Start confirm.
+4. **Capture telegraph:** if a deployment square is attacked by an enemy piece, the square is marked
+   with the threat and the capture line is previewed. This is information the player could
    derive by hand; hiding it only punishes carelessness, not judgment.
 5. **Deck panel sort:** group by durability ascending? **No** — group by `pieceType` (stable), with a
    filter for "spent" and "one deployment left." Sorting by durability would reshuffle under the
@@ -286,22 +290,23 @@ Durability must be readable without opening a panel.
 
 | Case | Resolution |
 |---|---|
-| Deck contains only the King | Opening line = King only; stage is playable but nearly impossible; UI offers abandon-run |
-| Deploy with no legal square | Action cannot be committed; durability not spent |
-| Deploy that would leave own king in check | Commit refused (I2); durability not spent |
+| Deck contains only the King | The King and the spawned pawns are the whole army; the solver still had to find a mate, so the stage is winnable, but the UI offers abandon-run |
+| Summon onto an occupied or off-rank square | Not placeable (I8) |
+| Start with the King in check | Start refused (I2); nothing paid, placements kept |
+| More pieces in the deck than the summon limit | The player chooses; the rest stay in the deck untouched |
 | Captured while transformed (Ascension) | Piece destroyed normally; no reversion step |
 | Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
 | Captured Rare/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
 | Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must cut pieces until the deck fits (I9) |
 | Spawned pawn captured | Lost for this stage only; nothing leaves the deck |
 | Spawned pawn survives the stage without promoting | Discarded at stage end; nothing carries over |
-| Promoted piece deployed in the same stage | Allowed — it joins the deployable pool at once and pays the normal deploy cost |
+| Promoted piece in the same stage | Joins the deck at once but cannot be summoned — the deck is locked after Start (I15). First summonable next stage |
 | Legendary knight + Twin Step | Both apply: Twin Step adds a credit for any piece; the knight's bonus move is only for itself |
 | Ascension on a Rare/Unique bishop | It moves as a Normal queen for the turn; its leap abilities return when the transform reverts |
 | Legendary knight gives check, then tries to capture the king with its bonus move | Impossible: the king's square is never a legal destination (I3). The bonus move may go anywhere else |
 | Multi-capture whose second target is the enemy king | The move stops on the first capture; the king is in check; nothing else happens |
 | Legendary rook leaps an ally, then meets two connected enemies | Captures the first only — a rook never multi-captures after a leap. A Legendary queen would take both |
-| Unique queen captured, lifeline unused | Returns to the deck at stage end with 1 durability; still counts as 9 lost material; not redeployable that stage |
+| Unique queen captured, lifeline unused | Returns to the deck at stage end with 1 durability; still counts as 9 lost material; cannot return to the board that stage |
 | Unique queen captured a second time | Destroyed normally — the lifeline is once per run per instance |
 | Lifeline queen returns while the deck is full | It only reclaims its own slot, so capacity is unchanged |
 | Two instances of one type at different tiers | Both legal; they are independent instances (§3) |
@@ -313,4 +318,4 @@ Durability must be readable without opening a panel.
 | Merge three Unique queens, one with its lifeline used | Allowed; the Legendary result is a new instance with its lifeline unused |
 | Merge three Legendary pieces | Not possible — Legendary is the top tier |
 | Merging drops the deck below 4 | Recovery offer does **not** fire: it needs pieces lost in the stage, not merged away |
-| All non-king pieces captured mid-run | Run continues with the King and each stage's spawned pawns; the shop's recovery offer fires; abandoning is allowed and labelled honestly |
+| All non-king pieces captured mid-run | Run continues with the King and each stage's spawned pawns (as long as the solver finds a mate); the shop's recovery offer fires; abandoning is allowed and labelled honestly |

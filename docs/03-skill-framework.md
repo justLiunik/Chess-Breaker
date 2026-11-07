@@ -60,7 +60,7 @@ change, not a skill authoring detail.
 | `suppress_piece` | `target` | Targeted piece may not be moved by its owner |
 | `shield_king` | — | King ignores check for the duration (future; high risk) |
 | `remove_piece` | `square` | Deletes a piece (future; board manipulation) |
-| `place_piece` | `square, pieceType` | Creates a piece (future; board manipulation) |
+| `place_piece` | `square, pieceType` | Creates a Stage Piece — never a deck piece, which would break the deck lock (I15) (future; board manipulation) |
 | `displace_piece` | `from, to` | Forces a piece to another square (future) |
 | `reveal_intent` | — | Shows the enemy's next move (future; planning effect) |
 | `add_plan_undo` | — | Grants one post-commit undo (future; planning effect) |
@@ -135,7 +135,7 @@ restrictions: [once_per_turn]
 status: mvp
 ```
 
-- Grants one move credit, usable for `MOVE` **or** `DEPLOY`.
+- Grants one move credit, usable for a `MOVE` (credits pay for nothing else; pieces enter the board only in the Deployment phase).
 - Because costs are sequential, Twin Step must be activated *before* the action it pays for.
 - `once_per_turn` prevents stacking three Twin Steps into a six-action turn; three charges buy three
   extra actions across the stage, not inside one turn.
@@ -191,8 +191,10 @@ status: mvp
 
 - The suppressed piece **still attacks, still blocks, still defends, and can still be captured** — it
   simply cannot be *moved* by its owner.
-- If the enemy has only suppressed pieces and its king, the enemy may be forced to move the king or
-  pass (see [02 §8](02-rules-framework.md#8-enemy-behavior)).
+- R3 counts legal moves with the suppression in force. If the only enemy pieces that could move are
+  suppressed and the king has no move, the enemy is **stalemated and the player loses**
+  ([02 §7](02-rules-framework.md#7-stage-end-evaluation)) — unless the king is in check, which is
+  checkmate. The preview shows which, so Lockdown is a mating tool with a visible edge.
 - `distinct_targets` means one Lockdown per enemy piece per stage — preventing "lock the whole army"
   degenerate play.
 - The king is excluded: freezing the king would make checkmate trivially deterministic.
@@ -241,8 +243,9 @@ A skill cannot ship unless it passes all of these.
 - [ ] Cannot produce an end state with the player's king in check (I2).
 - [ ] Cannot grant a move credit except through `grant_move_credit` (I5).
 - [ ] Cannot grant unbounded Focus (I6).
-- [ ] Cannot move a piece without a move credit or a documented exception (I5, I8).
-- [ ] Cannot bypass durability spending for `DEPLOY` (I7).
+- [ ] Cannot move a piece without a move credit or a documented exception (I5).
+- [ ] Cannot bring a deck piece onto the board after Start, or summon without spending durability (I7, I15).
+- [ ] Cannot let the player skip a turn: a queue still needs at least one `MOVE` (I5).
 
 **Loop safety**
 - [ ] Cannot fund its own cost (no `grant_focus` + cost-0 activations that net positive).

@@ -39,8 +39,8 @@ durability  ──►  tempo  ──►  leftover turns  ──►  coins  ─�
  (long-run)      (stage)         (stage)          (run)      (run)
 ```
 
-- **Durability buys tempo.** Deploying a piece costs one durability and one action. You spend it to
-  bring more force to bear sooner.
+- **Durability buys tempo.** Every piece summoned in the Deployment phase costs one durability. A
+  bigger army mates sooner; a smaller one saves durability for later stages.
 - **Tempo buys coins.** Winning in 3 of 8 turns pays 5 remaining turns × the act rate.
 - **Coins buy power.** Pieces (new durability), skills (new options), repairs. The deck is capped at
   8 pieces, so power grows by quality — buying higher tiers and merging three pieces into one.
@@ -53,8 +53,12 @@ pawn with turns. The chain has a leak — pieces get captured — and managing t
 
 ## Loop 1 — Action
 
+0. **Deploy (once per stage).** Before the first move, read the generated board, place the King and
+   summon up to the act's limit from the deck. Start locks the deck for the stage
+   ([02 §5](02-rules-framework.md#5-deployment)).
 1. **Read.** Position, enemy threats, turns remaining, Focus, remaining charges.
-2. **Plan.** Assemble an ordered action queue: the Free Move, deployments, skill activations.
+2. **Plan.** Assemble an ordered action queue: the Free Move, any extra moves, skill activations. A
+   queue always holds at least one move — there is no pass.
 3. **Preview.** The engine simulates the queue, including end-of-turn expiry, and shows the
    resulting position plus the legal-state verdict.
 4. **Commit.** Only the *end* state must be legal; mid-queue impossibilities are allowed.
@@ -80,6 +84,7 @@ are held to it.
   | Checkmate — the **only** way to clear a stage | Base reward + `leftover × coinRate` bonus + salvage |
   | Turn limit reached | **Loss** |
   | King checkmated | **Loss, run over** |
+  | Stalemate — the enemy, or the player, has no legal move | **Loss, run over** |
 
 The stage loop's core tension is the **coin preview in the HUD**. It tells you, every turn, exactly
 what mating *right now* is worth — and it goes down by one rate step each turn you hesitate, down to
@@ -95,7 +100,7 @@ one purse:
   Hero Piece with a rarity tier; the act sets the highest tier the shop can offer (Rare in Act I).
 - **Skills** — the only way to break chess; also the only way to exceed one action per turn.
 - **Repairs** — restore durability on a piece you want to keep.
-- **Capacity and rerolls** — make every future shop better.
+- **Rerolls** — reshuffle a shop's offers (the deck's capacity is fixed at 8).
 
 See [07 — Shop Phase](07-shop-phase.md). Skipping the shop banks coins for a later, larger buy —
 a real option early in a run when piece prices outrun income.
@@ -116,6 +121,7 @@ a real option early in a run when piece prices outrun income.
 | Bad turn, committed | The enemy's reply | Play on |
 | Stage lost on turns | The run | — |
 | King mated | The run | — |
+| Stalemate (either side) | The run | — |
 | Piece captured | Its remaining durability, permanently | Buy or repair at the shop |
 | Skill charge spent | One charge, refreshed next stage | Wait for next stage |
 
@@ -126,7 +132,7 @@ fear the deck quietly.
 ## Emotional cadence
 
 1. **Read** — "I see the line." (confidence)
-2. **Plan** — "If I deploy here, and twin-step…" (creativity)
+2. **Plan** — "If I bring the rook, and twin-step…" (creativity)
 3. **Commit** — "That's it." (decisiveness)
 4. **Reveal** — the enemy reply lands (relief or dread)
 5. **Clock** — turns remaining ticks down (urgency)

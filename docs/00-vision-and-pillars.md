@@ -3,8 +3,8 @@
 ## Elevator pitch
 
 > Checkbreaker is a run-based chess-puzzle roguelike. Each stage is a tight, sparse-board mating
-> problem on a strict turn limit. Your army is a deck: durable pieces you deploy turn by turn, and
-> fragile pieces that die permanently when captured. Every checkmate pays coins, and every turn you
+> problem on a strict turn limit. Your army is a deck: before the first move you read the board and
+> choose which pieces to bring — each one spends durability, and any of them can die permanently. Every checkmate pays coins, and every turn you
 > save pays more; coins buy new pieces and the skills that let you break chess. You have 9 stages to
 > prove you can mate faster than you lose your army.
 
@@ -12,8 +12,8 @@
 
 **Every gain in efficiency is paid for with permanence.**
 
-Deploying a piece burns one of its finite deployments. Rushing a stage for coins means spending
-durability you cannot get back. Losing a piece to a capture removes it from the run forever. Every
+Summoning a piece into a stage burns one of its finite deployments. Bringing more force to rush a
+stage for coins means spending durability you cannot get back. Losing a piece to a capture removes it from the run forever. Every
 system in the game is a consequence of that sentence.
 
 ## Genre positioning

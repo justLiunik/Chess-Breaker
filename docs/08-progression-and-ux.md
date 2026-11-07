@@ -54,26 +54,53 @@ The HUD shows a live, per-plan value:
 
 ### 3.2 HUD layout
 
+**Deployment phase** — the board as generated, the deck tray, and the summon counter. Nothing is paid
+until START.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +14 ◈          │
+│ ACT I · STAGE 2 · DEPLOYMENT     TURNS 8      SUMMON ●●○  2/3        │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
 │     7  │  │  │  │♚ │  │  │  │  │                                     │
 │     6  │  │  │  │  │  │♞ │  │  │      ENEMY  ♟♟♟♞  9                 │
-│     5  │  │  │  │  │  │  │  │  │      SALVAGE  +1 ◈ this stage        │
+│     5  │  │  │  │  │  │  │  │  │                                     │
+│     4  │  │  │  │  │  │  │  │  │                                     │
+│     3  │  │  │♙ │  │  │  │  │  │      SPAWNED ♙c3 → Rare Knight      │
+│     2  │  │  │  │  │  │  │  │  │                                     │
+│     1  │♖ │  │  │♔ │  │♝ │  │  │                                     │
+│        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1,2)        │
+│         a  b  c  d  e  f  g  h                                       │
+├──────────────────────────────────────────────────────────────────────┤
+│  DECK  [♔ placed] [♖ ●● placed] [♝ Rar ●● placed] [♞ ●●] [♞ ●○]      │
+│        paid at START:  ♖ 2→1   ♝ 2→1        ♞ ♞ stay safe in the deck│
+│                                                       [ START ▶ ]    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Action phase** — after START the deck tray is gone; the queue takes its place.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +14 ◈           │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
+│     7  │  │  │  │♚ │  │  │  │  │                                     │
+│     6  │  │  │  │  │  │♞ │  │  │      ENEMY  ♟♟♟♞  9                 │
+│     5  │  │  │  │  │  │  │  │  │      SALVAGE  +1 ◈ this stage       │
 │     4  │  │  │  │  │  │  │  │  │                                     │
 │     3  │  │  │  │  │  │  │  │  │                                     │
-│     2  │  │  │♙ │  │  │  │  │  │      YOU    ♟♟♟♞♝  6                 │
+│     2  │  │  │♙ │  │  │  │  │  │      YOU    ♖♙  6                   │
 │     1  │♖ │  │  │♔ │  │  │  │  │                                     │
-│        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1,2)       │
-│         a  b  c  d  e  f  g  h                                      │
+│        └──┴──┴──┴──┴──┴──┴──┴──┘    DECK LOCKED · 1/3 summoned       │
+│         a  b  c  d  e  f  g  h                                       │
 ├──────────────────────────────────────────────────────────────────────┤
-│  FOCUS ◉◉○  2/3      MOVES ●○  1 credit      DEPLOY ○ 0/1            │
+│  FOCUS ◉◉○  2/3      MOVES ●○  1 credit                              │
 │                                                                      │
-│  QUEUE: [Twin Step] → [Deploy ♖ → h1] → [♖ h1→h7]        +1 credit   │
-│                                                          pending     │
+│  QUEUE: [Twin Step] → [♖ a1→a7] → [♔ d1→e2]          +1 credit       │
+│                                                       pending        │
 │  [ Twin Step ◈1 ●●● ] [ Ascension ◈2 ●● ]        [ COMMIT ]  [UNDO]  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -84,7 +111,8 @@ This is the signature UI and the game's main skill-expression surface.
 
 - **Queue is a left-to-right strip** under the board. Each entry shows its action icon, cost, and
   the square it targets.
-- **Append by clicking** the board (move), the deployment tray (deploy), or a skill card (activate).
+- **Append by clicking** the board (move) or a skill card (activate). There is no deploy entry: the
+  army was chosen before START.
   Order is click order; entries can be dragged to reorder, and dragging re-validates in real time.
 - **Live preview:** the board renders the *result of the whole queue* as a ghosted overlay, with the
   intermediate steps available as a step-through (arrow keys) that highlights each entry.
@@ -93,6 +121,11 @@ This is the signature UI and the game's main skill-expression surface.
 - **Illegal end state** blocks COMMIT with the specific invariant (`Your king would be in check
   after Ascension reverts`). This is the single most important error message in the game — it must
   name the *cause*, never just say "invalid."
+- **A queue needs a move.** An empty queue, or one holding only skills, blocks COMMIT (`Add a move —
+  there is no pass`).
+- **Stalemate is called out.** If the previewed end state leaves the enemy with no legal move and not
+  in check, the preview shows `STALEMATE — YOU LOSE` and COMMIT asks for confirmation
+  ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
 - **UNDO is free and total before COMMIT.** After commit there is no undo (§6).
 
 **Deliberate non-feature:** no auto-solver, no "hint: play Rxf7." Hints describe *intent*
@@ -100,11 +133,21 @@ This is the signature UI and the game's main skill-expression surface.
 
 ### 3.4 Deployment interaction
 
-- Deployment squares are tinted on the board whenever a deploy is queued or hovered.
-- Dragging a piece from the deck tray to the board creates a `DEPLOY` entry.
-- Hovering a target square shows the threat overlay: which enemy pieces attack it, and the capture
-  line that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
-- If the target leaves the king in check, the square is marked invalid with a king-safety icon.
+The Deployment phase is a screen of its own, between entering the stage and the first move
+([02 §3](02-rules-framework.md#3-stage-flow-and-turn-structure--plan--commit)). The enemy army and the spawned
+pawns are already on the board; the player's side is empty.
+
+- Deployment squares are tinted for the whole phase. Dragging a piece from the deck tray onto one
+  places it; dragging it back, or onto another square, is free. The King must be placed before START
+  is enabled.
+- The **summon counter** (`SUMMON ●●○ 2/3`) fills as pieces are placed; once full, the remaining
+  tray pieces are dimmed, not hidden. The King never counts.
+- Hovering a square shows the threat overlay: which enemy pieces attack it, and the capture line
+  that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
+- A square where the King would start in check is marked invalid with a king-safety icon; START names
+  the cause if pressed.
+- **START** summarises what it will cost (`♖ 2→1  ♝ 2→1`) and states that the deck locks. After
+  START the tray disappears for the rest of the stage.
 - The tray shows durability pips and the rarity marker (tier name + frame shape), and disables pieces
   with `spent` status. On the board, Hero Pieces and spawned pawns keep their rarity frame; enemy
   pieces have none.
@@ -141,12 +184,13 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | Moment | Teaching | Mechanism |
 |---|---|---|
 | Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
-| Run 1, Act I stage 2 | Deployment and durability | Deck shown with pips; first deploy is prompted |
+| Run 1, Act I stage 2 | Choosing who to summon, and durability | The deck holds more pieces than the summon limit; the first START is prompted with its durability cost |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
 | Act I boss | Mating under turn pressure | One turn less than the rest of Act I; the coin preview's decay is highlighted once |
 | Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
 | First time three identical pieces are owned | Merging | The shop highlights the set and its `[MERGE]` action once |
+| First plan whose preview would stalemate the enemy | Stalemate is a loss | The `STALEMATE — YOU LOSE` warning is explained once, in one sentence |
 | First Rare+ piece acquired | That tier's ability | The piece card shows the ability sentence once; its first selection previews the new squares |
 | Act III | Everything composes | No scaffolding |
 
@@ -168,9 +212,12 @@ Rules for teaching:
 **No takebacks.** The game's tension comes entirely from the commit being real. Any "undo turn"
 feature would collapse the durability economy to zero. This is a hard design rule, not a UI choice.
 
-The only concession: **restart stage** is available, but a restarted stage reverts to its generated
-state *and does not refund durability already spent* — restarting is for mis-clicked plans, not for
-scouting.
+| Before START | Free placement, swapping and taking back |
+| After START | The deck is locked for the stage |
+
+The only concession: **restart stage** is available. A restarted stage returns to its generated state
+and the Deployment phase, *without refunding durability already paid at START* — summoning again pays
+again. Restarting is for mis-clicked plans, not for scouting the enemy's replies.
 
 ## 7. Hints and chess literacy
 
@@ -205,5 +252,6 @@ scouting.
 - ❌ Sorting the deck by durability (it reshuffles under the player's hand).
 - ❌ Any screen where the coin preview is not visible.
 - ❌ A promotion result revealed only when the pawn arrives — it is always shown in advance.
+- ❌ A stalemate the player discovers only after COMMIT — the preview always says so first.
 - ❌ Rarity shown by glow or by the threat/rule-breaking accent colors — rarity must never read as
   danger. Tier name plus frame shape, never color alone.

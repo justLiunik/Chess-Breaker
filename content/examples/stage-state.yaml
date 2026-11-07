@@ -16,6 +16,7 @@
 stageSeed: 9C41-0B77
 templateId: tpl-act1-open-field
 playerColor: white
+phase: action          # Start was pressed on turn 1; the deck is locked for this stage
 
 board:
   a1:
@@ -61,8 +62,7 @@ turnLimit: 8
 focus: 3
 focusPool: 3
 moveCredits: 0
-deploymentsThisTurn: 0
-deploymentsPerTurn: 1
+summonLimit: 3         # Act I; the King and the a1 rook were placed in the Deployment phase
 deploymentRanks: [1, 2]
 modifiers:
   - modifierId: mod_0007

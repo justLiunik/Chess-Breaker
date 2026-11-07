@@ -495,6 +495,70 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
   if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, promotion reachable`);
 }
 
+// 2a'''''. Deployment phase, summoning and stalemate (docs/02 §3, §5, §7).
+// The player places the King and summons up to summonLimit deck pieces before
+// turn 1; the deck is locked after the first move; there is no pass; either
+// side's stalemate is a loss for the player.
+{
+  const r = economy.rules ?? {};
+  let problems = 0;
+  for (const stale of ['deploymentsPerTurn', 'openingPlacements', 'stalemateBehavior']) {
+    if (stale in r) {
+      fail(`economy.yaml: rules.${stale} was removed (Deployment phase replaces it, docs/02 §5)`);
+      problems += 1;
+    }
+  }
+  let previous = -1;
+  for (let act = 1; act <= actCount; act++) {
+    const limit = r.summonLimit?.[`act${act}`];
+    if (!Number.isInteger(limit) || limit < 0 || limit > (economy.deck?.capacity ?? 8)) {
+      fail(`economy.yaml: rules.summonLimit.act${act} must be an integer in 0..deck capacity`);
+      problems += 1;
+    } else if (limit < previous) {
+      fail(`economy.yaml: rules.summonLimit.act${act} (${limit}) is below act ${act - 1} (${previous})`);
+      problems += 1;
+    } else previous = limit;
+  }
+  if (r.summonCostsDurability !== 1) {
+    fail('economy.yaml: rules.summonCostsDurability must be 1 (durability = stages a piece can be brought, I7)');
+    problems += 1;
+  }
+  if (r.deckLockedAfterStart !== true) {
+    fail('economy.yaml: rules.deckLockedAfterStart must be true (no summoning after the first move, I15)');
+    problems += 1;
+  }
+  if (!(Number.isInteger(r.minMovesPerQueue) && r.minMovesPerQueue >= 1)) {
+    fail('economy.yaml: rules.minMovesPerQueue must be >= 1 (there is no pass)');
+    problems += 1;
+  }
+  if (r.stalemate !== 'player_loses') {
+    fail('economy.yaml: rules.stalemate must be player_loses (docs/02 §7)');
+    problems += 1;
+  }
+  if (problems === 0) ok(`economy.yaml: summon limits ${[1, 2, 3].map((a) => r.summonLimit[`act${a}`]).join('/')}, deck locked after Start, no pass, stalemate loses`);
+
+  for (const t of docs['templates.yaml']?.templates ?? []) {
+    const actLimit = r.summonLimit?.[`act${t.act}`];
+    const limit = t.summonLimit ?? actLimit;
+    if (t.summonLimit !== undefined && actLimit !== undefined && t.summonLimit > actLimit) {
+      fail(`${t.id}: summonLimit ${t.summonLimit} raises act ${t.act}'s limit ${actLimit}; a template may only lower it`);
+      continue;
+    }
+    // King + every summon need a square in the deployment ranks.
+    const squares = 8 * (t.deploymentRanks ?? []).length;
+    if (limit !== undefined && squares < limit + 1) {
+      fail(`${t.id}: ${squares} deployment squares cannot hold the King plus ${limit} summons`);
+      continue;
+    }
+    const clash = (t.spawnedPawns?.ranks ?? []).filter((rank) => (t.deploymentRanks ?? []).includes(rank));
+    if (clash.length > 0) {
+      fail(`${t.id}: spawnedPawns.ranks overlap deploymentRanks on rank(s) ${clash.join(', ')}`);
+      continue;
+    }
+    ok(`${t.id}: King + ${limit} summon(s) fit the deployment ranks`);
+  }
+}
+
 // 2b. Runs: deck legality and economy invariants.
 for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
   const run = docs[file];
@@ -614,6 +678,32 @@ if (stage) {
     }
   }
 
+  // Deployment phase: only Stage Pieces stand on the board. Action phase: the
+  // King is present and at most summonLimit other Hero Pieces were summoned.
+  const heroes = pieces.filter(([, p]) => p.color === 'white' && p.instanceId && p.pieceType !== 'king');
+  if (stage.phase === 'deployment') {
+    const placed = pieces.filter(([, p]) => p.color === 'white' && p.instanceId);
+    if (placed.length > 0) fail(`stage-state.yaml: deployment phase, but Hero Pieces are already on ${placed.map(([sq]) => sq).join(', ')}`);
+  } else if (heroes.length > (stage.summonLimit ?? 0)) {
+    fail(`stage-state.yaml: ${heroes.length} summoned Hero Pieces exceed summonLimit ${stage.summonLimit} (I15)`);
+  } else {
+    ok(`stage-state.yaml: ${heroes.length} of ${stage.summonLimit} summons on the board`);
+  }
+  {
+    const tpl = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
+    const expected = tpl ? (tpl.summonLimit ?? economy.rules?.summonLimit?.[`act${tpl.act}`]) : undefined;
+    if (expected !== undefined && stage.summonLimit !== expected) {
+      fail(`stage-state.yaml: summonLimit ${stage.summonLimit} does not match template ${tpl.id}'s ${expected}`);
+    }
+    if ((stage.status === 'active') !== (stage.endReason === undefined)) {
+      fail('stage-state.yaml: endReason must be present exactly when status is not active');
+    } else if (stage.status === 'won' && stage.endReason !== 'checkmate') {
+      fail(`stage-state.yaml: a won stage must end by checkmate, not ${stage.endReason}`);
+    } else if (stage.status === 'lost' && stage.endReason === 'checkmate') {
+      fail('stage-state.yaml: checkmate is a win, never a loss reason');
+    }
+  }
+
   if (stageTemplate?.spawnedPawns && spawnedCount > stageTemplate.spawnedPawns.count[1]) {
     fail(`stage-state.yaml: ${spawnedCount} spawned pawns exceed template max ${stageTemplate.spawnedPawns.count[1]}`);
   } else if (spawnedCount > 0) {
@@ -622,9 +712,10 @@ if (stage) {
 
   const whiteKings = pieces.filter(([, p]) => p.color === 'white' && p.pieceType === 'king');
   const blackKings = pieces.filter(([, p]) => p.color === 'black' && p.pieceType === 'king');
-  if (whiteKings.length !== 1) fail(`stage-state.yaml: expected 1 white king, found ${whiteKings.length}`);
+  const expectedWhiteKings = stage.phase === 'deployment' ? 0 : 1; // the King is placed at Start
+  if (whiteKings.length !== expectedWhiteKings) fail(`stage-state.yaml: expected ${expectedWhiteKings} white king(s) in the ${stage.phase} phase, found ${whiteKings.length}`);
   if (blackKings.length !== 1) fail(`stage-state.yaml: expected 1 black king, found ${blackKings.length}`);
-  if (whiteKings.length === 1 && blackKings.length === 1) ok('stage-state.yaml: exactly one king per side');
+  if (whiteKings.length === expectedWhiteKings && blackKings.length === 1) ok(`stage-state.yaml: king count correct for the ${stage.phase} phase`);
 
   if (stage.playerColor === 'white' && whiteKings.length === 1) {
     const [kingSquare] = whiteKings[0];

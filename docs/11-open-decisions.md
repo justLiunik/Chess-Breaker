@@ -54,15 +54,15 @@ cannot fix it.
 
 ## E. Player-selected opening line
 
-**Question:** should the player choose which pieces are in the opening line, instead of the game
-drawing randomly?
-**Options:** (1) random automatic draw (current, per the requirement that the game provides randomized
-pieces); (2) player picks a subset; (3) player picks and the game picks the squares.
-**Default:** (1).
-**Alternative's appeal:** more agency at stage start; strengthens the "which pieces do I expose for
-free" decision.
-**Cost:** erodes the "game provides" framing and adds a pre-turn UI step to every stage.
-**Trigger:** playtest feedback that openings feel arbitrarily unfair.
+**Decided:** the player chooses everything. The random opening line is gone; in the Deployment
+phase the player places the King and summons up to `summonLimit` pieces onto squares of their choice,
+before the first move, and the deck locks at Start
+([02 §5](02-rules-framework.md#5-deployment)).
+**Why:** choosing the army against a fully visible board makes the analysis itself the first move
+of the puzzle, and removes the mid-stage "add pieces as needed" plan that made deployment reactive.
+**Still open:** the summon limits (Act I 3 · Act II 4 · Act III 5) and the faster durability drain
+are provisional, to be tuned with the headless bot (M4, M6); `no_first_turn_mate` checks single
+pieces only ([04 §4](04-stage-generation-and-authoring.md#4-preconditions)).
 
 ---
 

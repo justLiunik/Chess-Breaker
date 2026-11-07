@@ -3,9 +3,9 @@
 **A chess-puzzle roguelike where you break one rule at a time.**
 
 Checkbreaker is a single-player, run-based puzzle game built on real chess. Each stage hands you
-a sparse board, a strict turn limit, and a deck of pieces you must physically deploy. The only way to
-win is to checkmate the enemy king — every mate pays a base reward, every turn you save adds bonus
-coins, and every piece you lose is gone forever. Skills let you violate chess: move twice in one
+a sparse board, a strict turn limit, and a deck to choose your army from before the first move. The
+only way to win is to checkmate the enemy king (a stalemate on either side loses). Every mate pays a
+base reward, every turn you save adds bonus coins, and every piece you lose is gone forever. Skills let you violate chess: move twice in one
 turn, turn a bishop into a queen, freeze an enemy piece. They are scarce and they cost Focus.
 
 > **A stage is the puzzle. A run is the deck.**
@@ -42,7 +42,7 @@ Schemas, tuning data, and example content. There is no engine or UI code yet; se
 | System | What it is | Clock |
 |---|---|---|
 | **Turn limit** | Per-stage countdown; running out is a loss | Short |
-| **Durability** | Per-piece charges spent when deploying | Long |
+| **Durability** | Per-piece charges spent when summoning into a stage | Long |
 | **Coins** | Base reward per mate, plus leftover turns converted to currency | Run |
 | **Deck capacity** | Fixed cap of 8 pieces; grow by quality (tiers, merges), not by size | Run |
 
@@ -76,8 +76,10 @@ each failure with its JSON pointer path.
 | **Action Queue** | The ordered list of actions you commit to in a turn. |
 | **Focus** | Per-turn resource that pays for skills only. |
 | **Free Move** | The single standard move you get each turn. |
-| **Deploy** | Summoning a deck piece onto the board; costs the Free Move + 1 durability. Pawns are never deployed — they spawn. |
-| **Durability** | A piece instance's remaining deployments. Zero destroys it. |
+| **Deployment phase** | The step before the first move: the player places the King and summons up to the act's limit (3/4/5) from the deck. Start locks the deck for the stage. |
+| **Summon** | Placing a deck piece on the board in the Deployment phase; costs 1 durability, paid at Start. Pawns are never summoned — they spawn. |
+| **Stalemate** | A side not in check with no legal move. Either side's stalemate is a loss for the player. |
+| **Durability** | A piece instance's remaining deployments: stages it can still be summoned into. Zero destroys it. |
 | **Salvage** | Coins earned for capturing an enemy piece. |
 | **Base reward** | Coins paid for every cleared stage; unused turns add bonus coins on top. |
 | **Merge** | Combining 3 pieces of the same type and tier into 1 piece of the next tier, at full durability. |

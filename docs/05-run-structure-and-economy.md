@@ -170,7 +170,7 @@ item for the M6 balance pass.
 
 ## 5. Failure-spiral guardrails
 
-The interaction of permadeath and a fixed income is the game's most dangerous feedback loop. Six
+The interaction of permadeath and a fixed income is the game's most dangerous feedback loop. Seven
 levers, in order of precedence:
 
 | # | Lever | Rule | Rationale |
@@ -181,6 +181,7 @@ levers, in order of precedence:
 | 4 | **Recovery offer** | If pieces were lost in the stage just cleared and the non-king deck is now < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage — not a reward for merging down |
 | 5 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
 | 6 | **Turn limits** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
+| 7 | **Summon choice** | Pieces left in the deck at Deployment spend no durability and cannot be captured ([02 §5](02-rules-framework.md#5-deployment)) | A fragile deck can be protected by bringing less, at the price of a slower mate |
 
 **Explicit non-lever:** the game will **not** quietly raise income when the player is losing, and
 will **not** scale the enemy to the deck. Hidden assistance would destroy the "fair and provable"
@@ -193,10 +194,11 @@ pillar. A lost run must be *diagnosable* from the numbers on screen.
 | Rich (≥20 coins) | Buying power, not survival | Take riskier, faster lines; buy a second skill |
 | Comfortable (8–19) | One meaningful purchase per shop | Standard play |
 | Poor (1–7) | Repair only, or bank | Must slow down; must protect pieces; promotion becomes attractive |
-| Broke (0) | Cannot buy | Win the next stage on the opening line and spawned pawns |
+| Broke (0) | Cannot buy | Win the next stage with what the deck still holds and the spawned pawns |
 
-The broke state is recoverable — the guaranteed opening line plus each stage's spawned pawns mean a
-player is never *forced* to lose. They are only forced to play well.
+The broke state is recoverable — the King is always available, every stage spawns free pawns, and the
+solver proves each stage winnable with the deck as it actually is, so a player is never *forced* to
+lose. They are only forced to play well.
 
 ## 7. Tuning knobs (all in `data/economy.yaml`)
 

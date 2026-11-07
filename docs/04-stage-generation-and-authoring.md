@@ -33,7 +33,7 @@ title: Open Field
 act: 1
 tier: normal          # normal | boss
 turnLimit: 8
-openingPlacements: 3
+# summonLimit: 2     # optional: lowers the act's limit (data/economy.yaml), never raises it
 
 enemyArmy:            # ranges are inclusive [min, max]
   pawn:   [2, 4]
@@ -47,33 +47,36 @@ spawnedPawns:         # free, stage-only pawns for the player (docs/02 §2.1)
   ranks: [3, 4]       # rank 8 must be reachable within turnLimit
 
 deploymentRanks: [1, 2]
-deploymentsPerTurn: 1
 focusPool: 3
 
 enemyPolicy: { type: best_move, depth: 3 }
 
 preconditions:
-  - king_on_board
-  - no_immediate_mate
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
   - enemy_value_in_band
   - deployment_squares_available
   - spawned_pawns_placed
 ```
 
-Templates never specify the player's deck army — that comes from the deck. A normal template never
+Templates never specify the player's army — the player summons it from the deck in the Deployment phase ([02 §5](02-rules-framework.md#5-deployment)); a template may only lower `summonLimit`. A normal template never
 specifies exact squares — those are generated within `enemyZone` and `spawnedPawns.ranks`. Templates never
 specify **rarity**: enemy pieces are locked to Normal, and spawned pawns roll theirs from the act's
 rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
 further away makes it a costly detour from the coin preview. The validator rejects a template whose
-lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone`.
+lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone` or
+`deploymentRanks` (the deployment ranks must stay free for the King and the summons).
 
 **Fixed (set-piece) templates.** A template with `placement: fixed` replaces `enemyArmy` and
 `enemyZone` with `fixedEnemy`, a hand-written square for every enemy piece, king included. Use it
 for the few moments where an authored position matters more than variety — the run-1 tutorial stage
-and signature bosses — usually paired with a `scripted` enemy. Everything else stays generated: the
-opening line, spawned pawns, rarities, and the solver check against the player's actual deck. A fixed
+and signature bosses — usually paired with a `scripted` enemy. Everything else stays as usual: spawned
+pawns and their rarities are generated, the player still chooses their own army, and the solver
+still checks the stage against the player's actual deck. A fixed
 template that the deck cannot solve fails like any other and falls through to the next template
 (§3). Example: `tpl-act1-first-steps`.
 
@@ -96,8 +99,8 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 | **G0** | Derive seed: `hash(runSeed, actIndex, stageIndex)` | — |
 | **G1** | Select template: filter by act + tier, weighted; exclude templates used in the previous stage of the same act where possible | No template → engine bug (every act/tier must have ≥2 templates) |
 | **G2** | Roll enemy army from `enemyArmy` ranges (a fixed template takes `fixedEnemy` as-is). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
-| **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, no pre-check on the player king, king not adjacent-attacked at start); skipped for a fixed template | Retry placement (max 50 tries) → regenerate |
-| **G4** | Draw opening line: King first (pinned to `e1` where legal, else random legal square), then random deck pieces up to `openingPlacements`; place randomly in `deploymentRanks`. These are Hero Pieces and keep their own rarity | Regenerate |
+| **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, the enemy king not in check, and at least one deployment square left unattacked for the player's King); skipped for a fixed template | Retry placement (max 50 tries) → regenerate |
+| **G4** | Prepare the Deployment phase: set `summonLimit` (the act's limit, lowered by the template if it says so) and `phase: deployment`. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
 | **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
 | **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
@@ -111,14 +114,26 @@ an unverified stage. This is a **fail-loud** path, not a silent fallback.
 
 ## 4. Preconditions
 
+The player's army is not on the board when these run — the King and the summons are placed later, in
+the Deployment phase. So every precondition is about the generated board alone, or about what *any*
+deployment could do on it.
+
 | Precondition | Rule | Reason |
 |---|---|---|
-| `king_on_board` | Exactly one king of each color; player king in `deploymentRanks` | Player must own a starting army |
-| `no_immediate_mate` | The player has no mate available in one action | Instant wins are not puzzles |
+| `enemy_king_on_board` | Exactly one black king; no white Hero Piece on the board (`phase: deployment`) | The player's army is the player's to place |
+| `safe_king_square` | At least one empty deployment square is not attacked by the enemy | The King must be able to start out of check (I2) |
+| `no_first_turn_mate` | No single deck piece, summoned on any deployment square, mates in one move | Instant wins are not puzzles |
+| `enemy_has_moves` | The enemy has at least one legal move with the board as generated | A stage must not open on a stalemate (a loss, [02 §7](02-rules-framework.md#7-stage-end-evaluation)) |
 | `enemy_value_in_band` | `enemyArmyValue` within the act's band ([§6](#6-difficulty-curve)) | Prevents hopeless boards |
-| `deployment_squares_available` | ≥ 2 empty squares in `deploymentRanks` | Deployment must be possible later |
-| `no_precheck` | The player's king is not in check at stage start | The opening line must be playable |
+| `deployment_squares_available` | At least `summonLimit + 1` empty squares in `deploymentRanks` | The King and every allowed summon must fit |
 | `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity and `promotesTo` within the act ceiling | Promotion must be a real, visible option from turn 1 |
+
+`no_first_turn_mate` is an **approximation**: it tries each deck piece alone, not every combination
+of summons, because the combinations explode. A deployment that combines pieces into a turn-1 mate
+is possible in principle; the enemy zone keeps it rare (the deployment ranks are at least four
+ranks from the enemy king), and finding one is a reward for reading the board, not a bug. If
+playtests show it happening, the check widens to pairs (tracked in
+[10](10-roadmap-and-milestones.md)).
 
 ## 5. The solver
 
@@ -129,31 +144,44 @@ it tractable.
 "This deck" includes each Hero Piece's rarity, because rarity changes movement: the solver generates
 moves with the abilities of [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities) (ally leaps,
 extra leaps and steps, multi-capture, the Legendary knight's free second move). Lifeline does not
-affect a stage — the queen still leaves the board — so the solver ignores it. It also models spawned pawns and promotion,
-including deploying a freshly promoted piece later in the same stage. Because every promotion result is
-rolled at generation, the solver sees exactly what the player sees.
+affect a stage — the queen still leaves the board — so the solver ignores it. It also models spawned
+pawns and promotion; a promoted piece joins the deck but cannot be summoned until the next stage, so
+within a stage promotion only removes the pawn. Because every promotion result is rolled at
+generation, the solver sees exactly what the player sees.
 
 ### Search shape
 
-- **Plies are turns, not actions.** Each ply expands the current position into candidate *queues*,
-  not individual actions.
-- **Queue candidates** per turn are generated from a bounded combinatorial set:
+- **Ply 0 is the deployment.** The solver first chooses a King square and up to `summonLimit`
+  pieces with their squares. Trying every placement is hopeless (dozens of squares, up to five
+  pieces), so it enumerates a bounded candidate set:
+  - pieces: subsets of the deck by **type + tier** (identical instances are interchangeable), largest
+    and most valuable first;
+  - squares: for each piece, only squares from which it reaches the enemy zone, an open file or
+    diagonal, or a spawned pawn's path within two moves; the King on safe squares only.
+
+  This search is **incomplete but sound**: a stage it accepts has a real winning deployment and
+  line, so no unwinnable stage ever ships; a winning deployment it fails to try only costs a
+  regeneration.
+- **Every later ply is a turn, not an action.** Each ply expands the current position into candidate
+  *queues*, not individual actions.
+- **Queue candidates** per turn are generated from a bounded combinatorial set, each holding at
+  least one `MOVE` (there is no pass):
   - single `MOVE`
-  - single `DEPLOY`
   - `MOVE` + one skill
-  - `DEPLOY` + one skill
   - skill + `MOVE` + `MOVE` (Twin Step lines)
-  - `DEPLOY` + `MOVE` (when credits allow)
   - `MOVE` + bonus `MOVE` (Legendary knight; also combined with each line above)
 - **Move enumeration** is chess-legal generation plus rarity abilities; skills add a small
   multiplicative factor (bounded by charges remaining). Rare+ knights and bishops widen per-piece
   branching, and a Legendary knight roughly squares its own; these are the first places to look if
   solver budgets are exceeded.
+- **Losing leaves are pruned at once.** A queue that stalemates the enemy, a reply that leaves the
+  player with no legal queue, and a position with no turns left are all losses
+  ([02 §7](02-rules-framework.md#7-stage-end-evaluation)); the solver never expands them.
 - **Enemy replies are not branched.** The enemy is a deterministic function
   (`enemyMove`, [02 §8.1](02-rules-framework.md#81-enemy-ai)), so after each candidate queue the solver
   computes the *one* reply the enemy will actually play — including scripted lines and their fallback.
-  The solver is therefore a **single-agent search** over the player's queues, far cheaper than a
-  two-sided minimax, and its prediction always matches the real game.
+  The solver is therefore a **single-agent search** over the player's deployment and queues, far
+  cheaper than a two-sided minimax, and its prediction always matches the real game.
 - **Enemy replies are memoized** per position (`generation.memoizeEnemyReplies`): the same position
   never runs the enemy's search twice. Without this, an enemy search at every solver node would be
   the dominant cost.
@@ -164,7 +192,7 @@ rolled at generation, the solver sees exactly what the player sees.
 |---|---|---|
 | `solverNodeBudget` | 200,000 queue-nodes | Hard stop |
 | `solverTimeMs` | 2,000 | Wall-clock guard |
-| Acceptance | any action sequence terminating in `WIN` **using at least 2 turns** | First found wins; the 2-turn floor rejects free wins |
+| Acceptance | any deployment + queue sequence terminating in `WIN` **using at least 2 turns** | First found wins; the 2-turn floor rejects free wins |
 | Ordering heuristic | mate-in-1 first → checks/captures → everything else | Finds wins fast; keeps cost flat |
 | Rejection | budget exhausted with no win | Stage regenerated |
 
@@ -172,23 +200,25 @@ rolled at generation, the solver sees exactly what the player sees.
 
 The solver is affordable **only** because templates are narrow. With ~8–10 pieces on the board,
 ~3 skills, and an 8-turn limit, the branching factor per ply stays in the low hundreds in practice;
-the mate-first ordering typically resolves Act I stages in well under 10k nodes.
+the mate-first ordering typically resolves Act I stages in well under 10k nodes. The deployment ply
+multiplies everything below it, so its candidate set is the first knob to turn: fewer candidate
+squares per piece, or only the strongest few subsets.
 
 Mitigations if real numbers exceed budget (tracked in [10](10-roadmap-and-milestones.md)):
 1. Cache: memoize accepted template+seed combinations in a shipped table for the most common
    starting decks.
 2. Precompute: validate a template family offline against a set of representative deck archetypes,
-   then verify only the deck-specific opening line online.
+   then verify only the deck-specific deployment online.
 3. Loosen: reduce Act I turn limits, which shrinks the search depth.
 
 ## 6. Difficulty curve
 
-| Act | Turn limit | Enemy army value | Opening line | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
+| Act | Turn limit | Enemy army value | Summon limit | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
 |---|---|---|---|---|---|---|
 | **I** | 8 | 7–9 | 3 | 2 (3–4) | Normal–Rare | 2 |
-| **II** | 6 | 10–14 | 3 | 1–2 (3–4) | up to Unique | 3 |
-| **III** | 5 | 14–22 | 3 | 1–2 (3–5) | up to Legendary | 3 |
-| **Boss** | limit − 1 | its act's band ×1.25 | 3 | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
+| **II** | 6 | 10–14 | 4 | 1–2 (3–4) | up to Unique | 3 |
+| **III** | 5 | 14–22 | 5 | 1–2 (3–5) | up to Legendary | 3 |
+| **Boss** | limit − 1 | its act's band ×1.25 | as its act | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
 
 Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only that
 rank 8 must be reachable within the turn limit from every spawn rank (§2). Rarity comes from the act's
@@ -219,7 +249,7 @@ Act I should be cleared on a first run by a player who understands the rules; Ac
 2. **Draft the template** in `content/templates/`. Keep it ~15 lines.
 3. **Run the validator** (M3) which generates 200 seeded instances and reports:
    solver success rate, distribution of turns-to-win, and the failure-reason histogram.
-4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `openingPlacements`, and
+4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `summonLimit`, and
    `spawnedPawns`.
 5. **Acceptance for a template:** ≥95% of generated instances solvable (a mate exists within the
    limit), and median mating turn around 60% of the turn limit.
@@ -233,11 +263,11 @@ one that always mates in 2 is too loose.
 | Test | Assertion |
 |---|---|
 | Solvability | 10,000 generated stages across all templates: ≥95% pass the solver |
-| King guarantee | 100% of stages have exactly one player king, placed in `deploymentRanks` |
-| No pre-check | 100% of stages start with the player king not in check |
+| Deployment start | 100% of stages are emitted in `phase: deployment` with no Hero Piece on the board, and with at least one deployment square safe for the King |
+| No opening stalemate | 100% of stages give the enemy at least one legal move |
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
-| Deployment availability | 100% of stages have ≥2 free deployment squares |
-| Stage rarity | 100% of enemy pieces are Normal (I13); opening-line pieces match their deck instance's rarity; spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
+| Deployment availability | 100% of stages have at least `summonLimit + 1` free deployment squares |
+| Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
 | Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks, with promotion reachable in the turn limit |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |

@@ -1,8 +1,9 @@
 # Stage templates — designed encounter skeletons.
 #
 # A template fixes the SHAPE of an encounter (enemy composition, turn limit,
-# board sparsity) and leaves placement + the player's army to generation. The
-# player's army always comes from their current deck.
+# board sparsity) and leaves enemy placement to generation. The player's army
+# is never generated: in the Deployment phase the player places the King and
+# summons up to summonLimit pieces from their deck (docs/02 §5).
 #
 # Checkmate is the only way to clear a stage (docs/02 §7), so the one material
 # rule every template must satisfy is that enemyArmyValue sits inside the act
@@ -18,7 +19,6 @@ templates:
     act: 1
     tier: normal
     turnLimit: 8
-    openingPlacements: 3
     enemyArmy:
       pawn: [5, 6]
       knight: [1, 1]
@@ -27,21 +27,21 @@ templates:
       count: [2, 2]
       ranks: [3, 4]
     deploymentRanks: [1, 2]
-    deploymentsPerTurn: 1
     focusPool: 3
     enemyPolicy:
       type: best_move
       depth: 2
     preconditions:
-      - king_on_board
-      - no_precheck
-      - no_immediate_mate
+      - enemy_king_on_board
+      - safe_king_square
+      - no_first_turn_mate
+      - enemy_has_moves
       - deployment_squares_available
       - enemy_value_in_band
       - spawned_pawns_placed
     designNote: >-
       Teaching template. Enemy army value 8-9 against an 8-turn limit: enough
-      slack to learn deployment and the turn counter without the stage being a
+      slack to learn summoning and the turn counter without the stage being a
       free win. Depth-2 policy punishes obvious hangs only.
 
   - id: tpl-act1-first-steps
@@ -49,8 +49,8 @@ templates:
     act: 1
     tier: normal
     turnLimit: 8
-    openingPlacements: 3
     placement: fixed
+    summonLimit: 2      # one fewer than Act I's 3: fewer choices on the very first stage
     fixedEnemy:
       e8: king
       a7: pawn
@@ -63,16 +63,16 @@ templates:
       count: [2, 2]
       ranks: [3, 4]
     deploymentRanks: [1, 2]
-    deploymentsPerTurn: 1
     focusPool: 3
     enemyPolicy:
       type: scripted
       line: [c6e5, e5c4, c4b6]
       fallbackDepth: 2
     preconditions:
-      - king_on_board
-      - no_precheck
-      - no_immediate_mate
+      - enemy_king_on_board
+      - safe_king_square
+      - no_first_turn_mate
+      - enemy_has_moves
       - deployment_squares_available
       - enemy_value_in_band
       - spawned_pawns_placed
@@ -88,7 +88,6 @@ templates:
     act: 1
     tier: boss
     turnLimit: 7
-    openingPlacements: 3
     enemyArmy:
       pawn: [3, 4]
       knight: [1, 1]
@@ -98,15 +97,15 @@ templates:
       count: [1, 2]
       ranks: [3, 4]
     deploymentRanks: [1, 2]
-    deploymentsPerTurn: 1
     focusPool: 3
     enemyPolicy:
       type: best_move
       depth: 4
     preconditions:
-      - king_on_board
-      - no_precheck
-      - no_immediate_mate
+      - enemy_king_on_board
+      - safe_king_square
+      - no_first_turn_mate
+      - enemy_has_moves
       - deployment_squares_available
       - enemy_value_in_band
       - spawned_pawns_placed
@@ -121,7 +120,6 @@ templates:
     act: 2
     tier: normal
     turnLimit: 6
-    openingPlacements: 3
     enemyArmy:
       pawn: [5, 6]
       knight: [1, 1]
@@ -131,30 +129,29 @@ templates:
       count: [1, 2]
       ranks: [3, 4]
     deploymentRanks: [1, 2]
-    deploymentsPerTurn: 1
     focusPool: 3
     enemyPolicy:
       type: best_move
       depth: 3
     preconditions:
-      - king_on_board
-      - no_precheck
-      - no_immediate_mate
+      - enemy_king_on_board
+      - safe_king_square
+      - no_first_turn_mate
+      - enemy_has_moves
       - deployment_squares_available
       - enemy_value_in_band
       - spawned_pawns_placed
     designNote: >-
       Enemy value 11-12, six turns. The slack from Act I is gone: there is no
-      slow win to fall back on, so the player must spend durability for tempo
-      to reach a mate in time. Tests whether the deck was built or only
-      survived.
+      slow win to fall back on, so the player must summon the right pieces in
+      the Deployment phase to reach a mate in time. Tests whether the deck was
+      built or only survived.
 
   - id: tpl-act3-boss-redoubt
     title: The Redoubt
     act: 3
     tier: boss
     turnLimit: 4
-    openingPlacements: 3
     enemyArmy:
       pawn: [6, 7]
       knight: [2, 2]
@@ -165,15 +162,15 @@ templates:
       count: [1, 1]
       ranks: [4, 5]
     deploymentRanks: [1, 2]
-    deploymentsPerTurn: 1
     focusPool: 3
     enemyPolicy:
       type: best_move
       depth: 4
     preconditions:
-      - king_on_board
-      - no_precheck
-      - no_immediate_mate
+      - enemy_king_on_board
+      - safe_king_square
+      - no_first_turn_mate
+      - enemy_has_moves
       - deployment_squares_available
       - enemy_value_in_band
       - spawned_pawns_placed

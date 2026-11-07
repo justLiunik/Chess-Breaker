@@ -6,8 +6,8 @@
   "type": "object",
   "required": [
     "id", "title", "act", "tier", "turnLimit",
-    "openingPlacements", "spawnedPawns", "deploymentRanks",
-    "deploymentsPerTurn", "focusPool", "enemyPolicy", "preconditions"
+    "spawnedPawns", "deploymentRanks",
+    "focusPool", "enemyPolicy", "preconditions"
   ],
   "additionalProperties": false,
   "properties": {
@@ -16,11 +16,11 @@
     "act": { "type": "integer", "minimum": 1, "maximum": 3 },
     "tier": { "enum": ["normal", "boss"] },
     "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
-    "openingPlacements": {
+    "summonLimit": {
       "type": "integer",
-      "minimum": 1,
+      "minimum": 0,
       "maximum": 8,
-      "description": "Pieces drawn from the deck for the free opening line, King always included."
+      "description": "Optional: lowers the act's summonLimit (economy.yaml rules.summonLimit) for this template. Deck pieces the player may summon in the Deployment phase, King excluded. Never raises it."
     },
     "enemyArmy": {
       "type": "object",
@@ -81,7 +81,6 @@
       "minItems": 1,
       "uniqueItems": true
     },
-    "deploymentsPerTurn": { "type": "integer", "minimum": 0, "maximum": 3 },
     "focusPool": { "type": "integer", "minimum": 1, "maximum": 9 },
     "enemyPolicy": { "$ref": "#/$defs/enemyPolicy" },
     "preconditions": {
@@ -90,9 +89,10 @@
       "uniqueItems": true,
       "items": {
         "enum": [
-          "king_on_board",
-          "no_precheck",
-          "no_immediate_mate",
+          "enemy_king_on_board",
+          "safe_king_square",
+          "no_first_turn_mate",
+          "enemy_has_moves",
           "deployment_squares_available",
           "enemy_value_in_band",
           "spawned_pawns_placed"

@@ -21,8 +21,8 @@ pieces:
     purchasable: false
     notes: >-
       Run identity. Never capturable, never destroyed, occupies no deck slot.
-      Always included in the generated opening line. Checkmate of the player
-      king ends the run. Has no rarity.
+      Always placed by the player in the Deployment phase, free and outside
+      summonLimit. Checkmate of the player king ends the run. Has no rarity.
 
   - id: pawn
     pieceType: pawn

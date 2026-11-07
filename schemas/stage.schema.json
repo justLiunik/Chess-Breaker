@@ -5,8 +5,8 @@
   "description": "One generated chess encounter. Ephemeral: discarded at stage end. Emitted by the pipeline in docs/04 §3 and consumed by the engine in docs/02.",
   "type": "object",
   "required": [
-    "stageSeed", "templateId", "playerColor", "board", "turnsUsed", "turnLimit",
-    "focus", "focusPool", "moveCredits", "deploymentsThisTurn", "deploymentsPerTurn",
+    "stageSeed", "templateId", "playerColor", "phase", "board", "turnsUsed", "turnLimit",
+    "focus", "focusPool", "moveCredits", "summonLimit",
     "deploymentRanks", "modifiers", "enemyPolicy", "status"
   ],
   "additionalProperties": false,
@@ -14,9 +14,13 @@
     "stageSeed": { "type": "string", "pattern": "^[0-9A-F]{4}-[0-9A-F]{4}$" },
     "templateId": { "type": "string", "pattern": "^tpl-[a-z0-9-]+$" },
     "playerColor": { "enum": ["white", "black"] },
+    "phase": {
+      "enum": ["deployment", "action"],
+      "description": "deployment: the player places the King and up to summonLimit deck pieces; nothing is paid until Start. action: begins with the first move; the deck is locked for the rest of the stage (docs/02 §3)."
+    },
     "board": {
       "type": "object",
-      "description": "Sparse map of occupied squares only. Keys are algebraic squares.",
+      "description": "Sparse map of occupied squares only. Keys are algebraic squares. In the deployment phase it holds only Stage Pieces (enemy army, spawned pawns); the player's King and summons are added at Start.",
       "patternProperties": {
         "^[a-h][1-8]$": { "$ref": "#/$defs/boardPiece" }
       },
@@ -27,8 +31,12 @@
     "focus": { "type": "integer", "minimum": 0 },
     "focusPool": { "type": "integer", "minimum": 1 },
     "moveCredits": { "type": "integer", "minimum": 0 },
-    "deploymentsThisTurn": { "type": "integer", "minimum": 0 },
-    "deploymentsPerTurn": { "type": "integer", "minimum": 0 },
+    "summonLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "Deck pieces (King excluded) the player may summon in the Deployment phase of this stage."
+    },
     "deploymentRanks": {
       "type": "array",
       "items": { "type": "integer", "minimum": 1, "maximum": 8 },
@@ -61,6 +69,10 @@
       }
     },
     "status": { "enum": ["active", "won", "lost"] },
+    "endReason": {
+      "enum": ["checkmate", "enemy_stalemated", "out_of_turns", "player_mated", "player_stalemated"],
+      "description": "Set when status leaves active. checkmate is the only win; every other reason is a loss (docs/02 §7)."
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": false,

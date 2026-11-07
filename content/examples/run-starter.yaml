@@ -2,7 +2,7 @@
 #
 # King + 2 Knights + 2 Bishops: 4 of 8 capacity slots. Pawns are never in the
 # deck — every stage spawns its own pawns for the player (docs/02 §2.2) — so the
-# deck holds only the pieces that cost durability to deploy. The free slots leave
+# deck holds only the pieces that cost durability to summon. The free slots leave
 # room for shop purchases and promotion rewards without forcing a cut.
 # The King occupies no slot and has null durability (immortal) and null rarity.
 # Every starter piece is Normal rarity (data/economy.yaml → rarity.starterRarity).

@@ -12,17 +12,20 @@ This document is the authority. If any other document disagrees with it, this on
 | **Run** | One attempt: 3 acts × 3 stages. Ends on any stage loss. State lives in `RunState`. |
 | **Stage** | One chess encounter with a turn limit and terminal conditions. State lives in `StageState`. |
 | **Turn** | One player commit + resolution + one enemy reply. |
-| **Action** | A single entry in the player's action queue: `MOVE`, `DEPLOY`, or `ACTIVATE_SKILL`. |
+| **Action** | A single entry in the player's action queue: `MOVE` or `ACTIVATE_SKILL`. |
 | **Action Queue** | The ordered list of actions committed for a turn. |
-| **Move credit** | Currency that pays for `MOVE` and `DEPLOY`. Starts at 1 per turn (the **Free Move**). |
+| **Move credit** | Currency that pays for `MOVE`. Starts at 1 per turn (the **Free Move**). |
 | **Focus** | Currency that pays for `ACTIVATE_SKILL` only. Refills to the pool value each turn. |
-| **Durability** | A piece instance's remaining deployments (see [06](06-deck-durability-and-permadeath.md)). |
+| **Durability** | A piece instance's remaining deployments: how many more stages it can be summoned into (see [06](06-deck-durability-and-permadeath.md)). |
 | **Hero Piece** | A piece the player owns: an instance in `RunState.deck`. On a board it carries an `instanceId`. May hold any rarity. |
 | **Stage Piece** | A piece placed by the stage itself, not drawn from the deck: the enemy army and the player's spawned pawns (and any future neutral pieces). No `instanceId`, never joins the deck. Enemy Stage Pieces are always Normal rarity. |
 | **Spawned pawn** | A free, stage-only pawn the stage places for the player, with a rolled rarity and a visible promotion result (§2.2). The only way the player gets pawns. |
 | **Promotion** | A spawned pawn reaching rank 8 leaves the board and becomes a new Hero Piece in the deck (§2.2). |
 | **Rarity** | A piece's tier: Normal, Rare, Unique, Legendary (ascending). Every piece except the King has one. Bishops, knights, rooks and queens gain abilities by tier (§2.3); see also [06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity). |
-| **Deployment square** | An empty square in the player's deployment ranks where a piece may be placed. |
+| **Deployment phase** | The step between entering a stage and the first move, in which the player places the King and summons pieces from the deck (§5). |
+| **Summon** | Placing a deck piece on the board in the Deployment phase. Costs 1 durability, paid at Start. The only way a Hero Piece reaches the board. |
+| **Deployment square** | An empty square in the player's deployment ranks where the King or a summon may be placed. |
+| **Stalemate** | A side that is not in check and has no legal move (the player: no legal queue). Either side's stalemate is a **loss** for the player (§7). |
 | **End state** | The board position after the queue resolves *and* after end-of-turn expiry (step R1). |
 
 **The player always plays White and always moves first.** Playing Black is deferred
@@ -52,8 +55,8 @@ Pawns cannot be bought and never enter the deck. Each stage **spawns** pawns for
   ranks are chosen so that rank 8 is reachable within the turn limit.
 - Each spawned pawn gets a rarity rolled from the act's rarity pool
   ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)): Act I pawns are Normal or Rare.
-- Spawned pawns cost nothing: no deck slot, no durability, no deployment. They are placed with the
-  opening line, before turn 1.
+- Spawned pawns cost nothing: no deck slot, no durability, no summon. They are placed by the stage
+  at generation, so they are already on the board when the Deployment phase begins.
 - They move and capture as standard chess pawns at every tier (one square forward, capture
   diagonally; the two-square first step applies only from rank 2). Their rarity changes only what
   they promote into.
@@ -68,8 +71,8 @@ When a spawned pawn reaches rank 8, it **promotes**:
 1. The pawn leaves the board immediately; its square becomes empty. Nothing appears in its place.
 2. A new **Hero Piece** instance is created: the pawn's `promotesTo` result, at full durability for
    its type and tier, with `origin: promotion`.
-3. The new piece joins the deck **at once** and is part of the deployable pool for the rest of the
-   stage — later in the same queue, if credits allow.
+3. The new piece joins the deck **at once**, but the deck is locked for the stage (§5): it can first
+   be summoned in the **next** stage.
 
 **The result is rolled at stage generation, not at promotion**, and is shown on the pawn from turn 1
 ("→ Rare Knight"). Promotion is random, but never a hidden dice roll: the player plans with the
@@ -151,11 +154,10 @@ keeps everything below it. Data lives in `content/examples/pieces.yaml → rarit
 
 #### Lifeline (Unique and Legendary queen)
 
-- Triggers the first time in the run that this queen instance is captured — on the board from a
-  deployment or from the opening line.
+- Triggers the first time in the run that this queen instance is captured.
 - The queen leaves the board as usual.
 - Instead of being destroyed, the instance returns to the deck **at stage end** with **1 durability**,
-  and is not deployable again during the stage in which it was captured.
+  and cannot return to the board during the stage in which it was captured (the deck is locked anyway).
 - The instance records `usedOnce: [lifeline]`; the next capture destroys it normally.
 
 Rules that apply to every ability:
@@ -185,19 +187,32 @@ Rules that apply to every ability:
 | Fifty-move rule | Ignored | Turn limits dominate |
 | Insufficient material | Ignored | The turn limit handles "no progress": a stage that cannot be mated in time is lost |
 | Draw by agreement | Doesn't exist | There is only win or loss |
-| Stalemate | **Enemy passes** (see §8) | Prevents dead stages and enables zugzwang play |
+| Stalemate | **Loss for the player**, on either side (see §7) | The enemy is always the losing side, so a draw would be an unearned escape; mate must be exact |
 
-## 3. Turn structure — "Plan & Commit"
+## 3. Stage flow and turn structure — "Plan & Commit"
 
-A turn has five phases:
+A stage runs in a fixed order. Each step ends before the next begins, and none can be revisited.
+
+| # | Phase | What happens |
+|---|---|---|
+| 1 | **Shop** | The player buys pieces and skills ([07](07-shop-phase.md)). The last chance to change the deck before the stage. |
+| 2 | **Enter stage** | The stage is generated ([04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)): the enemy army and the player's spawned pawns are placed, and every spawned pawn's promotion result is shown. No Hero Piece is on the board yet. |
+| 3 | **Analysis & Deployment** | The player studies the board and places the King and up to `summonLimit` deck pieces in the deployment ranks (§5). Placements can be moved or taken back freely; nothing is paid yet. |
+| 4 | **Start → Action** | Pressing **Start** commits the deployment, pays durability, and **locks the deck**. The player's first move follows at once, and turns run until the stage ends (§7). From here on, no piece can be summoned. |
+
+Each turn of the Action phase has five steps:
 
 1. **Plan.** The player assembles an ordered action queue. All costs are accounted sequentially.
 2. **Validate.** The engine simulates the entire queue plus end-of-turn expiry (R1) and checks the
    result against the legality invariants (§9). Failure blocks the commit and explains why.
 3. **Commit.** The queue becomes immutable.
-4. **Resolve.** Actions execute in order. Captures, transforms, placements, and durability spends
-   apply **immediately** as each action executes.
+4. **Resolve.** Actions execute in order. Captures, transforms and promotions apply **immediately**
+   as each action executes.
 5. **Reply.** End-of-turn resolution (§6) runs, then the enemy takes one move per its policy (§8).
+
+**There is no pass.** Every queue contains at least one `MOVE` (`rules.minMovesPerQueue`). A
+player who has no legal queue at the start of a turn has lost the stage (§7) — checkmated if the King
+is in check, stalemated if it is not.
 
 **Nothing is evaluated mid-queue.** A queue is not required to be legal at any intermediate point —
 only at its end. This is a core mechanic, not a loophole:
@@ -207,69 +222,68 @@ only at its end. This is a core mechanic, not a loophole:
 - A piece may temporarily occupy a square that would normally be impossible.
 
 **What is *not* deferred:** each individual `MOVE` must still be a legal move *for that piece in the
-board state at that moment* — blocking, path, and occupancy rules still apply. Durability and
-deployment rules still apply. Skills break exactly one named rule each. "Move twice" is two real
-moves, not a teleport.
+board state at that moment* — blocking, path, and occupancy rules still apply. Skills break exactly
+one named rule each. "Move twice" is two real moves, not a teleport.
 
 ## 4. Action types and costs
 
 | Action | Payload | Costs | Notes |
 |---|---|---|---|
-| `MOVE` | `{ pieceId, from, to }` | 1 move credit (0 for a Legendary knight's bonus move) | Must be legal for that piece right now, including its rarity abilities (§2.3) |
-| `DEPLOY` | `{ pieceInstanceId, to }` | 1 move credit + 1 durability | Target must be an empty deployment square |
+| `MOVE` | `{ from, to }` | 1 move credit (0 for a Legendary knight's bonus move) | Must be legal for that piece right now, including its rarity abilities (§2.3) |
 | `ACTIVATE_SKILL` | `{ skillId, target? }` | Focus equal to the skill's cost | Does **not** cost a move credit; may grant credits |
+
+A `MOVE` names its piece by its square: the piece on `from` at that moment of the queue. Stage Pieces
+have no id, and a square is unambiguous at every step.
+
+There is no `DEPLOY` action. Pieces enter the board only in the Deployment phase (§5).
 
 Cost accounting is **sequential**: walking the queue, each action must be affordable *at the moment
 it executes*. A skill that grants a move credit cannot retroactively pay for a move already committed
 earlier in the queue.
 
-- **Move credits** start at 1 per turn (`freeMovesPerTurn`). Only skills grant more.
+- **Move credits** start at 1 per turn (`freeMovesPerTurn`). Only skills grant more. Credits pay
+  only for `MOVE`.
 - **Focus** starts at the pool value (default 3) each turn, does not carry over, and **can never buy
   a move credit**. This is the balance anchor: exceeding one action per turn requires a skill — or a
   Legendary knight.
 - **Legendary knight bonus move.** Once per turn, after a Legendary knight has made a paid `MOVE`, its
   *next* `MOVE` that turn costs 0 credits. The bonus belongs to that knight: it cannot pay for any
-  other piece's move or a deployment, and it does not carry over. With two Legendary knights, each
-  has its own bonus. Deploying a knight is not a `MOVE` and does not unlock the bonus.
+  other piece's move, and it does not carry over. With two Legendary knights, each has its own bonus.
 - **Skill charges** are per stage, not per turn (see [03](03-skill-framework.md)). A skill with 2
   charges may be activated twice in the same stage — including twice in one turn, Focus permitting.
 
 ## 5. Deployment
 
-Deployment is how the deck becomes an army. It is action-priced, so reinforcement always competes
-directly with playing chess.
+Deployment is how the deck becomes an army, and it happens **once per stage, before the first
+move**. The decision it asks is *who comes*: the enemy board is fully visible, the deck is larger than
+the summon limit, and every piece brought costs durability.
 
 **Rules**
 
-1. Target square must be **empty**.
-2. Target square must be in the player's **deployment ranks** (default 1 and 2 — the player's two home
-   ranks). Templates may narrow this.
-3. The piece must still have **durability ≥ 1**; deploying decrements it by exactly 1.
-4. Deployment consumes **1 move credit**.
-5. Deployments per turn are limited (`deploymentsPerTurn`, default 1) unless a skill or template
-   raises it.
+1. The player places the **King** on any empty square in the **deployment ranks** (default 1 and 2 —
+   the player's two home ranks). The King is mandatory, free, and does not count toward the limit.
+2. The player may **summon** up to `summonLimit` deck pieces (Act I 3, Act II 4, Act III 5; bosses
+   use their act's limit; a template may lower it, never raise it). Summoning none is allowed.
+3. Each summon goes on an **empty** square in the deployment ranks.
+4. A summoned piece must have **durability ≥ 1**; summoning decrements it by exactly 1.
+5. Until **Start**, placements may be moved, swapped or taken back without cost. Durability is paid
+   only when Start commits the deployment.
+6. Start is refused if the King would begin in check (I2). A refused Start costs nothing.
+7. After Start the **deck is locked** for the stage (I15). Nothing — no action, no skill, no
+   promotion — brings another deck piece onto the board until the next stage.
 
-**Opening line (automatic).** Before turn 1 the engine draws the **opening line**: a randomized
-subset of the player's current deck, `openingPlacements` pieces strong (default 3, capped at deck
-size), **always including the King**. Those pieces are placed on randomly chosen legal squares
-within the deployment ranks.
+There is no randomness in deployment: no piece is placed for the player, and no square is chosen for
+them. Spawned pawns are not summons; they are already on the board when the phase begins (§2.1).
 
-Opening placement costs **no durability and no action**. It is the game supplying your starting army,
-which guarantees a run can never reach a stage with an empty board. The randomization is the game's;
-your control over your army's *position* begins with `DEPLOY`. Everything still in the deck after the
-draw is the **deployable pool** for the stage.
-
-Deployments and the opening line are therefore two different things, and the difference is the whole
-point: **the opening line is free but not yours to choose; a deployment is yours to choose but costs
-durability.**
-
-**Deployment failures are non-destructive.** If a deployment cannot legally complete (no valid
-square, or it would produce an illegal end state), it does not execute and its durability is **not**
-spent.
-
-**Deployed pieces are removed from the deck's available pool for the stage** but remain in the deck
+**Summoned pieces are removed from the deck's available pool for the stage** but remain in the deck
 for the run. A piece that survives the stage returns to the deck with its reduced durability. A piece
 captured during the stage is destroyed permanently (see [06](06-deck-durability-and-permadeath.md)).
+Pieces left in the deck are untouched: they spend no durability and cannot be lost.
+
+**Why before the first move.** Mid-stage reinforcement made the strongest plan "start small, add
+pieces as the position demands", which turned deployment into a reaction instead of a commitment.
+Choosing the whole army up front, against a board you can fully read, makes the analysis phase the
+puzzle's first move — and every piece left behind a deliberate saving of durability.
 
 ## 6. End-of-turn resolution order
 
@@ -279,30 +293,43 @@ This order is fixed and load-bearing. Changing it changes the game.
 |---|---|---|
 | **R1** | Expire temporary modifiers | All modifiers with duration `this_turn` revert. A bishop-turned-queen becomes a bishop again. |
 | **R2** | Illegal end-state assertion | The post-R1 state must satisfy §9. At runtime this should never fire (commit-time validation already covered it); if it does, it is an engine bug and the turn is rolled back. |
-| **R3** | Checkmate evaluation | If the enemy king is in check and has no legal move, the player **wins by checkmate**. |
-| **R4** | Stage end and economy evaluation | Stage end conditions checked (§7); turn counter decremented; coin reward computed on a win (see [05](05-run-structure-and-economy.md)). |
-| **R5** | Enemy turn | The enemy makes one move per its policy, then the turn ends: Focus refills, new turn begins. |
+| **R3** | Terminal evaluation | If the enemy king is in check and the enemy has no legal move, the player **wins by checkmate**. If the enemy king is *not* in check and the enemy has no legal move, the enemy is **stalemated and the player loses**. |
+| **R4** | Stage end and economy evaluation | Stage end conditions checked (§7); turn counter advanced; coin reward computed on a win (see [05](05-run-structure-and-economy.md)). |
+| **R5** | Enemy turn | The enemy makes one move per its policy, then the turn ends: Focus and credits refill, and the player's position is checked for a legal queue (§7) before the new turn begins. |
 
 **Consequence worth calling out explicitly:** a temporarily transformed piece that delivers mate
 does **not** deliver mate, because R1 reverts it *before* R3 evaluates. Burst transformations cannot
 win the stage; they win *position and material* — clearing defenders out of a mating net and
-earning salvage — which is exactly the intended use.
+earning salvage — which is exactly the intended use. The same revert can also *create* a stalemate
+that R3 then scores as a loss; the preview shows it (§7).
 
 Similarly, an end state in which reverting a transform would expose the player's own king is illegal
 and cannot be committed. A "free" transform is never free of positional consequence.
 
 ## 7. Stage end evaluation
 
-**Checkmate is the only way to clear a stage.** There is no material win, no domination route and no
-swing metric.
+**Checkmate is the only way to clear a stage.** There is no material win, no domination route, no
+swing metric — and no draw: **a stalemate on either side is a loss for the player.**
 
-Evaluated at R4 each turn, in this order; the first match wins:
+Evaluated in this order; the first match ends the stage:
 
-| Priority | Condition | Outcome |
-|---|---|---|
-| 1 | Enemy king is checkmated (from R3) | **WIN** — stage reward ([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins)) |
-| 2 | Player king is checkmated | **LOSS** — run ends immediately |
-| 3 | Turns remaining = 0 | **LOSS** — run ends |
+| Priority | When | Condition | Outcome (`endReason`) |
+|---|---|---|---|
+| 1 | R3 | Enemy king in check, enemy has no legal move | **WIN** — `checkmate`; stage reward ([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins)) |
+| 2 | R3 | Enemy king not in check, enemy has no legal move | **LOSS** — `enemy_stalemated` |
+| 3 | R4 | Turns remaining = 0 | **LOSS** — `out_of_turns`; the enemy does not move |
+| 4 | after R5 | Player king in check, the player has no legal queue | **LOSS** — `player_mated` |
+| 5 | after R5 | Player king not in check, the player has no legal queue | **LOSS** — `player_stalemated` |
+
+Any loss ends the run. A **legal queue** is any queue that satisfies §3–§4 and the invariants of
+§9: at least one `MOVE`, every action legal and affordable, and the player's King not in check at the
+end. The deck is locked, so only moves and skills count. The player can never be mated or stalemated
+at the end of their own turn — I2 forbids ending a turn in check, and the check after R5 catches the
+rest — so priorities 4 and 5 are only ever reached through the enemy's move.
+
+**Stalemate is visible before commit.** The preview evaluates R3 like everything else (I10), so a
+queue that would stalemate the enemy shows **STALEMATE — YOU LOSE** and asks for confirmation. The
+rule never springs on the player; it shapes what they plan.
 
 **Stage reward:**
 
@@ -315,16 +342,24 @@ unused turn adds bonus coins on top. Salvage for captured enemy pieces is paid a
 
 **What captures are for.** Capturing no longer wins anything by itself. It is worth doing for three
 reasons: it removes defenders from the mating net, it removes attackers from the player's pieces, and
-it pays salvage. Losing a piece costs the run that piece; it does not move any win condition.
+it pays salvage. Losing a piece costs the run that piece; it does not move any win condition. A
+capture can also *cost* the stage: taking the enemy's last mobile piece next to a boxed-in king is
+the classic way to stalemate it.
 
 **Why checkmate only.** A fallback material win let a player trade down slowly and still clear the
 stage. Without it, every stage is a mating problem against the clock, the solver proves exactly one
 thing (a mate exists within the limit, [04 §5](04-stage-generation-and-authoring.md#5-the-solver)),
 and the turn counter is the only pressure the player has to read.
 
+**Why stalemate loses.** In chess a stalemate rescues the losing side. Here the enemy is always the
+losing side, so a draw would be a consolation the puzzle never earns — and "enemy passes", the old
+rule, let a player freeze the enemy with no risk. Making stalemate a loss turns it into the oldest
+constraint in mating puzzles: overwhelming force is not enough; the net must leave the king exactly
+one way to be checkmated, and no way to be smothered into a draw.
+
 ## 8. Enemy behavior
 
-- The enemy is **standard-move-only** in MVP: it never deploys, never uses skills, and never gains
+- The enemy is **standard-move-only** in MVP: it never summons, never uses skills, and never gains
   reinforcement mid-stage. (Boss skills are an M6 feature; the schema already reserves
   `enemyLoadout`.)
 - Every enemy piece is a **Stage Piece** at Normal rarity. Enemy rarity is never rolled or authored,
@@ -335,24 +370,25 @@ and the turn counter is the only pressure the player has to read.
     seed and position.
   - `scripted` — a fixed authored line, used for teaching and boss stages.
 - **The enemy AI is our own code.** `best_move` is a small minimax in `packages/engine`, written
-  against *these* rules — multi-action player turns, rarity abilities, stalemate-passes, the turn
+  against *these* rules — multi-action player turns, rarity abilities, stalemate-as-loss, the turn
   limit. No external chess engine plays the enemy: a standard engine would misread every one of those
   rules, and could not be called the hundreds of thousands of times the solver needs. Stockfish has a
   role only as an offline design tool ([09 §1](09-technical-architecture.md#1-stack)).
-- **Stalemated enemy passes.** If the enemy has no legal move and is *not* in check, it does nothing
-  and the turn proceeds normally. The player is never awarded a stalemate draw and never forced into
-  one.
+- **The enemy never passes.** R5 runs only after R3, and R3 has already ended the stage if the enemy
+  has no legal move — by checkmate (a win) or by stalemate (a loss). So whenever the enemy is asked to
+  move, it has at least one legal move.
 
 ### 8.1 Enemy AI
 
-The enemy is one pure function, `enemyMove(stage, seed) → move | pass`, used unchanged by the engine,
+The enemy is one pure function, `enemyMove(stage, seed) → move`, used unchanged by the engine,
 the solver and replay. Same position + same seed → same move, always. Every constant below lives in
 [`data/economy.yaml`](../data/economy.yaml) → `enemyAI`.
 
-**What the enemy wants.** The enemy "wins" when the player runs out of turns or is mated, so its job
-is to **defend first and punish mistakes**: survive the clock, keep its king safe, take the player's
-pieces when that is safe, and mate the player's king whenever it can. It does not launch risky
-attacks.
+**What the enemy wants.** The enemy "wins" when the player runs out of turns, is mated, or causes a
+stalemate on either side, so its job is to **defend first and punish mistakes**: survive the clock,
+keep its king safe, take the player's pieces when that is safe, mate the player's king whenever it
+can — and steer toward positions where the player's only remaining moves would stalemate it. It does
+not launch risky attacks.
 
 **Search.**
 
@@ -361,7 +397,7 @@ attacks.
 | Algorithm | Alpha-beta minimax with **iterative deepening** (depth 1, 2, … up to the policy depth) and a deterministic **transposition table** |
 | Depth | The template's `enemyPolicy.depth`: Act I 2, Act II–III 3, bosses 4 ([04 §6](04-stage-generation-and-authoring.md#6-difficulty-curve)) |
 | One ply | One enemy move, or one player reply |
-| The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine deploys, skills, or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
+| The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine skills or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
 | Quiescence | At the horizon, keep searching **captures only**, at most 2 more plies, so the enemy never hangs a piece just past its depth |
 | The clock | The search knows how many turns the player has left. A line where the player runs out of turns is a win for the enemy |
 
@@ -374,6 +410,7 @@ so every stage stays provably clearable however the enemy misjudges the player.
 | Outcome (always outranks any position) | Score |
 |---|---|
 | Player king mated | +100,000, minus plies to reach it (sooner is better) |
+| Either side stalemated (enemy with no move, or player with no move, neither in check) | Same as player king mated: the player has lost |
 | Player out of turns | +50,000 |
 | Enemy king mated | −100,000, plus plies to reach it (an unavoidable mate is delayed as long as possible) |
 
@@ -405,53 +442,67 @@ These are the contract the engine, the generator, and the tests all share.
 
 | ID | Invariant |
 |---|---|
-| **I1** | Exactly one white king and one black king exist on the board at all times. |
-| **I2** | The end state has the player's king **not** in check. |
+| **I1** | From Start until the stage ends, exactly one white king and one black king are on the board. (In the Deployment phase only the black king is; the player places theirs before Start.) |
+| **I2** | The end state of every queue — and the position at Start — has the player's king **not** in check. |
 | **I3** | A king is never captured and never removed by any effect — including multi-capture and the Legendary knight's bonus move. |
 | **I4** | Every `MOVE` was legal for its piece — including its rarity abilities (§2.3) — in the position at the moment it executed. |
-| **I5** | The number of paid `MOVE` + `DEPLOY` actions in a queue never exceeds the credits earned in it; each Legendary knight makes at most one free bonus move per turn. |
+| **I5** | The number of paid `MOVE` actions in a queue never exceeds the credits earned in it, and every queue has at least one `MOVE`; each Legendary knight makes at most one free bonus move per turn. |
 | **I6** | Total Focus spent in a queue never exceeds the pool plus Focus granted during that queue. |
-| **I7** | A piece's durability never goes below 0; deploying requires durability ≥ 1. |
-| **I8** | No `DEPLOY` places a piece on an occupied square or outside the deployment ranks. |
+| **I7** | A piece's durability never goes below 0; summoning requires durability ≥ 1 and spends exactly 1. |
+| **I8** | No placement in the Deployment phase — King or summon — is on an occupied square or outside the deployment ranks. |
 | **I9** | Outside a stage, deck size never exceeds the fixed capacity of 8 (a promotion may overflow it during a stage; the cut happens at stage end); the king is never destroyed or removed from the deck; the deck never holds a pawn. |
 | **I10** | The coin payout shown in the preview equals the payout at evaluation, for the same plan. |
 | **I11** | Given identical `(RunState, seed)`, generation and all enemy decisions are reproducible. |
 | **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance (a merge creates a new instance; it never changes an existing one). |
 | **I13** | Every enemy piece is Normal rarity. |
 | **I14** | Nothing — shop offer, spawned pawn, or promotion result — is above its act's rarity ceiling; the Act I ceiling is Rare. |
+| **I15** | Hero Pieces enter the board only in the Deployment phase: at most `summonLimit` summons plus the King, and none after Start. |
 
-## 10. Worked example turn
+## 10. Worked example: deployment and the first turn
 
-Stage: Act I template, 8 turns, Focus 3. The deck contains a Rook (durability 2) and the skill
-**Twin Step** (cost 1, 3 charges). Board: player king on `e1`; enemy king on `g8`, enemy rook on `d4`.
-The enemy rook controls the `d`-file, including `d1`.
+Stage: Act I template, 8 turns, summon limit 3. The deck holds a Rook and a Bishop (durability 2
+each) and two Knights. Board after generation: enemy king on `g8`, enemy rook on `d4`. The enemy rook
+controls the `d`-file, including `d1` and `d2`, and the fourth rank.
 
-Deploying the rook to a natural square would drop it straight onto `d4`'s line. Two actions, however,
-reach `h7` — outside the enemy rook's reach and dominant along the seventh rank. The player builds
-this queue:
+**Deployment phase.** The player reads the board before placing anything. The rook belongs on the
+seventh rank, next to the enemy king — but a rook on `h7` is adjacent to `g8` and would simply be
+taken unless something defends it. The long diagonal `b1`–`h7` is open. So the player places:
+
+| Placement | Why | Paid at Start |
+|---|---|---|
+| King → `e1` | Off the `d`-file | free |
+| Rook → `h1` | Clear run up the `h`-file to `h7` | durability 2 → 1 |
+| Bishop → `b1` | Guards `h7` along `b1`–`h7` | durability 2 → 1 |
+
+Two of three summons are used; both knights stay in the deck and spend nothing. Start: the King on
+`e1` is not in check (I2 ✓), every square was empty and inside ranks 1–2 (I8 ✓), 2 summons ≤ 3
+(I15 ✓). The deck is now locked.
+
+**Turn 1.** The queue is one action:
 
 | # | Action | Cost | Running state |
 |---|---|---|---|
-| 1 | `ACTIVATE_SKILL Twin Step` | 1 Focus (2 left), grants +1 move credit | 2 credits; rook still in the deck |
-| 2 | `DEPLOY Rook → h1` | 1 credit (1 left) + 1 durability (2→1) | Rook on `h1`, outside `d4`'s lines |
-| 3 | `MOVE Rook h1 → h7` | 1 credit (0 left) | Rook on `h7` |
+| 1 | `MOVE h1 → h7` | 1 credit (0 left) | Rook on `h7`, defended by the bishop on `b1` |
 
-Validation: the end state leaves the player king on `e1` not in check (I2 ✓), 2 credits spent / 2
-earned (I5 ✓), 1 Focus spent of 3 available (I6 ✓), 1 durability remaining (I7 ✓), `h1` was empty and
-inside ranks 1–2 (I8 ✓).
+Validation: the player king on `e1` is not in check (I2 ✓), 1 credit spent of 1 (I5 ✓), at least one
+`MOVE` (✓).
 
 R1: no `this_turn` modifiers to expire.
 R2: end-state legality assertion passes.
-R3: the enemy king on `g8` is not in check — no win.
-R4: no checkmate and turns remain — play continues.
-R5: the enemy replies; the `best_move` policy likely consolidates on the queenside.
+R3: the enemy king on `g8` is not in check. It is not stalemated either: `f8` is free, and the enemy
+rook has moves. Play continues.
+R4: turn 1 of 8 used — play continues.
+R5: the enemy replies; `best_move` sees that `g8xh7` walks into the bishop and keeps its king on the
+`f8` side.
 
-Note what the player *didn't* do: deploy onto `d1`'s line and hand the enemy a free rook — lost
-for the run, and one less piece for the mating net.
+Note what the player *didn't* do: summon onto `d1` or `d2` and hand the enemy a free rook — lost for
+the run, and one less piece for the mating net. And note the trap one step ahead: if the enemy rook
+ever leaves the board while the king is boxed on `g8`/`f8`, a careless quiet move could leave it with
+no legal move at all — a stalemate, and a lost stage (§7).
 
-And note the freedom deferred validation buys: the same king may **step into check on one action and
-out of it on the next**, because check is evaluated only on the end state. That is not a loophole —
-it is the mechanic that makes extra moves worth buying.
+The freedom deferred validation buys still applies inside every turn: the same king may **step into
+check on one action and out of it on the next**, because check is evaluated only on the end state.
+That is not a loophole — it is the mechanic that makes extra moves worth buying.
 
 ## 11. Rules that are out of scope for MVP
 

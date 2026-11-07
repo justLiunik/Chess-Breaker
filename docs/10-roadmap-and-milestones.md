@@ -34,11 +34,14 @@ repository scaffolding.
 ## M1 — Chess Core & Turn Engine
 
 **Delivers:** `packages/engine` — board, move generation, per-action legality, queue simulation,
-sequential cost accounting, end-of-turn resolution R1–R5, stage end evaluation. No skills, no deck.
+sequential cost accounting, end-of-turn resolution R1–R5, stage end evaluation. No skills, no deck,
+no Deployment phase: M1 tests start from stages already in `phase: action`.
 
 **Scope**
 - Move generation for all six piece types, blocking, capture, check, checkmate, stalemate detection.
-- `Action` types `MOVE` only (deploy and skills stubbed behind the same interface).
+- `Action` type `MOVE` only (skills stubbed behind the same interface); `empty_queue` refused.
+- Terminal outcomes of [02 §7](02-rules-framework.md#7-stage-end-evaluation): checkmate wins;
+  enemy stalemate, out of turns, and no legal queue after the enemy's move (mate or stalemate) lose.
 - `simulate`/`apply` split and the `CommitError` union.
 - Invariants I1–I5, I11 enforced and tested.
 - `engine/enemy`: the enemy AI of `docs/02 §8.1` — alpha-beta with iterative deepening, transposition
@@ -62,20 +65,21 @@ must be resisted — that would silently delete the game's core mechanic.
 
 ## M2 — Deck, Durability, Deployment & Skills
 
-**Delivers:** the three launch skills, the modifier stack, durability, deployment, the opening line.
+**Delivers:** the three launch skills, the modifier stack, durability, the Deployment phase.
 
 **Scope**
 - `PieceInstance` lifecycle (`in_deck` → `deployed` → `captured` | `spent`), including the
   fixed `rarity` field (null for the King).
-- `DEPLOY` action with durability spend and non-destructive failure.
-- Opening-line draw.
+- Deployment phase: `startStage` with the King, up to `summonLimit` summons, durability spent at
+  Start, all-or-nothing validation, and the deck lock (I15).
 - `ACTIVATE_SKILL` with `grant_move_credit`, `set_piece_type`, `suppress_piece`.
 - Duration semantics: `instant`, `this_turn`, `next_enemy_turn`.
 - Final R1→R5 ordering including revert-before-mate.
 - Rarity abilities (`leap_allies`, `add_leaper`, `add_rider`, `bonus_self_move`, `multi_capture`, `lifeline`), driven by
   `pieces.yaml`.
-- Spawned pawns and promotion: pawn removed on rank 8, `promotesTo` instance added to the deck and
-  deployable in the same stage.
+- Spawned pawns and promotion: pawn removed on rank 8, `promotesTo` instance added to the deck,
+  summonable from the next stage.
+- The no-legal-queue check after R5 widened to skills (a skill-enabled escape is a legal queue).
 
 **Acceptance criteria**
 - [ ] Twin Step, Ascension and Lockdown behave exactly as specified in `docs/03 §5`, including every
@@ -83,6 +87,12 @@ must be resisted — that would silently delete the game's core mechanic.
 - [ ] A temporary queen never delivers checkmate (asserted by test).
 - [ ] A revert that exposes the player's king is refused at commit with a named cause.
 - [ ] Durability 0 → `spent` → removed at stage end, never earlier (test).
+- [ ] `startStage` spends exactly 1 durability per summon, nothing for the King or for pieces left
+      in the deck, and refuses every case in [09 §9](09-technical-architecture.md#9-testing-strategy)
+      without spending anything (test).
+- [ ] No action or skill can bring a deck piece onto the board after Start (I15, test).
+- [ ] A Lockdown that leaves the enemy without a legal move is scored at R3: checkmate if in check,
+      stalemate (a loss) otherwise (test).
 - [ ] Captured instance is permanently absent from `RunState.deck` (test).
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
 - [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
@@ -113,8 +123,8 @@ report.
 - `npm run gen:report` producing solvability rate (mate within the limit) and median mating turn.
 
 **Acceptance criteria**
-- [ ] 10,000 generated stages: ≥95% solvable, 100% pass king/pre-check/enemy-value/deployment
-      preconditions ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
+- [ ] 10,000 generated stages: ≥95% solvable, 100% pass the enemy-king, safe-King-square,
+      enemy-has-moves, enemy-value and deployment preconditions ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
 - [ ] Same seed twice → byte-identical `StageState`.
 - [ ] Median accepted stage generated in < 250 ms on a laptop.
 - [ ] Every template reports a median mating turn within ±20% of its band.
@@ -122,6 +132,8 @@ report.
 - [ ] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
       results never exceed the act ceiling (I14).
 - [ ] Solver models rarity abilities and promotion; measured node counts reported per tier mix.
+- [ ] Solver searches the deployment ply (bounded candidates, sound but incomplete) and prunes
+      stalemate leaves; node counts reported separately for the deployment ply.
 
 **Risks:** solver cost. Mitigations staged in
 [04 §5](04-stage-generation-and-authoring.md#5-the-solver) (cache → offline archetypes → tighter
@@ -173,8 +185,10 @@ One complete run playable start to finish in a browser.
 **Scope**
 - Board rendering with ghost preview and step-through.
 - Queue builder with reorder, inline affordability, named commit errors.
-- HUD: turns, live coin preview (base + turn bonus), focus, credits, deployments, salvage.
-- Deployment tray with durability pips and capture telegraphing.
+- HUD: turns, live coin preview (base + turn bonus), focus, credits, salvage.
+- Deployment-phase screen: deck tray with durability pips, summon counter, capture telegraphing,
+  START with its durability summary.
+- `STALEMATE — YOU LOSE` preview warning with confirm.
 - Shop screen per the wireframe in [07 §6](07-shop-phase.md#6-screen-layout).
 - Keyboard play, reduced motion, colorblind-safe threat icons.
 
@@ -218,7 +232,7 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 
 | Risk | Likelihood | Impact | Mitigation | Milestone |
 |---|---|---|---|---|
-| Skills trivialize stages | High | High | Charge scarcity, action-priced deployment, solver validation, boss skills | M2, M6 |
+| Skills trivialize stages | High | High | Charge scarcity, summon limit, solver validation, boss skills | M2, M6 |
 | Death spiral unfun | Medium | High | Spawned pawns, promotion, recovery offer, salvage, bank & skip | M4 |
 | Solver too slow | Medium | Medium | Single-agent search (enemy is deterministic), memoized enemy replies, template narrowing, caching, offline archetypes | M3 |
 | Enemy blind to multi-action turns looks dumb | Medium | Low | Intended (skills stay surprising); if playtests object, add a threat-awareness term for charged skills | M6 |
@@ -232,6 +246,10 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune turn limits and enemy bands first in M6 | M3, M6 |
 | Base reward + no capacity sink inflates coins | Medium | Medium | Headless-bot tuning of `baseReward` before prices; merges as the main deck-growth path | M4, M6 |
 | Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
+| Deployment ply blows up the solver | Medium | High | Bounded candidate subsets and squares, sound-but-incomplete search, regeneration on miss; measure first | M3 |
+| A multi-piece deployment mates on turn 1 | Low | Medium | `no_first_turn_mate` checks single pieces; widen to pairs if playtests find turn-1 mates | M3, M6 |
+| Durability drains too fast without a free opening line | Medium | Medium | Summon limit, "bring less" as a real choice, repair price and durability tuning by the headless bot | M4, M6 |
+| Stalemate-as-loss feels like a trap | Medium | Medium | Preview always names it before commit; tutorial stage shows it once; enemy-has-moves precondition | M5, M6 |
 
 ## Dependencies
 

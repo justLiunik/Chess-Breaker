@@ -136,22 +136,37 @@ interface BoardPiece {
 interface StageState {
   stageSeed: string;
   templateId: string;
+  phase: 'deployment' | 'action';  // deployment: only Stage Pieces on the board; action: deck locked
   board: Record<Square, BoardPiece | undefined>;
   turnsUsed: number;
   turnLimit: number;
   focus: number;
   focusPool: number;
   moveCredits: number;             // reset to freeMovesPerTurn each turn
-  deploymentsThisTurn: number;
-  deploymentsPerTurn: number;
+  summonLimit: number;             // deck pieces (King excluded) allowed in the Deployment phase
   deploymentRanks: number[];
   modifiers: ActiveModifier[];
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
+  endReason?: 'checkmate' | 'enemy_stalemated' | 'out_of_turns' | 'player_mated' | 'player_stalemated';
 }
 ```
 
 ## 4. The reducer contract
+
+A stage has two commits. The first, once per stage, ends the Deployment phase:
+
+```ts
+startStage(
+  run: RunState,
+  stage: StageState,               // phase: 'deployment'
+  placements: { instanceId: string; to: Square }[],   // the King plus up to summonLimit pieces
+): Result<{ run: RunState; stage: StageState; events: GameEvent[] }, CommitError>
+```
+
+It validates all placements at once (I2, I7, I8, I15), spends 1 durability per non-King summon,
+marks those instances `deployed`, and returns the stage in `phase: 'action'`. Placements are never
+partially applied. Every later turn goes through the second:
 
 ```ts
 commitQueue(
@@ -182,9 +197,14 @@ type CommitError =
   | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[] }
   | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
   | { kind: 'credits_exceeded'; atStep: number }
-  | { kind: 'durability_unavailable'; instanceId: string }
+  | { kind: 'empty_queue' }                                   // no MOVE in the queue: there is no pass
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: string }
-  | { kind: 'invalid_deployment'; atStep: number; to: Square; reason: string };
+  | { kind: 'stage_not_active' }
+  | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
+  // startStage only:
+  | { kind: 'durability_unavailable'; instanceId: string }
+  | { kind: 'invalid_deployment'; to: Square; reason: string }    // occupied, off-rank, or King missing
+  | { kind: 'summon_limit_exceeded'; limit: number; placed: number };
 ```
 
 ## 5. Determinism and RNG
@@ -217,7 +237,8 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | `engine/board` | Square math, move generation per piece type and rarity ability (data-driven from `pieces.yaml`) | Know about durability or skills |
 | `engine/legality` | Per-action legality, end-state invariants | Know about transitions/durations |
 | `engine/queue` | Sequential cost accounting, simulate/apply | Decide win conditions |
-| `engine/rules` | End-of-turn order R1–R5, stage end evaluation | Render or animate |
+| `engine/deployment` | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
+| `engine/rules` | End-of-turn order R1–R5, stage end evaluation (checkmate, stalemate, turns, no legal queue) | Render or animate |
 | `engine/skills` | Primitive interpretation, modifier stack, expiry | Add per-skill special cases |
 | `engine/enemy` | `enemyMove(stage, seed)`: alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
@@ -254,14 +275,16 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I13 over generated random queues (fuzz) |
+| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz) |
 | Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
 | Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
 | Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
 | Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
-| Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, deployable in the same queue; over-capacity cut fires at stage end |
+| Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
+| Deployment phase | `startStage` refuses: no King, King in check, occupied or off-rank squares, more than `summonLimit` summons, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
+| Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate(q).state === apply(q).state` for random legal-ish queues |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |
