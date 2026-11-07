@@ -51,6 +51,13 @@ describe('simulate', () => {
     expect(v.events).toContainEqual({ type: 'stage_lost', endReason: 'enemy_stalemated' });
   });
 
+  it('ends a malformed stage whose turnsUsed already exceeds the limit', () => {
+    const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 9, turnLimit: 8 });
+    const v = ok(simulate(runOf(), stage, mv('h1', 'h2'), config));
+    expect(v.stage.status).toBe('lost');
+    expect(v.stage.endReason).toBe('out_of_turns');
+  });
+
   it('loses on the last turn without mate', () => {
     const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 7, turnLimit: 8 });
     const v = ok(simulate(runOf(), stage, mv('h1', 'h2'), config));

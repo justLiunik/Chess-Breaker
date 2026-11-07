@@ -137,6 +137,7 @@ export type GameEvent =
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
 export interface EngineConfig {
+  /** `focusPool` is the default pool for stage generation (M3); the engine reads `stage.focusPool`. */
   rules: { freeMovesPerTurn: number; focusPool: number; minMovesPerQueue: number };
   pieceValues: Record<PieceType, number>;
   economy: {

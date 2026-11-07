@@ -208,18 +208,21 @@ Guarantees:
 - **Total.** Returns either a new state or a typed error, never throws for a player-legal-shaped input.
 - **Event-emitting.** `GameEvent[]` is the *only* channel the UI animates from. The UI never diffs
   state to infer what happened.
-- **Two-phase internally:** `simulate(queue)` produces the resolved state and the validation verdict;
-  `apply(queue)` commits it. The **preview UI calls `simulate` and discards it** — preview and
-  execution are literally the same function, which is how invariant I10 (preview equals payout) is
+- **Two-phase internally:** `simulate(queue)` runs Resolve–R4 and produces the resolved state and the
+  validation verdict; `commitQueue(queue)` is `simulate` plus R5 (the enemy's reply). The **preview UI
+  calls `simulate` and discards it** — preview and execution share the same code path, which is how invariant I10 (preview equals payout) is
   satisfied by construction rather than by discipline.
 
 `CommitError` is a discriminated union whose members are the invariant IDs of
 [02 §9](02-rules-framework.md#9-legality-invariants), each carrying a human-readable cause:
 
+M1 produces `king_in_check_at_end`, `credits_exceeded`, `empty_queue`, `illegal_move`,
+`stage_not_active`, `wrong_phase`, `unsupported_action` and `invariant_violation`.
+
 ```ts
 type CommitError =
   | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[] }
-  | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
+  | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }   // not produced in M1 (no skills yet)
   | { kind: 'credits_exceeded'; atStep: number }
   | { kind: 'empty_queue' }                                   // no MOVE in the queue: there is no pass
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
@@ -254,7 +257,7 @@ function rng(seed: string, cursor: number): { value: number; next: number }
 - Seed derivation:
   - `runSeed            = player seed or generated`
   - `stageSeed          = hash(runSeed, actIndex, stageIndex)`
-  - `enemySeed          = hash(stageSeed, turnsUsed)`
+  - `enemySeed          = hash(stageSeed, turnsUsed)`, where `turnsUsed` is the value after R4's increment
   - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)` — covers piece
     type *and* rarity rolls, including rerolls
   - spawned-pawn rarity and `promotesTo` are drawn from `stageSeed` during generation (G4b), never
@@ -268,12 +271,12 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | Module | Owns | Must not |
 |---|---|---|
 | `engine/board` | Square math, move generation per piece type and rarity ability (data-driven from `pieces.yaml`) | Know about durability or skills |
-| `engine/legality` | Per-action legality, end-state invariants | Know about transitions/durations |
-| `engine/queue` | Sequential cost accounting, simulate/apply | Decide win conditions |
+| `engine/legality` | Per-action legality, check detection and `hasLegalQueue` (not the end-state invariants, which `engine/queue` checks) | Know about transitions/durations |
+| `engine/queue` | `resolveQueue` (Resolve, R1, R2, I2) and `applyPlayerMove`: sequential cost accounting and per-step legality | Decide win conditions |
 | `engine/deployment` | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
-| `engine/rules` | End-of-turn order R1–R5, stage end evaluation (checkmate, stalemate, turns, no legal queue) | Render or animate |
+| `engine/rules` | `simulate` and `commitQueue` (R3–R5): stage end evaluation (checkmate, stalemate, turns, no legal queue) and the enemy reply | Render or animate |
 | `engine/skills` | Primitive interpretation, modifier stack, expiry | Add per-skill special cases |
-| `engine/enemy` | `enemyMove(stage, seed)`: alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
+| `engine/enemy` | `enemyMove(stage, seed, config) → { move | null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `gen` | Templates, generation pipeline, solver | Be imported by the web app |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
@@ -319,7 +322,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Deployment phase | `startStage` refuses: no King, King in check, occupied or off-rank squares, more than `summonLimit` summons, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
-| Preview/execution parity | Property test: `simulate(q).state === apply(q).state` for random legal-ish queues |
+| Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |
 | Generation | 10k-stage solvability and precondition suite ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)) |
 | Content | `npm run validate` — schema conformance of every content file |

@@ -36,7 +36,7 @@ export function simulate(
 
   // R4: the turn is spent.
   next = { ...next, turnsUsed: next.turnsUsed + 1 };
-  if (next.status === 'active' && next.turnsUsed === next.turnLimit) {
+  if (next.status === 'active' && next.turnsUsed >= next.turnLimit) {
     next = { ...next, status: 'lost', endReason: 'out_of_turns' };
   }
 

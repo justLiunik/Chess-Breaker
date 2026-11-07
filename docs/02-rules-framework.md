@@ -380,7 +380,7 @@ one way to be checkmated, and no way to be smothered into a draw.
 
 ### 8.1 Enemy AI
 
-The enemy is one pure function, `enemyMove(stage, seed) → move`, used unchanged by the engine,
+The enemy is one pure function, `enemyMove(stage, seed, config) → { move | null, policy }` (`move` is null only when the enemy has no legal move), used unchanged by the engine,
 the solver and replay. Same position + same seed → same move, always. Every constant below lives in
 [`data/economy.yaml`](../data/economy.yaml) → `enemyAI`.
 

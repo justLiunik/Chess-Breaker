@@ -42,7 +42,7 @@ no Deployment phase: M1 tests start from stages already in `phase: action`.
 - `Action` type `MOVE` only (skills stubbed behind the same interface); `empty_queue` refused.
 - Terminal outcomes of [02 §7](02-rules-framework.md#7-stage-end-evaluation): checkmate wins;
   enemy stalemate, out of turns, and no legal queue after the enemy's move (mate or stalemate) lose.
-- `simulate`/`apply` split and the `CommitError` union.
+- `simulate`/`commitQueue` split and the `CommitError` union.
 - Invariants I1–I5, I11 enforced and tested.
 - `engine/enemy`: the enemy AI of `docs/02 §8.1` — alpha-beta with iterative deepening, transposition
   table, capture quiescence, evaluation weights from `economy.yaml`, seeded tie-break, scripted lines

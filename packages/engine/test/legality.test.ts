@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { fromBoard } from '../src/position';
-import { toIndex, toSquare } from '../src/square';
+import { toSquare } from '../src/square';
 import {
   checkPlayerMove, hasLegalQueue, inCheck, legalMoves, legalPlayerMoves,
 } from '../src/legality';
@@ -34,6 +34,18 @@ describe('checkPlayerMove', () => {
   });
 });
 
+describe('legalPlayerMoves', () => {
+  it('lists exactly the reachable squares', () => {
+    const t = st({ e1: 'K', a1: 'R', a4: 'P', d1: 'n', h8: 'k' });
+    expect([...legalPlayerMoves(t, 'a1')].sort()).toEqual(['a2', 'a3', 'b1', 'c1', 'd1']);
+  });
+  it('is empty for a malformed or empty square', () => {
+    const t = st({ e1: 'K', a1: 'R', h8: 'k' });
+    expect(legalPlayerMoves(t, 'a1x')).toEqual([]);
+    expect(legalPlayerMoves(t, 'c3')).toEqual([]);
+  });
+});
+
 describe('hasLegalQueue', () => {
   it('stalemate is false', () => {
     expect(hasLegalQueue(st({ a1: 'K', b3: 'q', c3: 'k' }), config)).toBe(false);
@@ -45,6 +57,5 @@ describe('hasLegalQueue', () => {
     const doc = parse(readFileSync(new URL('../../../content/examples/stage-state.yaml', import.meta.url), 'utf8'));
     const s = deepFreeze(doc) as StageState;
     expect(hasLegalQueue(s, config)).toBe(true);
-    expect(legalPlayerMoves(s, 'a1').every((q) => toIndex(q) >= 0)).toBe(true);
   });
 });

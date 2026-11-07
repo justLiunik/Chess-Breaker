@@ -1,6 +1,6 @@
 import type { Color, EngineConfig, MoveRejection, Square, StageState } from './types';
 import * as position from './position';
-import { toIndex, toSquare } from './square';
+import { isSquare, toIndex, toSquare } from './square';
 import * as movegen from './movegen';
 import type { Move } from './movegen';
 
@@ -122,6 +122,8 @@ export const COUNTS = { king: 0 };
 export function checkPlayerMove(
   board: StageState['board'], from: Square, to: Square,
 ): MoveRejection | null {
+  if (!isSquare(from)) return 'no_piece';
+  if (!isSquare(to)) return 'unreachable';
   const piece = board[from];
   if (!piece) return 'no_piece';
   if (piece.color !== 'white') return 'not_your_piece';
@@ -135,6 +137,7 @@ export function checkPlayerMove(
 }
 
 export function legalPlayerMoves(stage: StageState, from: Square): Square[] {
+  if (!isSquare(from)) return [];
   const b = fromBoard(stage.board);
   const f = toIndex(from);
   if (b[f]! <= 0) return [];

@@ -8,6 +8,18 @@ const run = runOf();
 
 describe('resolveQueue errors', () => {
   const base = { e1: 'K', h8: 'k' };
+  it('rejects malformed squares without touching the inputs', () => {
+    const s = deepFreeze(stageOf({ ...base, a7: 'R' }, { moveCredits: 2 }));
+    const r0 = deepFreeze(runOf());
+    for (const to of ['a7x', 'a10']) {
+      expect(resolveQueue(r0, s, [mv('a7', to)], config)).toEqual({
+        ok: false, error: { kind: 'illegal_move', atStep: 0, from: 'a7', to, reason: 'unreachable' },
+      });
+    }
+    expect(resolveQueue(r0, s, [mv('a1x', 'a8')], config)).toEqual({
+      ok: false, error: { kind: 'illegal_move', atStep: 0, from: 'a1x', to: 'a8', reason: 'no_piece' },
+    });
+  });
   it('stage_not_active', () => {
     const s = stageOf(base, { status: 'won' });
     expect(resolveQueue(run, s, [mv('e1', 'e2')], config)).toEqual({ ok: false, error: { kind: 'stage_not_active' } });

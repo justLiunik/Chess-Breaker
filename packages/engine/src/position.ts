@@ -13,10 +13,6 @@ const CODE: Record<PieceType, number> = {
   pawn: PAWN, knight: KNIGHT, bishop: BISHOP, rook: ROOK, queen: QUEEN, king: KING,
 };
 
-export function colorOfCode(code: number): Color | null {
-  return code > 0 ? 'white' : code < 0 ? 'black' : null;
-}
-
 export function fromBoard(board: StageState['board']): Int8Array {
   const b = new Int8Array(64);
   for (const [sq, piece] of Object.entries(board)) {
