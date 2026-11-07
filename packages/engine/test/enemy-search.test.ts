@@ -36,6 +36,12 @@ describe('scoreRootMoves', () => {
     expect(maxScore(res)).toBe(99999);
   });
 
+  it('scores a mate on the horizon as a terminal', () => {
+    const res = scoreRootMoves(b({ a1: 'K', a2: 'P', b2: 'P', h8: 'k', e8: 'r' }), 5, 1, config);
+    expect(scoreOf(res, 'e8', 'e1')).toBe(99999);
+    expect(maxScore(res)).toBe(99999);
+  });
+
   it('scores a forced loss by its distance', () => {
     const res = scoreRootMoves(b({ b6: 'K', c6: 'Q', a8: 'k' }), 5, 2, config);
     expect(res).toHaveLength(1);
@@ -55,18 +61,16 @@ describe('scoreRootMoves', () => {
     expect(scoreOf(res, 'd5', 'd4')).toBeLessThan(bestQuiet);
   });
 
-  it('scores every non-mating move as out of turns when the player has none left', () => {
+  it('scores every root move as out of turns when the player has none left, mates included', () => {
+    // White's out-of-turns check comes before its no-legal-move check, so even a mate scores 50000.
     for (const fen of MIDGAME_FENS) {
-      const board = fenBoard(fen);
-      const res = scoreRootMoves(board, 0, 2, config);
+      const res = scoreRootMoves(fenBoard(fen), 0, 2, config);
       expect(res.length).toBeGreaterThan(0);
-      for (const r of res) {
-        const after = board.slice();
-        makeMove(after, r.move);
-        const mates = inCheck(after, 'white') && legalMoves(after, 'white').length === 0;
-        if (!mates) expect(r.score).toBe(50000);
-      }
+      for (const r of res) expect(r.score).toBe(50000);
     }
+    const mate = scoreRootMoves(b({ a1: 'K', a2: 'P', b2: 'P', h8: 'k', e8: 'r' }), 0, 2, config);
+    expect(scoreOf(mate, 'e8', 'e1')).toBe(50000);
+    expect(mate.every((r) => r.score === 50000)).toBe(true);
   });
 
   it('gives identical tied-best scores with the transposition table on and off', () => {
@@ -84,9 +88,40 @@ describe('scoreRootMoves', () => {
     const res = scoreRootMoves(board, 8, 2, config);
     expect(board).toEqual(copy);
     expect(res).toHaveLength(legalMoves(board, 'black').length);
-    const caps = res.filter((r) => r.move.captured !== 0).length;
-    expect(res.slice(0, caps).every((r) => r.move.captured !== 0)).toBe(true);
     for (const r of res) expect(Number.isInteger(r.score)).toBe(true);
+  });
+
+  it('orders root moves by MVV/LVA, then checks, then from-index, then to-index', () => {
+    // Bxd4+ and Nxd4 take the queen with equal-value attackers, so the check breaks the tie; the quiet
+    // check Rh1+ comes before every other quiet move although its from-index (h6) is high.
+    const board = b({
+      a1: 'K', d4: 'Q', b5: 'N', h7: 'k', d8: 'r', c6: 'n', e5: 'b', a6: 'p', h6: 'r',
+    });
+    const res = scoreRootMoves(board, 5, 2, config);
+    const names = res.map((r) => `${toSquare(r.move.from)}${toSquare(r.move.to)}`);
+    expect(names.slice(0, 6)).toEqual(['e5d4', 'c6d4', 'd8d4', 'a6b5', 'h6h1', 'e5h2']);
+
+    // The full order against an independent statement of the comparator.
+    const value = (code: number, attacker: boolean): number => {
+      const t = (['pawn', 'pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const)[Math.abs(code)]!;
+      return attacker && t === 'king' ? Infinity : config.pieceValues[t];
+    };
+    const keyed = legalMoves(board, 'black').map((m) => {
+      const after = board.slice();
+      makeMove(after, m);
+      return {
+        name: `${toSquare(m.from)}${toSquare(m.to)}`,
+        cap: m.captured !== 0 ? 1 : 0,
+        v: m.captured !== 0 ? value(m.captured, false) : 0,
+        a: m.captured !== 0 ? value(board[m.from]!, true) : 0,
+        chk: inCheck(after, 'white') ? 1 : 0,
+        from: m.from,
+        to: m.to,
+      };
+    });
+    keyed.sort((x, y) => (y.cap - x.cap) || (y.v - x.v) || (x.a - y.a) || (y.chk - x.chk)
+      || (x.from - y.from) || (x.to - y.to));
+    expect(names).toEqual(keyed.map((k) => k.name));
   });
 
   it('does not throw for turns left beyond the hash range', () => {

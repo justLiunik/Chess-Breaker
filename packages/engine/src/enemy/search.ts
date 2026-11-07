@@ -19,7 +19,10 @@ interface Ctx {
   b: Int8Array;
   config: EngineConfig;
   tt: Map<number, Entry> | null;
-  /** MVV/LVA value per absolute piece code; the king as an attacker ranks above every piece. */
+  /**
+   * MVV/LVA value per absolute piece code. The king's attacker value is +inf, so a king capture
+   * sorts after every other attacker of an equally valuable victim.
+   */
   victim: number[];
   attacker: number[];
   qmax: number;
@@ -241,17 +244,24 @@ export function scoreRootMoves(
   orderMoves(ctx, moves, true, null);
   const finalDepth = Number.isFinite(depth) ? Math.max(1, Math.floor(depth)) : 1;
   const scores = new Array<number>(moves.length).fill(0);
-  // Iterative deepening: each iteration fills the TT that orders the next; the last one's scores stand.
+  // Iterative deepening: each iteration searches the previous iteration's best move first (full
+  // window), then the rest in the stable order with (best - 1, +inf), and fills the TT that orders the
+  // tree. Scores land in their stable-order slots; the last iteration's scores stand.
+  let prevBest = 0;
   for (let d = 1; d <= finalDepth; d++) {
     let best = -INF;
-    for (let i = 0; i < moves.length; i++) {
+    let bestIdx = prevBest;
+    for (let k = 0; k < moves.length; k++) {
+      // k = 0 is the previous best; then every other move in the stable order.
+      const i = k === 0 ? prevBest : k <= prevBest ? k - 1 : k;
       const m = moves[i]!;
       makeMove(b, m);
-      const s = search(ctx, false, d - 1, i === 0 ? -INF : best - 1, INF, 1, playerTurnsLeft);
+      const s = search(ctx, false, d - 1, k === 0 ? -INF : best - 1, INF, 1, playerTurnsLeft);
       unmakeMove(b, m);
       scores[i] = s;
-      if (s > best) best = s;
+      if (s > best) { best = s; bestIdx = i; }
     }
+    prevBest = bestIdx;
   }
   return moves.map((move, i) => ({ move, score: scores[i]! }));
 }
