@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest';
+import { applyPlayerMove } from '../src/queue';
+import { config, stageOf } from './helpers';
+
+describe('applyPlayerMove', () => {
+  const cases: [string, string, number][] = [
+    ['n', 'knight', 1], ['p', 'pawn', 0], ['q', 'queen', 3], ['r', 'rook', 1],
+  ];
+  for (const [letter, type, salvage] of cases) {
+    it(`capturing a black ${type} pays salvage ${salvage}`, () => {
+      const s = stageOf({ e1: 'K', a1: 'R', a5: letter, h8: 'k' });
+      const r = applyPlayerMove(s.board, 'a1', 'a5', config);
+      expect(r.salvage).toBe(salvage);
+      expect(r.board['a5']).toMatchObject({ pieceType: 'rook', color: 'white' });
+      expect(r.board['a1']).toBeUndefined();
+      expect(r.events).toEqual([
+        { type: 'move', from: 'a1', to: 'a5', pieceType: 'rook', color: 'white' },
+        { type: 'capture', square: 'a5', pieceType: type, color: 'black', salvage },
+      ]);
+    });
+  }
+
+  it('leaves the frozen input board untouched', () => {
+    const s = stageOf({ e1: 'K', a1: 'R', a5: 'n', h8: 'k' });
+    const r = applyPlayerMove(s.board, 'a1', 'a5', config);
+    expect(r.board).not.toBe(s.board);
+    expect(s.board['a1']).toBeDefined();
+    expect(s.board['a5']).toMatchObject({ pieceType: 'knight' });
+  });
+
+  it('plain move emits only a move event with zero salvage', () => {
+    const s = stageOf({ e1: 'K', a1: 'R', h8: 'k' });
+    const r = applyPlayerMove(s.board, 'a1', 'a4', config);
+    expect(r.salvage).toBe(0);
+    expect(r.events.map((e) => e.type)).toEqual(['move']);
+  });
+
+  it('white pawn c7 to c8 vanishes and emits pawn_promoted', () => {
+    const s = stageOf({ e1: 'K', c7: 'P', h8: 'k' });
+    const r = applyPlayerMove(s.board, 'c7', 'c8', config);
+    expect(r.board['c8']).toBeUndefined();
+    expect(r.board['c7']).toBeUndefined();
+    expect(r.events).toEqual([
+      { type: 'move', from: 'c7', to: 'c8', pieceType: 'pawn', color: 'white' },
+      { type: 'pawn_promoted', square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' } },
+    ]);
+  });
+
+  it('pawn capturing onto rank 8 emits move, capture, pawn_promoted', () => {
+    const s = stageOf({ e1: 'K', c7: 'P', d8: 'r', h8: 'k' });
+    const r = applyPlayerMove(s.board, 'c7', 'd8', config);
+    expect(r.board['d8']).toBeUndefined();
+    expect(r.events.map((e) => e.type)).toEqual(['move', 'capture', 'pawn_promoted']);
+    expect(r.salvage).toBe(1);
+  });
+});
