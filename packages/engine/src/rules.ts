@@ -4,7 +4,7 @@ import type {
 import { hasLegalQueue, inCheck, legalMoves } from './legality';
 import { enemyMove } from './enemy/policy';
 import { hash } from './rng';
-import { KING, fromBoard } from './position';
+import { KING, fromBoard, tiersOf } from './position';
 import { toSquare } from './square';
 import { resolveQueue } from './queue';
 import { frozenMask } from './skills/registry';
@@ -21,11 +21,12 @@ export function simulate(
   let nextRun = resolved.value.run;
   let next: StageState = resolved.value.stage;
 
-  // R3: evaluate Black's position, with suppressed pieces unable to move.
+  // R3: evaluate Black's position, with suppressed pieces unable to move, against White's abilities.
   const b = fromBoard(next.board);
-  const checked = inCheck(b, 'black');
+  const t = tiersOf(next.board);
+  const checked = inCheck(b, 'black', t, config.abilities);
   let award: Award | null = null;
-  if (legalMoves(b, 'black', frozenMask(next)).length === 0) {
+  if (legalMoves(b, 'black', frozenMask(next), t, config.abilities).length === 0) {
     if (checked) {
       next = { ...next, status: 'won', endReason: 'checkmate' };
     } else {

@@ -279,3 +279,25 @@ export function unmakeMove(b: Int8Array, m: Move): void {
   b[m.to] = m.captured;
   if (m.via >= 0) b[m.via] = m.viaCaptured;
 }
+
+/**
+ * `makeMove` on `b` and the tier array `t` beside it: the tier moves with the piece (and is dropped
+ * when the piece vanishes), captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
+ * needs to restore `t` exactly: from, to and via, two bits each.
+ */
+export function makeMoveTiered(b: Int8Array, t: Int8Array, m: Move): number {
+  const via = m.via;
+  const saved = t[m.from]! | (t[m.to]! << 2) | (via >= 0 ? t[via]! << 4 : 0);
+  makeMove(b, m);
+  t[m.to] = b[m.to]! > 0 ? t[m.from]! : 0;
+  t[m.from] = 0;
+  if (via >= 0) t[via] = 0;
+  return saved;
+}
+
+export function unmakeMoveTiered(b: Int8Array, t: Int8Array, m: Move, saved: number): void {
+  unmakeMove(b, m);
+  t[m.from] = saved & 3;
+  t[m.to] = (saved >> 2) & 3;
+  if (m.via >= 0) t[m.via] = (saved >> 4) & 3;
+}

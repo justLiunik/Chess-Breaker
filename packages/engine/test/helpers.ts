@@ -2,7 +2,7 @@ import { loadEngineConfig } from '@checkbreaker/content';
 import { rng } from '../src/rng';
 import { isAttacked } from '../src/movegen';
 import type {
-  BoardPiece, Color, EngineConfig, PieceType, RunState, Square, StageState,
+  BoardPiece, Color, EngineConfig, PieceType, Rarity, RunState, Square, StageState,
 } from '../src/types';
 
 export const config: EngineConfig = loadEngineConfig();
@@ -126,6 +126,25 @@ export const GAME_FENS: string[] = [
   'r5k1/1p3ppp/2n1b3/8/8/2P2P2/3N4/R1B1KQ2 b - - 0 1',
   '2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3 b - - 0 1',
 ];
+
+/**
+ * The rarity benchmark positions: each GAME_FEN with every White knight, bishop, rook and queen
+ * (all Hero Pieces) at Rare, at Unique and at Legendary. Build one with `rarityStage`.
+ */
+export const RARITY_FENS: { fen: string; rarity: Exclude<Rarity, 'normal'> }[] = GAME_FENS.flatMap(
+  (fen) => (['rare', 'unique', 'legendary'] as const).map((rarity) => ({ fen, rarity })),
+);
+
+/** `fenToStage(fen)` with the White knights, bishops, rooks and queens at `rarity`. */
+export function rarityStage(fen: string, rarity: Rarity): StageState {
+  const stage = fenToStage(fen);
+  const board: Record<Square, BoardPiece> = {};
+  for (const [sq, piece] of Object.entries(stage.board)) {
+    const tiered = piece.color === 'white' && piece.instanceId !== undefined && piece.pieceType !== 'king';
+    board[sq] = tiered ? { ...piece, rarity } : piece;
+  }
+  return deepFreeze({ ...stage, board });
+}
 
 export function fenToStage(fen: string, overrides: Partial<StageState> = {}): StageState {
   const placement = fen.split(' ')[0]!;

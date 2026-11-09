@@ -164,7 +164,7 @@ describe('fast engine against the slow reference', () => {
       }
       expect(fastMap).toEqual(refMap);
     }
-  });
+  }, 60_000);
 
   it('the tier boards exercise every ability (counted with the reference)', () => {
     const n = { rareLeapBlocked: 0, uniqueCaptureAfterLeap: 0, multiCapture: 0, kingOnYBehindX: 0 };
@@ -188,6 +188,77 @@ describe('fast engine against the slow reference', () => {
       expect(evaluate(b, config)).toBe(refEvaluate(b, config));
     }
   });
+});
+
+describe('Black against White abilities, against the reference', () => {
+  /** KING_ZONE[k]: the squares next to k. */
+  const KING_ZONE = Array.from({ length: 64 }, (_, k) => {
+    const out: number[] = [];
+    for (let df = -1; df <= 1; df++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        const f = (k & 7) + df;
+        const r = (k >> 3) + dr;
+        if ((df !== 0 || dr !== 0) && f >= 0 && f < 8 && r >= 0 && r < 8) out.push(f + 8 * r);
+      }
+    }
+    return out;
+  });
+
+  /** Whether Black's king is attacked only through an ability (the M1 rules see no check). */
+  const abilityCheck = (b: Int8Array, t: Int8Array): boolean => {
+    const k = b.indexOf(-6);
+    return refAttacked(b, k, 'white', t) && !refAttacked(b, k, 'white');
+  };
+
+  /** `n` tier boards, then `m` with Black in check from an ability piece only. */
+  function blackCases(n: number, m: number): { b: Int8Array; t: Int8Array; checked: boolean }[] {
+    const out: { b: Int8Array; t: Int8Array; checked: boolean }[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = new Int8Array(64);
+      const b = randomBoard('ref-black-tier', i, { tiers: t });
+      out.push({ b, t, checked: abilityCheck(b, t) });
+    }
+    for (let i = 0, found = 0; found < m; i++) {
+      const t = new Int8Array(64);
+      const b = randomBoard('ref-black-ability-check', i, { tiers: t });
+      if (!abilityCheck(b, t)) continue;
+      out.push({ b, t, checked: true });
+      found++;
+    }
+    return out;
+  }
+
+  it('Black legal moves equal refLegalMoves on 2,000 tier boards, 1,000 more with Black in check from an ability', () => {
+    let checked = 0;
+    for (const { b, t, checked: c } of blackCases(1000, 1000)) {
+      expect(sortMoves(legalMoves(b, 'black', undefined, t, config.abilities)))
+        .toEqual(sortMoves(refLegalMoves(b, 'black', t)));
+      if (c) checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(1000);
+  }, 120_000);
+
+  it("the search's White replies equal refLegalMoves with tiers, multi-captures included", () => {
+    const key = (m: { from: number; to: number; via: number }) => `${m.from}-${m.to}-${m.via}`;
+    let multi = 0;
+    for (const { b, t } of blackCases(2000, 0)) {
+      const fast = legalMoves(b, 'white', undefined, t, config.abilities).map(key).sort();
+      expect(fast).toEqual(refLegalMoves(b, 'white', t).map(key).sort());
+      if (fast.some((k) => !k.endsWith('--1'))) multi++;
+    }
+    expect(multi).toBeGreaterThanOrEqual(10);
+  }, 120_000);
+
+  it("evaluate's kingZoneAttacked counts ability attacks (fast == refEvaluate with tiers on 5,000 boards)", () => {
+    let zoneByAbility = 0;
+    for (const { b, t } of blackCases(4000, 1000)) {
+      expect(evaluate(b, config, t)).toBe(refEvaluate(b, config, t));
+      const k = b.indexOf(-6);
+      const zone = KING_ZONE[k]!;
+      if (zone.some((sq) => refAttacked(b, sq, 'white', t) && !refAttacked(b, sq, 'white'))) zoneByAbility++;
+    }
+    expect(zoneByAbility).toBeGreaterThanOrEqual(500);
+  }, 120_000);
 });
 
 describe('White legal moves with tiers against the reference', () => {

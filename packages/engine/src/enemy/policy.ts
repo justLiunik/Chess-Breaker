@@ -1,5 +1,5 @@
 import type { EngineConfig, EnemyPolicy, Square, StageState } from '../types';
-import { fromBoard } from '../position';
+import { fromBoard, tiersOf } from '../position';
 import { legalMoves } from '../legality';
 import { frozenMask } from '../skills/registry';
 import { isSquare, toIndex, toSquare } from '../square';
@@ -8,10 +8,10 @@ import { scoreRootMoves } from './search';
 type Pick = { move: { from: Square; to: Square } | null; policy: EnemyPolicy };
 
 function searchMove(
-  stage: StageState, b: Int8Array, frozen: Uint8Array, seed: number, depth: number,
+  stage: StageState, b: Int8Array, t: Int8Array, frozen: Uint8Array, seed: number, depth: number,
   policy: EnemyPolicy, config: EngineConfig,
 ): Pick {
-  const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config, frozen);
+  const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config, frozen, t);
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
   const tied = scored.filter((r) => r.score === best);
@@ -27,8 +27,9 @@ function searchMove(
 export function enemyMove(stage: StageState, seed: number, config: EngineConfig): Pick {
   const policy = stage.enemyPolicy;
   const b = fromBoard(stage.board);
+  const t = tiersOf(stage.board);
   const frozen = frozenMask(stage);
-  const legal = legalMoves(b, 'black', frozen);
+  const legal = legalMoves(b, 'black', frozen, t, config.abilities);
   if (legal.length === 0) return { move: null, policy: { ...policy } };
   const fallbackDepth = config.enemyAI.search.defaultFallbackDepth;
 
@@ -47,11 +48,11 @@ export function enemyMove(stage: StageState, seed: number, config: EngineConfig)
       }
     }
     const next: EnemyPolicy = { ...policy, fellBack: true, cursor };
-    return searchMove(stage, b, frozen, seed, policy.fallbackDepth ?? fallbackDepth, next, config);
+    return searchMove(stage, b, t, frozen, seed, policy.fallbackDepth ?? fallbackDepth, next, config);
   }
 
   const depth = policy.type === 'scripted'
     ? (policy.fallbackDepth ?? fallbackDepth)
     : (policy.depth ?? fallbackDepth);
-  return searchMove(stage, b, frozen, seed, depth, { ...policy }, config);
+  return searchMove(stage, b, t, frozen, seed, depth, { ...policy }, config);
 }

@@ -336,6 +336,37 @@ export function abilityAttacked(b: Int8Array, t: Int8Array, sq: number, table: A
   return false;
 }
 
+/**
+ * Sets `out[sq] = 1` on every square the piece on `from` attacks by `abilityAttacked`'s rule, and
+ * returns true, when it is a White knight, bishop, rook or queen with a tier; else returns false and
+ * marks nothing (its attacks are the M1 ones). Along a ray: each square up to and including the
+ * first Black piece, passing White pieces only when it leaps allies, and marking beyond the first
+ * ally only when it may capture after the leap; then every leap target, whatever stands there.
+ */
+export function markAbilityAttacks(
+  b: Int8Array, t: Int8Array, from: number, table: AbilityTable, out: Uint8Array,
+): boolean {
+  const m = moverAt(compiledOf(table), b, t, from);
+  if (m === undefined) return false;
+  const rays = m.rays[from]!;
+  for (let r = 0; r < rays.length; r++) {
+    const ray = rays[r]!;
+    let passed = false;
+    for (let i = 0; i < ray.length; i++) {
+      const x = ray[i]!;
+      if (!passed || m.leapAllies === 2) out[x] = 1;
+      else break;
+      const c = b[x]!;
+      if (c === 0) continue;
+      if (c < 0 || m.leapAllies === 0) break;
+      passed = true;
+    }
+  }
+  const leaps = m.leaps[from]!;
+  for (let i = 0; i < leaps.length; i++) out[leaps[i]!] = 1;
+  return true;
+}
+
 /** Whether `piece` has a bonus move (the Legendary knight): a Hero Piece of a tier whose flags say so. */
 export function hasBonusMove(piece: BoardPiece, config: EngineConfig): boolean {
   const tier = position.tierOfPiece(piece);
