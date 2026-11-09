@@ -4,9 +4,10 @@ import { config, deepFreeze } from './helpers';
 import { makeCase } from './fuzzgen';
 
 describe('parity: simulate is the first half of commitQueue', () => {
-  it('holds on 1,000 random accepted queues', () => {
+  it('holds on 1,000 random accepted queues (skills included)', () => {
     let checked = 0;
     let ended = 0;
+    let withSkills = 0;
     for (let i = 0; checked < 1000; i++) {
       const { run, stage, queue } = makeCase('parity', i);
       deepFreeze(stage);
@@ -15,6 +16,7 @@ describe('parity: simulate is the first half of commitQueue', () => {
       const c = commitQueue(run, stage, queue, config);
       if (!c.ok) throw new Error(`commitQueue refused what simulate accepted at ${i}`);
       checked++;
+      if (s.value.events.some((e) => e.type === 'skill_activated')) withSkills++;
       expect(c.value.events.slice(0, s.value.events.length)).toEqual(s.value.events);
       expect(c.value.award).toEqual(s.value.award);
       expect(c.value.run.coins).toBeGreaterThanOrEqual(s.value.run.coins);
@@ -29,5 +31,6 @@ describe('parity: simulate is the first half of commitQueue', () => {
       }
     }
     expect(ended).toBeGreaterThan(0);
+    expect(withSkills).toBeGreaterThan(20);
   }, 30_000);
 });

@@ -80,6 +80,25 @@ skills: they cost no Focus, have no charges, and occupy no loadout slot. But the
 rule — no special cases in `engine/rules` — and a skill that touches movement must state how it
 composes with them (default: a transform suspends rarity abilities until it reverts).
 
+### Modifiers
+
+An activation that has a lasting effect records a **modifier**: `{ modifierId, primitive, source,
+target?, duration, appliedOnTurn }`. Modifier ids are `m{turn}_{step}` (the turn number and the
+queue step that activated it): deterministic and unique within a stage. A modifier's `target` is a
+**piece id** (`instanceId` for Hero Pieces, `stageId` for Stage Pieces), never a square, so it follows
+its piece. `grant_move_credit` records no modifier (credits reset every turn). A transformed piece
+carries `transformed: { pieceType, modifierId }`; R1 finds it by that id, and a modifier whose target
+was captured is dropped (with a `modifier_expired` event). Movement generation counts a transformed
+piece as tier 0 (rarity abilities suspended); suppression is applied through a frozen-square mask
+(R3 and the root of R5 only, [02 §6](02-rules-framework.md#6-end-of-turn-resolution-order)).
+
+`hasLegalQueue(run, stage, config)` searches **skills first, then moves**: any ordered set of usable
+skills (distinct, within Focus and charges, each with every legal target), followed by up to the
+resulting credits in moves, each legal when made, with I2 holding after R1. It is complete for the
+launch three because a credit must be granted before the move it pays for, a transform must precede
+the moves of its piece, and Lockdown never changes I2; a test brute-forces every interleaving on
+small boards to confirm. A future skill that breaks one of these needs the search revisited.
+
 ### Duration semantics
 
 | Duration | Expires | Typical use |
@@ -183,9 +202,11 @@ status: mvp
   Unique bishop gains straight lines but loses its leap for the turn. A **Legendary bishop cannot be
   targeted** (`excludesRarity: [legendary]`): it already moves like a queen, so Ascension would add
   no move and only take its leaps away — a wasted charge, not a choice.
-- **Edge cases:** reverting to a bishop that would expose the player's king makes the end state
-  illegal (I2), so the commit is refused. Transforming a bishop that is later captured simply
-  removes it; no reversion occurs.
+- **Edge cases:** the engine checks I2 again after R1 (`king_in_check_at_end { afterRevert: true }`),
+  but with this skill the case cannot occur: the bishop's square and what it blocks never change at
+  the revert, so the King is no more exposed after it than before. The check is a guard for future
+  transform skills. Transforming a bishop that is later captured simply removes it; no reversion
+  occurs, and R1 drops the modifier (emitting `modifier_expired`).
 
 ### Lockdown — *Status*
 

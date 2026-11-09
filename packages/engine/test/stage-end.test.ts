@@ -3,6 +3,7 @@ import { endStage } from '../src/stage-end';
 import { startStage } from '../src/deployment';
 import { commitQueue } from '../src/rules';
 import { legalPlayerMoves } from '../src/legality';
+import { applyPlayerMove } from '../src/queue';
 import { rng } from '../src/rng';
 import { config, deepFreeze, deploymentStageOf, runOf, stageOf } from './helpers';
 import type { Action, PieceInstance, RunState, StageState } from '../src/types';
@@ -87,15 +88,15 @@ describe('endStage', () => {
       origin: 'promotion', acquiredAtStage: 0, status: 'in_deck',
     });
     const king = runOf().deck[0]!;
-    const eight = deepFreeze({ ...runOf(), deck: [king, ...[1, 2, 3, 4, 5, 6, 7, 8].map(mk)] });
+    const eight = deepFreeze({ ...runOf(), deck: [king, ...Array.from({ length: config.deck.capacity }, (_, n) => mk(n + 1))] });
     expect(ok(endStage(eight, won(), config)).overCapacity).toBe(0);
-    const nine = deepFreeze({ ...runOf(), deck: [...eight.deck, mk(9)] });
+    const nine = deepFreeze({ ...runOf(), deck: [...eight.deck, mk(config.deck.capacity + 1)] });
     expect(ok(endStage(nine, won(), config)).overCapacity).toBe(1);
   });
 });
 
 describe('I15: no queue adds a Hero Piece to the board after startStage', () => {
-  it('the set of instanceIds on the board only shrinks (500 random queues)', () => {
+  it('the set of instanceIds on the board only shrinks (500 chained random queues)', () => {
     const dep = deploymentStageOf({ e8: 'k', c7: 'p', f7: 'p', a8: 'r' }, { enemyPolicy: { type: 'best_move', depth: 1 } });
     const started = ok(startStage(runOf(), dep, [
       { instanceId: 'p_king_01', to: 'e1' }, { instanceId: 'p_knight_02', to: 'b1' }, { instanceId: 'p_bishop_04', to: 'c1' },
@@ -106,18 +107,31 @@ describe('I15: no queue adds a Hero Piece to the board after startStage', () => 
     expect(before.size).toBe(3);
     let cursor = 0;
     const pick = (n: number): number => { const r = rng('I15', cursor); cursor = r.next; return Math.floor(r.value * n); };
-    const whites = Object.entries(started.stage.board).filter(([, p]) => p.instanceId !== undefined).map(([sq]) => sq);
+    let commits = 0;
+    let current = { run: started.run, stage: started.stage };
     for (let i = 0; i < 500; i++) {
+      // Chain turns from the previous result; pick every queued move from the board at that point.
       const queue: Action[] = [];
-      for (let q = 0; q < 1 + pick(2); q++) {
+      let board = current.stage.board;
+      const length = 1 + pick(current.stage.moveCredits);
+      for (let q = 0; q < length; q++) {
+        const whites = Object.entries(board).filter(([, p]) => p.instanceId !== undefined).map(([sq]) => sq);
+        if (whites.length === 0) break;
         const from = whites[pick(whites.length)]!;
-        const tos = legalPlayerMoves(started.stage, from);
-        if (tos.length > 0) queue.push({ type: 'MOVE', from, to: tos[pick(tos.length)]! });
+        const tos = legalPlayerMoves({ ...current.stage, board }, from);
+        if (tos.length === 0) continue;
+        const to = tos[pick(tos.length)]!;
+        queue.push({ type: 'MOVE', from, to });
+        board = applyPlayerMove(board, from, to, config).board;
       }
-      if (queue.length === 0) continue;
-      const r = commitQueue(started.run, started.stage, queue, config);
-      if (!r.ok) continue;
+      if (queue.length === 0) { current = { run: started.run, stage: started.stage }; continue; }
+      const r = commitQueue(current.run, current.stage, queue, config);
+      if (!r.ok) { current = { run: started.run, stage: started.stage }; continue; }
+      commits++;
       for (const id of ids(r.value.stage)) expect(before.has(id)).toBe(true);
+      // An ended stage restarts from the deployed state.
+      current = r.value.stage.status === 'active' ? { run: r.value.run, stage: r.value.stage } : { run: started.run, stage: started.stage };
     }
+    expect(commits).toBeGreaterThanOrEqual(100);
   });
 });

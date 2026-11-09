@@ -326,7 +326,19 @@ earning salvage — which is exactly the intended use. The same revert can also 
 that R3 then scores as a loss; the preview shows it (§7).
 
 Similarly, an end state in which reverting a transform would expose the player's own king is illegal
-and cannot be committed. A "free" transform is never free of positional consequence.
+and cannot be committed. A "free" transform is never free of positional consequence. (With the launch
+skills this can never happen: Ascension transforms only an own bishop, and a revert changes neither
+its square nor what it blocks, so the King's safety is the same before and after R1. The check
+after R1 (`king_in_check_at_end { afterRevert: true }`) is a general guard for future skills.)
+
+**Suppression and modifiers.** Modifiers (skill effects with a duration) target **piece ids** (a
+Hero Piece's `instanceId` or a Stage Piece's `stageId`), never squares, so a modifier follows its
+piece. A piece suppressed by Lockdown is **in force at R3**, where it has no moves (a suppressed side
+with no other move is stalemated, or mated if in check), and **at the root of R5**, where the enemy
+search may not move it; `next_enemy_turn` modifiers expire at the end of R5. A modifier whose target
+was captured is dropped (R1 emits `modifier_expired` for it too). A stage that ends at R3 or R4
+keeps its live suppress modifier in `modifiers`: the stage is finished and discarded, and `endStage`
+ignores modifiers.
 
 ## 7. Stage end evaluation
 
@@ -422,6 +434,11 @@ not launch risky attacks.
 | The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine skills or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
 | Quiescence | At the horizon, keep searching **captures only**, at most 2 more plies, so the enemy never hangs a piece just past its depth |
 | The clock | The search knows how many turns the player has left. A line where the player runs out of turns is a win for the enemy |
+
+**Suppression (Lockdown).** A suppressed piece is frozen **at the root of the search only**: the
+enemy may not move it on this turn, but deeper plies are *later* enemy turns, on which the
+suppression has expired, so the search treats the piece as free there. The piece still attacks,
+blocks and defends in every ply, and can be captured.
 
 The enemy's model of the player is deliberately simpler than the player. The solver is not: it
 searches the player's full action set ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)),

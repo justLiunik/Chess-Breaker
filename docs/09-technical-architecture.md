@@ -199,8 +199,13 @@ enemyMove(stage, seed: number, config): {
   policy: EnemyPolicy,                         // scripted cursor / fellBack advanced
 }
 legalPlayerMoves(stage, from): Square[]
-hasLegalQueue(stage, config): boolean
+hasLegalQueue(run, stage, config): boolean   // credits are read from stage.moveCredits
+endStage(run, stage, config): Result<{ run; events; overCapacity: number }, CommitError>
 ```
+
+`hasLegalQueue` searches skills first, then moves (see [03 §3](03-skill-framework.md#3-effect-primitives)).
+`endStage` runs on a `won` stage: it returns deployed pieces to the deck with their durability, removes
+`spent` pieces, and returns a lifeline-saved queen with durability 1.
 
 `simulate` runs R1–R4 (the player's queue and stage-end evaluation); `commitQueue` is `simulate`
 plus R5, the enemy's reply and the start of the next turn.
@@ -218,32 +223,61 @@ Guarantees:
 `CommitError` is a discriminated union whose members are the invariant IDs of
 [02 §9](02-rules-framework.md#9-legality-invariants), each carrying a human-readable cause:
 
-M1 produces `king_in_check_at_end`, `credits_exceeded`, `empty_queue`, `illegal_move`,
-`stage_not_active`, `wrong_phase`, `unsupported_action` and `invariant_violation`.
-
 ```ts
 type CommitError =
-  | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[] }
-  | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }   // not produced in M1 (no skills yet)
+  | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[]; afterRevert: boolean }
+  | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
   | { kind: 'credits_exceeded'; atStep: number }
   | { kind: 'empty_queue' }                                   // no MOVE in the queue: there is no pass
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
+  | { kind: 'skill_unavailable'; atStep: number; skillId: string;
+      reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
+  | { kind: 'invalid_target'; atStep: number; skillId: string; target?: Square;
+      reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
   | { kind: 'stage_not_active' }
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   // startStage only:
   | { kind: 'durability_unavailable'; instanceId: string }
-  | { kind: 'invalid_deployment'; to: Square; reason: string }    // occupied, outside ranks 1–4, or King missing
+  | { kind: 'invalid_deployment'; to: Square;
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate' }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
-  // M1 only (removed in M2, when skills exist):
-  | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
+  // endStage only:
+  | { kind: 'stage_not_won'; status: StageState['status'] }
   // R2 safety net; a bug if it ever fires:
   | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
 
 type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
 ```
 
-M1 produces only the first group plus `unsupported_action` and `invariant_violation`; the
-`startStage`-only kinds arrive in M2.
+`king_in_check_at_end.afterRevert` is true when the King is attacked only on the board R1 reverted.
+`unsupported_action` is gone: an `ACTIVATE_SKILL` is checked like any other step (spec section 8.1
+order: loadout and `mvp` status, charges, `once_per_turn`, Focus, then the target). `focus_exceeded`
+is produced for a skill whose cost exceeds the Focus left at its step.
+
+### Events
+
+`GameEvent[]` is the only animation channel. Besides the M1 events (`move`, `capture`,
+`pawn_promoted`, `enemy_promoted`, `check`, `stage_won`, `stage_lost`, `enemy_move`,
+`enemy_fell_back`, `turn_started`), M2 adds:
+
+| Event | Emitted by |
+|---|---|
+| `stage_started` | `startStage` |
+| `piece_summoned { instanceId, square }` | `startStage`, one per summon |
+| `skill_activated { skillId, target? }` | each accepted `ACTIVATE_SKILL` |
+| `piece_transformed { target, pieceType }` | `set_piece_type` (`target` is a piece id) |
+| `piece_suppressed { target }` | `suppress_piece` |
+| `transform_reverted { target }` | R1, when a transformed piece reverts |
+| `modifier_expired { modifierId }` | R1 and the end of R5, for every modifier removed, including one dropped because its target was captured |
+| `lifeline_saved { instanceId }` | a Unique+ queen captured for the first time |
+| `piece_returned { instanceId, durability }` | `endStage`, per piece back in the deck |
+| `piece_removed { instanceId, reason: 'spent' }` | `endStage`, per spent piece |
+
+`capture` and `pawn_promoted` carry the ids of the pieces involved (`instanceId` / `stageId`).
+`enemy_fell_back` is emitted **before** `enemy_move`.
+
+A stage that ends at R3 or R4 keeps its live suppress modifier in `StageState.modifiers`; the stage
+is finished and `endStage` ignores modifiers.
 
 ## 5. Determinism and RNG
 
@@ -313,7 +347,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz) |
+| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz): 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants) and Focus spent never exceeds the pool |
 | Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
@@ -324,7 +358,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Deployment phase | `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
-| Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues |
+| Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues, skills included |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |
 | Generation | 10k-stage solvability and precondition suite ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)) |
 | Content | `npm run validate` — schema conformance of every content file |
