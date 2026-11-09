@@ -198,3 +198,45 @@ describe('ACTIVATE_SKILL effects', () => {
     expect(refused(runWith('twin_step'), stage(), [skill('twin_step')])).toEqual({ kind: 'empty_queue' });
   });
 });
+
+describe('ACTIVATE_SKILL check order (earlier check wins)', () => {
+  const twinLogged = { skillId: 'twin_step', turn: 1 };
+  it('not_implemented beats no_charges', () => {
+    const run = runOf({ loadout: [slot('gallop', 0)] });
+    expect(refused(run, stage(), [skill('gallop'), mv('a1', 'a2')])).toMatchObject({ reason: 'not_implemented' });
+  });
+  it('no_charges beats once_per_turn', () => {
+    const run = runOf({ loadout: [slot('twin_step', 0)] });
+    const s = stage({ skillLog: [twinLogged] });
+    expect(refused(run, s, [skill('twin_step'), mv('a1', 'a2')])).toMatchObject({ reason: 'no_charges' });
+  });
+  it('once_per_turn beats focus_exceeded', () => {
+    const s = stage({ focus: 0, skillLog: [twinLogged] });
+    expect(refused(runWith('twin_step'), s, [skill('twin_step'), mv('a1', 'a2')])).toMatchObject({
+      reason: 'once_per_turn',
+    });
+  });
+  it('focus_exceeded beats no_target', () => {
+    expect(refused(runWith('lockdown'), stage({ focus: 0 }), [skill('lockdown'), mv('a1', 'a2')])).toEqual({
+      kind: 'focus_exceeded', atStep: 0, needed: 1, available: 0,
+    });
+  });
+  it('wrong_target beats excluded', () => {
+    const s = stage();
+    const legendKnight = deepFreeze({ ...s, board: { ...s.board, g8: { ...s.board.g8!, rarity: 'legendary' as const } } });
+    expect(refused(runWith('ascension'), legendKnight, [skill('ascension', 'g8'), mv('a1', 'a2')])).toMatchObject({
+      reason: 'wrong_target',
+    });
+  });
+  it('excluded beats already_targeted', () => {
+    const s0 = stage();
+    const s = stage({ skillLog: [{ skillId: 'lockdown', turn: 0, targetId: s0.board.e8!.stageId! }] });
+    expect(refused(runWith('lockdown'), s, [skill('lockdown', 'e8'), mv('a1', 'a2')])).toMatchObject({
+      reason: 'excluded',
+    });
+  });
+  it('a credit granted mid-queue applies from its step on: MOVE, Twin Step, MOVE is legal', () => {
+    const r = simulate(runWith('twin_step'), stage(), [mv('a1', 'a2'), skill('twin_step'), mv('a2', 'a3')], config);
+    expect(r.ok).toBe(true);
+  });
+});
