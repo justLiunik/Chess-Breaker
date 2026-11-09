@@ -1,4 +1,6 @@
 import { loadEngineConfig } from '@checkbreaker/content';
+import { rng } from '../src/rng';
+import { isAttacked } from '../src/movegen';
 import type {
   BoardPiece, EngineConfig, PieceType, RunState, Square, StageState,
 } from '../src/types';
@@ -112,4 +114,37 @@ export function fenToStage(fen: string, overrides: Partial<StageState> = {}): St
     }
   });
   return stageOf(pieces, overrides);
+}
+
+/**
+ * A deterministic random board: one king per side, 2-14 other pieces, no pawn on rank 1 or 8,
+ * neither king in check. The same (seed, i) always gives the same board.
+ */
+export function randomBoard(seed: string, i: number): Int8Array {
+  let cursor = 0;
+  const next = (n: number): number => {
+    const r = rng(`${seed}|${i}`, cursor);
+    cursor = r.next;
+    return Math.floor(r.value * n);
+  };
+  for (;;) {
+    const b = new Int8Array(64);
+    const place = (code: number, pawn: boolean): void => {
+      for (;;) {
+        const sq = next(64);
+        const rank = sq >> 3;
+        if (b[sq] !== 0 || (pawn && (rank === 0 || rank === 7))) continue;
+        b[sq] = code;
+        return;
+      }
+    };
+    place(6, false);
+    place(-6, false);
+    const others = 2 + next(13);
+    for (let n = 0; n < others; n++) {
+      const type = 1 + next(5);
+      place(next(2) === 0 ? type : -type, type === 1);
+    }
+    if (!isAttacked(b, b.indexOf(6), 'black') && !isAttacked(b, b.indexOf(-6), 'white')) return b;
+  }
 }
