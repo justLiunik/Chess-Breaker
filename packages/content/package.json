@@ -3,5 +3,5 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "yaml": "^2.6.1" }
+  "dependencies": { "@checkbreaker/engine": "*", "yaml": "^2.6.1" }
 }

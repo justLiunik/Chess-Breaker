@@ -73,6 +73,9 @@ export function commitQueue(
 
   // R5: the enemy replies.
   const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
+  if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
+    events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
+  }
   const mover = picked.move ? next.board[picked.move.from] : undefined;
   if (picked.move && mover) {
     const { from, to } = picked.move;
@@ -92,9 +95,6 @@ export function commitQueue(
       board[to] = mover;
     }
     next = { ...next, board };
-  }
-  if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
-    events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
   }
   next = {
     ...next,

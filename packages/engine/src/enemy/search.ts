@@ -22,8 +22,15 @@ const { zobristKey } = zobrist;
 type Bound = 'exact' | 'lower' | 'upper';
 type Entry = { depth: number; score: number; bound: Bound; best: Move | null };
 
-/** Scores at or beyond this magnitude depend on the ply and are stored node-relative in the TT. */
-const MATE_BOUND = 90000;
+/**
+ * Scores at or beyond this magnitude depend on the ply and are stored node-relative in the TT. It is
+ * the midpoint of the player-mated and out-of-turns scores, so mates (which sit within a few dozen
+ * plies of playerMated) are ply-adjusted and out-of-turns scores are not.
+ */
+export function mateBound(config: EngineConfig): number {
+  const t = config.enemyAI.terminal;
+  return (t.playerMated + t.playerOutOfTurns) / 2;
+}
 const INF = Number.POSITIVE_INFINITY;
 
 const TYPE_OF_CODE: PieceType[] = ['pawn', 'pawn', 'knight', 'bishop', 'rook', 'queen', 'king'];
@@ -42,6 +49,7 @@ interface Ctx {
   playerMated: number;
   playerOutOfTurns: number;
   enemyMated: number;
+  mateBound: number;
   /** Legality scratch per ply, so a node keeps its own across its children. */
   safety: Safety[];
   /** Move sort keys per ply, so a node keeps its own across its children. */
@@ -218,10 +226,10 @@ function quiesce(
   return best;
 }
 
-const toStored = (s: number, ply: number): number =>
-  s >= MATE_BOUND ? s + ply : s <= -MATE_BOUND ? s - ply : s;
-const fromStored = (s: number, ply: number): number =>
-  s >= MATE_BOUND ? s - ply : s <= -MATE_BOUND ? s + ply : s;
+const toStored = (s: number, ply: number, bound: number): number =>
+  s >= bound ? s + ply : s <= -bound ? s - ply : s;
+const fromStored = (s: number, ply: number, bound: number): number =>
+  s >= bound ? s - ply : s <= -bound ? s + ply : s;
 
 /** Fail-soft alpha-beta. Black maximises, White minimises; scores are from Black's view. */
 function search(
@@ -246,7 +254,7 @@ function search(
     if (e) {
       ttBest = e.best;
       if (e.depth >= depth) {
-        const s = fromStored(e.score, ply);
+        const s = fromStored(e.score, ply, ctx.mateBound);
         if (e.bound === 'exact') return s;
         if (e.bound === 'lower' && s >= beta) return s;
         if (e.bound === 'upper' && s <= alpha) return s;
@@ -279,7 +287,7 @@ function search(
 
   if (tt) {
     const bound: Bound = best <= alpha0 ? 'upper' : best >= beta0 ? 'lower' : 'exact';
-    tt.set(key, { depth, score: toStored(best, ply), bound, best: bestMove });
+    tt.set(key, { depth, score: toStored(best, ply, ctx.mateBound), bound, best: bestMove });
   }
   return best;
 }
@@ -320,6 +328,7 @@ export function scoreRootMoves(
     playerMated: term.playerMated,
     playerOutOfTurns: term.playerOutOfTurns,
     enemyMated: term.enemyMated,
+    mateBound: mateBound(config),
     safety: [],
     keys: [],
   };

@@ -278,7 +278,7 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | `engine/deployment` | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
 | `engine/rules` | `simulate` and `commitQueue` (R3–R5): stage end evaluation (checkmate, stalemate, turns, no legal queue) and the enemy reply | Render or animate |
 | `engine/skills` | Primitive interpretation, modifier stack, expiry | Add per-skill special cases |
-| `engine/enemy` | `enemyMove(stage, seed, config) → { move | null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
+| `engine/enemy` | `enemyMove(stage, seed, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `gen` | Templates, generation pipeline, solver | Be imported by the web app |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |

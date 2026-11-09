@@ -2241,13 +2241,13 @@ exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
         "type": "move",
       },
       {
+        "cursor": 3,
+        "type": "enemy_fell_back",
+      },
+      {
         "from": "e8",
         "to": "e7",
         "type": "enemy_move",
-      },
-      {
-        "cursor": 3,
-        "type": "enemy_fell_back",
       },
       {
         "turn": 2,
@@ -2401,13 +2401,13 @@ exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
         "type": "move",
       },
       {
+        "cursor": 0,
+        "type": "enemy_fell_back",
+      },
+      {
         "from": "e8",
         "to": "e7",
         "type": "enemy_move",
-      },
-      {
-        "cursor": 0,
-        "type": "enemy_fell_back",
       },
       {
         "turn": 2,

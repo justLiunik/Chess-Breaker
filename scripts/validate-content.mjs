@@ -492,6 +492,13 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     fail(`economy.yaml: enemyAI.terminal must satisfy playerMated > playerOutOfTurns > 10 × positional bound (${bound})`);
     problems += 1;
   }
+  // The search stores scores beyond this bound node-relative (ply-adjusted); mates must clear it and
+  // out-of-turns scores must not (src/enemy/search.ts mateBound).
+  const mateBound = (term.playerMated + term.playerOutOfTurns) / 2;
+  if (!(term.playerOutOfTurns + 40 < mateBound && mateBound < term.playerMated - 40)) {
+    fail(`economy.yaml: enemyAI.terminal mate bound ${mateBound} must lie within (playerOutOfTurns + 40, playerMated - 40)`);
+    problems += 1;
+  }
   if (term.enemyMated !== -term.playerMated) {
     fail('economy.yaml: enemyAI.terminal.enemyMated must be the negative of playerMated');
     problems += 1;

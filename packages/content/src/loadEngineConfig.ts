@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import type { EngineConfig, PieceType } from '../../engine/src/types';
+import type { EngineConfig, PieceType } from '@checkbreaker/engine';
 
 const DEFAULT_PATH = fileURLToPath(new URL('../../../data/economy.yaml', import.meta.url));
 const PIECE_TYPES: PieceType[] = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'];

@@ -69,6 +69,7 @@ describe('commitQueue', () => {
     const v = ok(commitQueue(runOf(), stage, mv('a1', 'a2'), config));
     expect(v.events).toContainEqual({ type: 'enemy_fell_back', cursor: 0 });
     expect(v.stage.enemyPolicy.fellBack).toBe(true);
+    expect(types(v.events).indexOf('enemy_fell_back')).toBeLessThan(types(v.events).indexOf('enemy_move'));
     const again = ok(commitQueue(runOf(), v.stage, mv('a2', 'a3'), config));
     expect(types(again.events)).not.toContain('enemy_fell_back');
   });

@@ -3,7 +3,7 @@ import { fromBoard } from '../src/position';
 import { toIndex, toSquare } from '../src/square';
 import { inCheck, legalMoves } from '../src/legality';
 import { makeMove } from '../src/movegen';
-import { scoreRootMoves } from '../src/enemy/search';
+import { mateBound, scoreRootMoves } from '../src/enemy/search';
 import type { EngineConfig } from '../src/types';
 import { MIDGAME_FENS, config, fenToStage, stageOf } from './helpers';
 
@@ -126,5 +126,27 @@ describe('scoreRootMoves', () => {
 
   it('does not throw for turns left beyond the hash range', () => {
     expect(() => scoreRootMoves(fenBoard(MIDGAME_FENS[0]!), 30, 2, config)).not.toThrow();
+  });
+});
+
+describe('mateBound', () => {
+  it('is the midpoint of the player-mated and out-of-turns scores', () => {
+    expect(mateBound(config)).toBe(75000);
+  });
+
+  it('keeps mate scores ply-adjusted when playerMated is raised', () => {
+    const big: EngineConfig = {
+      ...config,
+      enemyAI: {
+        ...config.enemyAI,
+        terminal: { playerMated: 200000, playerOutOfTurns: 50000, enemyMated: -200000 },
+      },
+    };
+    expect(mateBound(big)).toBe(125000);
+    const in1 = scoreRootMoves(b({ a1: 'K', a2: 'P', b2: 'P', h8: 'k', e8: 'r' }), 5, 3, big);
+    const in2 = scoreRootMoves(b({ a1: 'K', h8: 'k', c7: 'r', h6: 'r' }), 5, 3, big);
+    expect(maxScore(in1)).toBe(199999);
+    expect(maxScore(in2)).toBe(199997);
+    expect(maxScore(in1)).toBeGreaterThan(maxScore(in2));
   });
 });
