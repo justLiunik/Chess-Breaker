@@ -210,6 +210,14 @@ shop has not offered.
                                          └─────────────────────────────┘
 ```
 
+Two paths are not drawn:
+
+- **Lifeline** (Unique and Legendary queen, once per instance): `captured` → `in_deck` at stage end
+  with 1 durability, instead of destroyed (rule 4).
+- **Recall** (skill, M6 — [03 §5](03-skill-framework.md)): `deployed` → `in_deck` during the stage,
+  keeping its durability (nothing is refunded) and unable to return to the board until the next
+  stage (I15).
+
 **Rules**
 
 1. Summoning decrements durability by exactly 1 and requires durability ≥ 1. It is paid when Start
