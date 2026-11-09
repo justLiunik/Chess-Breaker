@@ -120,7 +120,8 @@ export type CommitError =
   | { kind: 'durability_unavailable'; instanceId: string }
   | { kind: 'invalid_deployment'; to: Square; reason: string }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
-  | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
+  | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
+  | { kind: 'invalid_target'; atStep: number; skillId: string; target?: string; reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
   | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
 
 export interface Award {
@@ -144,7 +145,10 @@ export type GameEvent =
   | { type: 'lifeline_saved'; instanceId: string }
   | { type: 'piece_returned'; instanceId: string; durability: number | null }
   | { type: 'piece_removed'; instanceId: string; reason: 'spent' }
-  | { type: 'stage_started' };
+  | { type: 'stage_started' }
+  | { type: 'skill_activated'; skillId: string; target?: Square }
+  | { type: 'piece_transformed'; target: string; pieceType: PieceType }
+  | { type: 'piece_suppressed'; target: string };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 

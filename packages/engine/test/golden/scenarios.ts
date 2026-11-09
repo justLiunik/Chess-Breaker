@@ -30,7 +30,7 @@ export const scenarios: Scenario[] = [
     stage: stageOf({ e1: 'K', a1: 'R', e8: 'k' }, { status: 'won', endReason: 'checkmate' }) },
   { name: 'err wrong_phase', run, queue: [mv('a1', 'a2')],
     stage: stageOf({ e1: 'K', a1: 'R', e8: 'k' }, { phase: 'deployment' }) },
-  { name: 'err unsupported_action', run, queue: [mv('a1', 'a2'), { type: 'ACTIVATE_SKILL', skillId: 'sk_x' }],
+  { name: 'err skill_unavailable not_in_loadout', run, queue: [mv('a1', 'a2'), { type: 'ACTIVATE_SKILL', skillId: 'sk_x' }],
     stage: stageOf({ e1: 'K', a1: 'R', e8: 'k' }) },
   { name: 'err invariant_violation without a White king', run, queue: [mv('a1', 'a2')],
     stage: stageOf({ a1: 'R', e8: 'k' }) },

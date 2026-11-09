@@ -36,12 +36,6 @@ describe('resolveQueue errors', () => {
     expect(resolveQueue(run, s, [], config)).toEqual(e);
     expect(resolveQueue(run, s, [{ type: 'ACTIVATE_SKILL', skillId: 'x' }], config)).toEqual(e);
   });
-  it('unsupported_action carries the step', () => {
-    const s = stageOf(base, { moveCredits: 2 });
-    expect(resolveQueue(run, s, [mv('e1', 'e2'), { type: 'ACTIVATE_SKILL', skillId: 'x' }], config)).toEqual({
-      ok: false, error: { kind: 'unsupported_action', atStep: 1, actionType: 'ACTIVATE_SKILL' },
-    });
-  });
   it('credits_exceeded at the step without a credit', () => {
     const s = stageOf(base);
     expect(resolveQueue(run, s, [mv('e1', 'e2'), mv('e2', 'e3')], config)).toEqual({

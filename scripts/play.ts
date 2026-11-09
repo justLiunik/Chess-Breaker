@@ -106,6 +106,9 @@ function eventText(e: GameEvent): string {
     case 'piece_returned': return `${e.instanceId} returns to the deck`;
     case 'piece_removed': return `${e.instanceId} is spent and removed from the deck`;
     case 'stage_started': return 'the stage begins';
+    case 'skill_activated': return `skill ${e.skillId} activated` + (e.target ? ` on ${e.target}` : '');
+    case 'piece_transformed': return `${e.target} becomes a ${e.pieceType}`;
+    case 'piece_suppressed': return `${e.target} is suppressed`;
   }
 }
 

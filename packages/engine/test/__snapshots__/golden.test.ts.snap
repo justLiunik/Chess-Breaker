@@ -1444,21 +1444,22 @@ exports[`golden commitQueue scenarios > err king_in_check_at_end 1`] = `
 }
 `;
 
-exports[`golden commitQueue scenarios > err stage_not_active 1`] = `
+exports[`golden commitQueue scenarios > err skill_unavailable not_in_loadout 1`] = `
 {
   "error": {
-    "kind": "stage_not_active",
+    "atStep": 1,
+    "kind": "skill_unavailable",
+    "reason": "not_in_loadout",
+    "skillId": "sk_x",
   },
   "ok": false,
 }
 `;
 
-exports[`golden commitQueue scenarios > err unsupported_action 1`] = `
+exports[`golden commitQueue scenarios > err stage_not_active 1`] = `
 {
   "error": {
-    "actionType": "ACTIVATE_SKILL",
-    "atStep": 1,
-    "kind": "unsupported_action",
+    "kind": "stage_not_active",
   },
   "ok": false,
 }

@@ -7,8 +7,22 @@ import { isAttacked } from './movegen';
 import { hash } from './rng';
 import { KING, PAWN, fromBoard } from './position';
 import { toSquare } from './square';
+import { applySkill, checkSkill } from './skills/check';
 
 type Board = StageState['board'];
+
+/** The queue's working state while it resolves; skills and moves update it in order. */
+export interface QueueCtx {
+  run: RunState;
+  board: Board;
+  focus: number;
+  /** Credits still unspent this turn. */
+  moveCredits: number;
+  modifiers: StageState['modifiers'];
+  skillLog: StageState['skillLog'];
+  /** The turn being played: `turnsUsed + 1`. */
+  turn: number;
+}
 
 export function applyPlayerMove(
   board: Board,
@@ -60,23 +74,28 @@ export function resolveQueue(
     return { ok: false, error: { kind: 'empty_queue' } };
   }
 
-  let board: Board = stage.board;
+  const ctx: QueueCtx = {
+    run, board: stage.board, focus: stage.focus, moveCredits: stage.moveCredits,
+    modifiers: stage.modifiers, skillLog: stage.skillLog, turn: stage.turnsUsed + 1,
+  };
   const events: GameEvent[] = [];
   let salvage = 0;
-  let made = 0;
   const promotions: PieceInstance[] = [];
   for (let atStep = 0; atStep < queue.length; atStep++) {
     const action = queue[atStep]!;
     if (action.type === 'ACTIVATE_SKILL') {
-      return { ok: false, error: { kind: 'unsupported_action', atStep, actionType: 'ACTIVATE_SKILL' } };
+      const error = checkSkill(ctx, action, atStep, config);
+      if (error) return { ok: false, error };
+      events.push(...applySkill(ctx, action, atStep, config));
+      continue;
     }
-    if (made >= stage.moveCredits) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
-    const reason = checkPlayerMove(board, action.from, action.to);
+    if (ctx.moveCredits < 1) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
+    const reason = checkPlayerMove(ctx.board, action.from, action.to);
     if (reason) {
       return { ok: false, error: { kind: 'illegal_move', atStep, from: action.from, to: action.to, reason } };
     }
-    const applied = applyPlayerMove(board, action.from, action.to, config);
-    board = applied.board;
+    const applied = applyPlayerMove(ctx.board, action.from, action.to, config);
+    ctx.board = applied.board;
     events.push(...applied.events);
     if (applied.promoted) {
       const { square, promotesTo } = applied.promoted;
@@ -90,12 +109,12 @@ export function resolveQueue(
       events.push({ type: 'pawn_promoted', square, promotesTo, instanceId });
     }
     salvage += applied.salvage;
-    made++;
+    ctx.moveCredits--;
   }
 
-  // R1: no modifiers exist in M1.
+  // R1 (expiry and revert of this_turn modifiers) arrives with the modifier stack.
   // R2: structural invariants on the end state.
-  const b = fromBoard(board);
+  const b = fromBoard(ctx.board);
   for (const [color, code] of [['white', KING], ['black', -KING]] as const) {
     let kings = 0;
     for (let i = 0; i < 64; i++) if (b[i] === code) kings++;
@@ -126,8 +145,11 @@ export function resolveQueue(
   return {
     ok: true,
     value: {
-      run: { ...run, coins: run.coins + salvage, deck: [...run.deck, ...promotions] },
-      stage: { ...stage, board, moveCredits: stage.moveCredits - made },
+      run: { ...ctx.run, coins: ctx.run.coins + salvage, deck: [...ctx.run.deck, ...promotions] },
+      stage: {
+        ...stage, board: ctx.board, focus: ctx.focus, moveCredits: ctx.moveCredits,
+        modifiers: ctx.modifiers, skillLog: ctx.skillLog,
+      },
       events,
     },
   };
