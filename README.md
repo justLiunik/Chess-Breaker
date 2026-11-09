@@ -76,10 +76,11 @@ each failure with its JSON pointer path.
 | **Action Queue** | The ordered list of actions you commit to in a turn. |
 | **Focus** | Per-turn resource that pays for skills only. |
 | **Free Move** | The single standard move you get each turn. |
-| **Deployment phase** | The step before the first move: the player places the King and summons up to the act's limit (3/4/5) from the deck. Start locks the deck for the stage. |
-| **Summon** | Placing a deck piece on the board in the Deployment phase; costs 1 durability, paid at Start. Pawns are never summoned — they spawn. |
+| **Deployment phase** | The step before the first move: the player places the King on ranks 1–4 and summons deck pieces within the stage's spawn points (9/12/15, bosses +3). Start locks the deck for the stage. |
+| **Summon** | Placing a deck piece on the board in the Deployment phase; costs its spawn cost (knight/bishop 3, rook 5, queen 9) and 1 durability, paid at Start. Pawns are never summoned — they spawn. |
+| **Spawn points** | A stage's summon budget. The King is free; unspent points are lost. |
 | **Stalemate** | A side not in check with no legal move. Either side's stalemate is a loss for the player. |
-| **Durability** | A piece instance's remaining deployments: stages it can still be summoned into. Zero destroys it. |
+| **Durability** | A piece instance's remaining deployments: stages it can still be summoned into. 2 for every deck piece (Legendary queen 1). Zero destroys it. |
 | **Salvage** | Coins earned for capturing an enemy piece. |
 | **Base reward** | Coins paid for every cleared stage; unused turns add bonus coins on top. |
 | **Merge** | Combining 3 pieces of the same type and tier into 1 piece of the next tier, at full durability. |

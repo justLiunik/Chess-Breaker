@@ -33,21 +33,20 @@ title: Open Field
 act: 1
 tier: normal          # normal | boss
 turnLimit: 8
-# summonLimit: 2     # optional: lowers the act's limit (data/economy.yaml), never raises it
+# spawnPoints: 6     # optional: lowers the act's budget (data/economy.yaml), never raises it
 
 enemyArmy:            # ranges are inclusive [min, max]
   pawn:   [2, 4]
   knight: [0, 1]
   bishop: [0, 1]
   rook:   [0, 1]
-enemyZone: [7, 8]     # enemy occupies these ranks (Black side)
+enemyZone: [7, 8]     # enemy occupies these ranks; ranks 5-8 only (Black side)
 
 spawnedPawns:         # free, stage-only pawns for the player (docs/02 §2.1)
   count: [2, 2]
   ranks: [3, 4]       # rank 8 must be reachable within turnLimit
 
-deploymentRanks: [1, 2]
-focusPool: 3
+focusPool: 3          # no deploymentRanks: the player always deploys on ranks 1-4
 
 enemyPolicy: { type: best_move, depth: 3 }
 
@@ -61,15 +60,16 @@ preconditions:
   - spawned_pawns_placed
 ```
 
-Templates never specify the player's army — the player summons it from the deck in the Deployment phase ([02 §5](02-rules-framework.md#5-deployment)); a template may only lower `summonLimit`. A normal template never
+Templates never specify the player's army — the player summons it from the deck in the Deployment phase ([02 §5](02-rules-framework.md#5-deployment)); a template may only lower its `spawnPoints`. The deployment ranks are not a template field: the player always deploys on ranks 1–4 (`rules.deploymentRanks`), and the enemy always starts on ranks 5–8. A normal template never
 specifies exact squares — those are generated within `enemyZone` and `spawnedPawns.ranks`. Templates never
 specify **rarity**: enemy pieces are locked to Normal, and spawned pawns roll theirs from the act's
 rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
 further away makes it a costly detour from the coin preview. The validator rejects a template whose
-lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone` or
-`deploymentRanks` (the deployment ranks must stay free for the King and the summons).
+lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone`.
+Spawn ranks may lie inside the deployment ranks (3 and 4 usually do): a spawned pawn simply takes a
+square the player could otherwise deploy on, and `deployment_squares_available` counts it.
 
 **Fixed (set-piece) templates.** A template with `placement: fixed` replaces `enemyArmy` and
 `enemyZone` with `fixedEnemy`, a hand-written square for every enemy piece, king included. Use it
@@ -100,7 +100,7 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 | **G1** | Select template: filter by act + tier, weighted; exclude templates used in the previous stage of the same act where possible | No template → engine bug (every act/tier must have ≥2 templates) |
 | **G2** | Roll enemy army from `enemyArmy` ranges (a fixed template takes `fixedEnemy` as-is). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
 | **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, the enemy king not in check, and at least one deployment square left unattacked for the player's King); skipped for a fixed template | Retry placement (max 50 tries) → regenerate |
-| **G4** | Prepare the Deployment phase: set `summonLimit` (the act's limit, lowered by the template if it says so) and `phase: deployment`. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
+| **G4** | Prepare the Deployment phase: set `spawnPoints` (the act and tier's budget, lowered by the template if it says so) and `phase: deployment`. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
 | **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
 | **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
@@ -122,18 +122,19 @@ deployment could do on it.
 |---|---|---|
 | `enemy_king_on_board` | Exactly one black king; no white Hero Piece on the board (`phase: deployment`) | The player's army is the player's to place |
 | `safe_king_square` | At least one empty deployment square is not attacked by the enemy | The King must be able to start out of check (I2) |
-| `no_first_turn_mate` | No single deck piece, summoned on any deployment square, mates in one move | Instant wins are not puzzles |
+| `no_first_turn_mate` | No deck piece alone, and no pair of deck pieces whose spawn costs fit the budget, summoned on any deployment squares, mates in one move | Instant wins are not puzzles |
 | `enemy_has_moves` | The enemy has at least one legal move with the board as generated | A stage must not open on a stalemate (a loss, [02 §7](02-rules-framework.md#7-stage-end-evaluation)) |
 | `enemy_value_in_band` | `enemyArmyValue` within the act's band ([§6](#6-difficulty-curve)) | Prevents hopeless boards |
-| `deployment_squares_available` | At least `summonLimit + 1` empty squares in `deploymentRanks` | The King and every allowed summon must fit |
+| `deployment_squares_available` | At least `floor(spawnPoints / cheapest spawn cost) + 1` empty squares on ranks 1–4 | The King and the most summons the budget allows must fit |
 | `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity and `promotesTo` within the act ceiling | Promotion must be a real, visible option from turn 1 |
 
-`no_first_turn_mate` is an **approximation**: it tries each deck piece alone, not every combination
-of summons, because the combinations explode. A deployment that combines pieces into a turn-1 mate
-is possible in principle; the enemy zone keeps it rare (the deployment ranks are at least four
-ranks from the enemy king), and finding one is a reward for reading the board, not a bug. If
-playtests show it happening, the check widens to pairs (tracked in
-[10](10-roadmap-and-milestones.md)).
+`no_first_turn_mate` is an **approximation**: it tries each deck piece alone and every pair that
+fits the budget, not every combination of summons, because larger combinations explode. Pairs are
+checked because a summon on rank 4 sits only one or two ranks from the enemy zone, close enough for
+one piece to cover the squares another needs to mate. A deployment of three or more pieces that
+combines into a turn-1 mate is possible in principle; the spawn-point budget keeps it rare (at most
+three summons in Act I), and finding one is a reward for reading the board, not a bug. If playtests
+show it happening, the check widens to triples (tracked in [10](10-roadmap-and-milestones.md)).
 
 ## 5. The solver
 
@@ -151,11 +152,11 @@ generation, the solver sees exactly what the player sees.
 
 ### Search shape
 
-- **Ply 0 is the deployment.** The solver first chooses a King square and up to `summonLimit`
-  pieces with their squares. Trying every placement is hopeless (dozens of squares, up to five
-  pieces), so it enumerates a bounded candidate set:
-  - pieces: subsets of the deck by **type + tier** (identical instances are interchangeable), largest
-    and most valuable first;
+- **Ply 0 is the deployment.** The solver first chooses a King square and a set of summons whose
+  spawn costs fit `spawnPoints`, with their squares. Trying every placement is hopeless (up to 32
+  squares on ranks 1–4, up to six pieces), so it enumerates a bounded candidate set:
+  - pieces: subsets of the deck by **type + tier** (identical instances are interchangeable) that fit
+    the budget, largest and most valuable first;
   - squares: for each piece, only squares from which it reaches the enemy zone, an open file or
     diagonal, or a spawned pawn's path within two moves; the King on safe squares only.
 
@@ -213,12 +214,16 @@ Mitigations if real numbers exceed budget (tracked in [10](10-roadmap-and-milest
 
 ## 6. Difficulty curve
 
-| Act | Turn limit | Enemy army value | Summon limit | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
+| Act | Turn limit | Enemy army value | Spawn points | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
 |---|---|---|---|---|---|---|
-| **I** | 8 | 7–9 | 3 | 2 (3–4) | Normal–Rare | 2 |
-| **II** | 6 | 10–14 | 4 | 1–2 (3–4) | up to Unique | 3 |
-| **III** | 5 | 14–22 | 5 | 1–2 (3–5) | up to Legendary | 3 |
-| **Boss** | limit − 1 | its act's band ×1.25 | as its act | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
+| **I** | 8 | 7–9 | 9 | 2 (3–4) | Normal–Rare | 2 |
+| **II** | 6 | 10–14 | 12 | 1–2 (3–4) | up to Unique | 3 |
+| **III** | 5 | 14–22 | 15 | 1–2 (3–5) | up to Legendary | 3 |
+| **Boss** | limit − 1 | its act's band ×1.25 | its act's + 3 (12 / 15 / 18) | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
+
+A normal stage's spawn points are three times the number of minors it can field (3 / 4 / 5 by act);
+a boss affords one more. The player's summoned value therefore tracks the enemy army value band, with
+the spawned pawns, the first move and the skills as the player's edge.
 
 Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only that
 rank 8 must be reachable within the turn limit from every spawn rank (§2). Rarity comes from the act's
@@ -249,7 +254,7 @@ Act I should be cleared on a first run by a player who understands the rules; Ac
 2. **Draft the template** in `content/templates/`. Keep it ~15 lines.
 3. **Run the validator** (M3) which generates 200 seeded instances and reports:
    solver success rate, distribution of turns-to-win, and the failure-reason histogram.
-4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `summonLimit`, and
+4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `spawnPoints`, and
    `spawnedPawns`.
 5. **Acceptance for a template:** ≥95% of generated instances solvable (a mate exists within the
    limit), and median mating turn around 60% of the turn limit.
@@ -266,7 +271,7 @@ one that always mates in 2 is too loose.
 | Deployment start | 100% of stages are emitted in `phase: deployment` with no Hero Piece on the board, and with at least one deployment square safe for the King |
 | No opening stalemate | 100% of stages give the enemy at least one legal move |
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
-| Deployment availability | 100% of stages have at least `summonLimit + 1` free deployment squares |
+| Deployment availability | 100% of stages have at least `floor(spawnPoints / 3) + 1` free squares on ranks 1–4, and no enemy piece on ranks 1–4 |
 | Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
 | Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks, with promotion reachable in the turn limit |
 | Determinism | Same seed twice → byte-identical `StageState` |

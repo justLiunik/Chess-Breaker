@@ -23,8 +23,9 @@ This document is the authority. If any other document disagrees with it, this on
 | **Promotion** | A spawned pawn reaching rank 8 leaves the board and becomes a new Hero Piece in the deck (§2.2). |
 | **Rarity** | A piece's tier: Normal, Rare, Unique, Legendary (ascending). Every piece except the King has one. Bishops, knights, rooks and queens gain abilities by tier (§2.3); see also [06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity). |
 | **Deployment phase** | The step between entering a stage and the first move, in which the player places the King and summons pieces from the deck (§5). |
-| **Summon** | Placing a deck piece on the board in the Deployment phase. Costs 1 durability, paid at Start. The only way a Hero Piece reaches the board. |
-| **Deployment square** | An empty square in the player's deployment ranks where the King or a summon may be placed. |
+| **Summon** | Placing a deck piece on the board in the Deployment phase. Costs its spawn cost from the stage's spawn points, and 1 durability, both paid at Start. The only way a Hero Piece reaches the board. |
+| **Spawn points** | A stage's summon budget (Act I 9 · Act II 12 · Act III 15; bosses +3). The summons' total spawn cost — knight 3, bishop 3 (Legendary 5), rook 5, queen 9 — must fit it; the King is free (§5). |
+| **Deployment square** | An empty square on ranks 1–4, the player's half of the board, where the King or a summon may be placed. Ranks 5–8 are enemy territory. |
 | **Stalemate** | A side that is not in check and has no legal move (the player: no legal queue). Either side's stalemate is a **loss** for the player (§7). |
 | **End state** | The board position after the queue resolves *and* after end-of-turn expiry (step R1). |
 
@@ -87,7 +88,8 @@ result in view, the solver knows it, and preview equals outcome (I10).
 
 **Over capacity.** The deck holds at most 8 pieces. If the new piece pushes it above 8, the stage
 continues normally; at stage end, before the shop, the player must merge
-([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)) or cut pieces until the deck fits (I9).
+([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)), sell (half the piece's current price,
+[07 §4](07-shop-phase.md#4-purchases)) or cut pieces until the deck fits (I9).
 
 Promotion is a tempo trade, exactly as pillar 2 requires: every move spent pushing a pawn is a move
 not spent mating, and the coin preview drops one rate step per turn. The reward is a permanent piece
@@ -105,7 +107,7 @@ keeps everything below it. Data lives in `content/examples/pieces.yaml → rarit
 | Normal | Standard bishop. |
 | Rare | **Leaps allies.** Its diagonal path may pass over the player's own pieces. Enemy pieces still block. A move that passed over at least one ally must end on an **empty** square: it cannot capture. A move that passed over no ally captures normally. |
 | Unique | **Captures after a leap.** As Rare, but a move that passed over allies may end by capturing an enemy piece. |
-| Legendary | **Moves like a queen.** As Unique, along orthogonal lines as well as diagonals — still leaping allies and capturing after a leap. Its `durabilityMax` is **1**, like a queen's. |
+| Legendary | **Moves like a queen.** As Unique, along orthogonal lines as well as diagonals — still leaping allies and capturing after a leap. Its spawn cost is **5**, not 3 — a rook's (§5). |
 
 **Knight**
 
@@ -132,7 +134,7 @@ keeps everything below it. Data lives in `content/examples/pieces.yaml → rarit
 | Normal | Standard queen. |
 | Rare | **Leaps allies.** As the Rare bishop, in all eight directions: a move that passed over an ally cannot capture. |
 | Unique | **Lifeline.** Once per run, when this queen is captured, it is not destroyed: it returns to the deck at stage end with 1 durability (below). |
-| Legendary | **Full sweep.** A move that passed over allies may capture, and **any** move — with or without a leap — may **multi-capture**. Durability stays 1. The Legendary queen is the rarest piece in the game ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)). |
+| Legendary | **Full sweep.** A move that passed over allies may capture, and **any** move — with or without a leap — may **multi-capture**. Its durability is **1**, the one exception to flat durability ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)). The Legendary queen is the rarest piece in the game ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)). |
 
 #### Multi-capture (Legendary rook and queen)
 
@@ -197,7 +199,7 @@ A stage runs in a fixed order. Each step ends before the next begins, and none c
 |---|---|---|
 | 1 | **Shop** | The player buys pieces and skills ([07](07-shop-phase.md)). The last chance to change the deck before the stage. |
 | 2 | **Enter stage** | The stage is generated ([04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)): the enemy army and the player's spawned pawns are placed, and every spawned pawn's promotion result is shown. No Hero Piece is on the board yet. |
-| 3 | **Analysis & Deployment** | The player studies the board and places the King and up to `summonLimit` deck pieces in the deployment ranks (§5). Placements can be moved or taken back freely; nothing is paid yet. |
+| 3 | **Analysis & Deployment** | The player studies the board, places the King, and summons deck pieces whose total spawn cost fits the stage's spawn points, all on ranks 1–4 (§5). Placements can be moved or taken back freely; nothing is paid yet. |
 | 4 | **Start → Action** | Pressing **Start** commits the deployment, pays durability, and **locks the deck**. The player's first move follows at once, and turns run until the stage ends (§7). From here on, no piece can be summoned. |
 
 Each turn of the Action phase has five steps:
@@ -255,22 +257,42 @@ earlier in the queue.
 ## 5. Deployment
 
 Deployment is how the deck becomes an army, and it happens **once per stage, before the first
-move**. The decision it asks is *who comes*: the enemy board is fully visible, the deck is larger than
-the summon limit, and every piece brought costs durability.
+move**. The decision it asks is *who comes*: the enemy board is fully visible, the stage's spawn
+points cannot pay for the whole deck, and every piece brought costs durability.
 
 **Rules**
 
-1. The player places the **King** on any empty square in the **deployment ranks** (default 1 and 2 —
-   the player's two home ranks). The King is mandatory, free, and does not count toward the limit.
-2. The player may **summon** up to `summonLimit` deck pieces (Act I 3, Act II 4, Act III 5; bosses
-   use their act's limit; a template may lower it, never raise it). Summoning none is allowed.
-3. Each summon goes on an **empty** square in the deployment ranks.
+1. The player places the **King** on any empty square of the **deployment ranks: ranks 1–4**, the
+   player's half of the board (`rules.deploymentRanks`, the same for every stage). Ranks 5–8 are enemy
+   territory: nothing is ever deployed there. The King is mandatory and free.
+2. The player may **summon** deck pieces whose total **spawn cost** fits the stage's **spawn points**:
+
+   | Spawn cost | Knight | Bishop | Rook | Queen | King |
+   |---|---|---|---|---|---|
+   | Points | 3 | 3 (Legendary **5**) | 5 | 9 | 0 |
+
+   | Spawn points | Normal stage | Boss |
+   |---|---|---|
+   | Act I | 9 | 12 |
+   | Act II | 12 | 15 |
+   | Act III | 15 | 18 |
+
+   Costs follow chess value and do not change with rarity, with one exception: a Legendary bishop
+   moves like a queen and costs 5. A template may lower its stage's budget, never raise it. Summoning
+   none is allowed; points left unspent are lost.
+3. Each summon goes on an **empty** square in the deployment ranks. A spawned pawn on rank 3 or 4
+   simply occupies its square.
 4. A summoned piece must have **durability ≥ 1**; summoning decrements it by exactly 1.
-5. Until **Start**, placements may be moved, swapped or taken back without cost. Durability is paid
-   only when Start commits the deployment.
-6. Start is refused if the King would begin in check (I2). A refused Start costs nothing.
+5. Until **Start**, placements may be moved, swapped or taken back without cost. Spawn points and
+   durability are paid only when Start commits the deployment.
+6. Start is refused if the King would begin in check (I2), or if the summons cost more than the
+   stage's spawn points. A refused Start costs nothing.
 7. After Start the **deck is locked** for the stage (I15). Nothing — no action, no skill, no
    promotion — brings another deck piece onto the board until the next stage.
+
+Because the cheapest summon costs 3, a normal stage fits at most 3 / 4 / 5 summons by act, and a boss
+one more. The budget is the ceiling, not the target: with durability this scarce
+([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)), bringing less is often right.
 
 There is no randomness in deployment: no piece is placed for the player, and no square is chosen for
 them. Spawned pawns are not summons; they are already on the board when the phase begins (§2.1).
@@ -449,20 +471,20 @@ These are the contract the engine, the generator, and the tests all share.
 | **I5** | The number of paid `MOVE` actions in a queue never exceeds the credits earned in it, and every queue has at least one `MOVE`; each Legendary knight makes at most one free bonus move per turn. |
 | **I6** | Total Focus spent in a queue never exceeds the pool plus Focus granted during that queue. |
 | **I7** | A piece's durability never goes below 0; summoning requires durability ≥ 1 and spends exactly 1. |
-| **I8** | No placement in the Deployment phase — King or summon — is on an occupied square or outside the deployment ranks. |
+| **I8** | No placement in the Deployment phase — King or summon — is on an occupied square or outside the deployment ranks (1–4). |
 | **I9** | Outside a stage, deck size never exceeds the fixed capacity of 8 (a promotion may overflow it during a stage; the cut happens at stage end); the king is never destroyed or removed from the deck; the deck never holds a pawn. |
 | **I10** | The coin payout shown in the preview equals the payout at evaluation, for the same plan. |
 | **I11** | Given identical `(RunState, seed)`, generation and all enemy decisions are reproducible. |
 | **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance (a merge creates a new instance; it never changes an existing one). |
 | **I13** | Every enemy piece is Normal rarity. |
 | **I14** | Nothing — shop offer, spawned pawn, or promotion result — is above its act's rarity ceiling; the Act I ceiling is Rare. |
-| **I15** | Hero Pieces enter the board only in the Deployment phase: at most `summonLimit` summons plus the King, and none after Start. |
+| **I15** | Hero Pieces enter the board only in the Deployment phase: the King plus summons whose total spawn cost fits the stage's spawn points, and none after Start. |
 
 ## 10. Worked example: deployment and the first turn
 
-Stage: Act I template, 8 turns, summon limit 3. The deck holds a Rook and a Bishop (durability 2
-each) and two Knights. Board after generation: enemy king on `g8`, enemy rook on `d4`. The enemy rook
-controls the `d`-file, including `d1` and `d2`, and the fourth rank.
+Stage: Act I template, 8 turns, 9 spawn points. The deck holds a Rook and a Bishop (durability 2
+each) and two Knights. Board after generation: enemy king on `g8`, enemy rook on `d5`. The enemy rook
+controls the `d`-file down to `d1`, and the fifth rank.
 
 **Deployment phase.** The player reads the board before placing anything. The rook belongs on the
 seventh rank, next to the enemy king — but a rook on `h7` is adjacent to `g8` and would simply be
@@ -474,9 +496,9 @@ taken unless something defends it. The long diagonal `b1`–`h7` is open. So the
 | Rook → `h1` | Clear run up the `h`-file to `h7` | durability 2 → 1 |
 | Bishop → `b1` | Guards `h7` along `b1`–`h7` | durability 2 → 1 |
 
-Two of three summons are used; both knights stay in the deck and spend nothing. Start: the King on
-`e1` is not in check (I2 ✓), every square was empty and inside ranks 1–2 (I8 ✓), 2 summons ≤ 3
-(I15 ✓). The deck is now locked.
+The rook and bishop cost 5 + 3 = 8 of 9 spawn points, so no knight fits; both stay in the deck and
+spend nothing. Start: the King on `e1` is not in check (I2 ✓), every square was empty and inside
+ranks 1–4 (I8 ✓), 8 points ≤ 9 (I15 ✓). The deck is now locked.
 
 **Turn 1.** The queue is one action:
 
@@ -495,7 +517,7 @@ R4: turn 1 of 8 used — play continues.
 R5: the enemy replies; `best_move` sees that `g8xh7` walks into the bishop and keeps its king on the
 `f8` side.
 
-Note what the player *didn't* do: summon onto `d1` or `d2` and hand the enemy a free rook — lost for
+Note what the player *didn't* do: summon onto the `d`-file (`d1`–`d4`) and hand the enemy a free rook — lost for
 the run, and one less piece for the mating net. And note the trap one step ahead: if the enemy rook
 ever leaves the board while the king is boxed on `g8`/`f8`, a careless quiet move could leave it with
 no legal move at all — a stalemate, and a lost stage (§7).

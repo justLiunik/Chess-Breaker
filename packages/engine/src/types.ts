@@ -28,7 +28,8 @@ export interface ActiveModifier {
   primitive:
     | 'grant_move_credit' | 'grant_focus' | 'set_piece_type' | 'override_moveset'
     | 'ignore_blockers' | 'suppress_piece' | 'shield_king' | 'remove_piece'
-    | 'place_piece' | 'displace_piece' | 'reveal_intent' | 'add_plan_undo';
+    | 'place_piece' | 'displace_piece' | 'return_to_deck' | 'shield_piece'
+    | 'reveal_intent' | 'add_plan_undo';
   source?: string;
   target?: string;
   duration: 'instant' | 'this_turn' | 'next_enemy_turn' | 'permanent';
@@ -49,8 +50,8 @@ export interface StageState {
   focus: number;
   focusPool: number;
   moveCredits: number;
-  summonLimit: number;
-  deploymentRanks: number[];
+  /** Summon budget: the summons' total spawnCost must fit (docs/02 §5). Deployment ranks are global (rules.deploymentRanks). */
+  spawnPoints: number;
   modifiers: ActiveModifier[];
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';
@@ -112,7 +113,7 @@ export type CommitError =
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   | { kind: 'durability_unavailable'; instanceId: string }
   | { kind: 'invalid_deployment'; to: Square; reason: string }
-  | { kind: 'summon_limit_exceeded'; limit: number; placed: number }
+  | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
   | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
 

@@ -148,8 +148,7 @@ interface StageState {
   focus: number;
   focusPool: number;
   moveCredits: number;             // reset to freeMovesPerTurn each turn
-  summonLimit: number;             // deck pieces (King excluded) allowed in the Deployment phase
-  deploymentRanks: number[];
+  spawnPoints: number;             // summon budget: total spawnCost of the summons (King free); ranks are rules.deploymentRanks
   modifiers: ActiveModifier[];
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
@@ -165,11 +164,14 @@ A stage has two commits. The first, once per stage, ends the Deployment phase:
 startStage(
   run: RunState,
   stage: StageState,               // phase: 'deployment'
-  placements: { instanceId: string; to: Square }[],   // the King plus up to summonLimit pieces
+  placements: { instanceId: string; to: Square }[],   // the King plus summons within spawnPoints
+  config: EngineConfig,
 ): Result<{ run: RunState; stage: StageState; events: GameEvent[] }, CommitError>
 ```
 
-It validates all placements at once (I2, I7, I8, I15), spends 1 durability per non-King summon,
+It validates all placements at once (I2, I7, I8, I15) — every square empty and on ranks 1–4, the
+summons' total spawn cost (per type and rarity, `pieces.<type>.spawnCost`) within `spawnPoints` —
+spends 1 durability per non-King summon,
 marks those instances `deployed`, and returns the stage in `phase: 'action'`. Placements are never
 partially applied. Every later turn goes through the second:
 
@@ -230,8 +232,8 @@ type CommitError =
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   // startStage only:
   | { kind: 'durability_unavailable'; instanceId: string }
-  | { kind: 'invalid_deployment'; to: Square; reason: string }    // occupied, off-rank, or King missing
-  | { kind: 'summon_limit_exceeded'; limit: number; placed: number }
+  | { kind: 'invalid_deployment'; to: Square; reason: string }    // occupied, outside ranks 1–4, or King missing
+  | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   // M1 only (removed in M2, when skills exist):
   | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
   // R2 safety net; a bug if it ever fires:
@@ -319,7 +321,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
 | Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
-| Deployment phase | `startStage` refuses: no King, King in check, occupied or off-rank squares, more than `summonLimit` summons, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
+| Deployment phase | `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues |

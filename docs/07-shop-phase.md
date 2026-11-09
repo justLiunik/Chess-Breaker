@@ -43,7 +43,7 @@ Generation rules:
   the stage ([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)).
 - Every piece offer is a **Hero Piece** and carries a rarity tier (see §2.1).
 - The deck is fixed at **8** pieces; the shop never sells capacity. A piece purchase with a full deck
-  needs a cut or a merge first (§4.1).
+  needs a cut, a sale or a merge first (§4, §4.1).
 - Repair is only offered if at least one piece has durability below its max.
 - Skills already at their loadout cap (3) are still offered, but flagged `replace` — buying one
   prompts a swap.
@@ -100,9 +100,29 @@ rarityMultiplier:  Normal ×1 · Rare ×1.5 · Unique ×2 · Legendary ×3
 
 Unique cannot appear in Act I and Legendary not before Act III, so those columns are only ever paid
 with that act's inflation on top. A tier that adds power adds cost — pillar 2. A Legendary bishop
-costs more than a Normal queen *and* deploys only once, so it is never the strictly better buy.
-The Legendary queen is the one deliberate outlier: at 48 base coins and with the rarest roll in the
-game, it is the run's most expensive and least likely item.
+costs more than a Normal queen *and* 5 spawn points to summon instead of 3, so it is never a free
+upgrade. The Legendary queen is the one deliberate outlier: at 48 base coins, with the rarest roll in
+the game and durability 1, it is the run's most expensive and least likely item.
+
+### 2.3 Skill prices
+
+Skills have no rarity, so their price is the skill's own `price` with act inflation only:
+
+```
+skillPrice = round(price × (1 + 0.20 × (act − 1)))
+upgrade    = round(skillPrice × 0.5)          # +1 charge to an owned skill
+```
+
+| Skill (Act I) | Price | Act II | Act III | Upgrade (Act I) |
+|---|---|---|---|---|
+| Lockdown · Gallop · Bulwark | 10 | 12 | 14 | 5 |
+| Twin Step · Ascension · Recall | 12 | 14 | 17 | 6 |
+| Phase Step | 14 | 17 | 20 | 7 |
+
+Only `status: mvp` skills are stocked until the engine supports the rest: Twin Step, Ascension and
+Lockdown from M2; Gallop, Phase Step, Recall and Bulwark from M6
+([03 §5](03-skill-framework.md)). Why skills cost more than a knight is in
+[03 §6](03-skill-framework.md).
 
 ## 3. Guarantees
 
@@ -127,10 +147,25 @@ soon as the deck is back to 4 pieces.
 | Category | Item | Notes |
 |---|---|---|
 | **Piece** | Any of knight / bishop / rook / queen, at a rolled rarity (§2.1) — never a pawn | Creates a **new Hero Piece instance** at full durability for its type and rarity; must fit in capacity |
-| **Skill** | One of the skill catalogue | Occupies a loadout slot (3 max); permanent for the run |
+| **Skill** | One of the skill catalogue, at its price (§2.3) | Occupies a loadout slot (3 max); permanent for the run |
 | **Skill upgrade** | A skill already owned | **+1 charge** at 50% price — deepen a build, don't widen it |
 | **Repair** | +1 durability to one chosen piece | Never above that piece's max; not offered for `spent` pieces |
 | **Reroll** | Reroll slots 1–5 (except a recovery offer) | First reroll each visit free, then 2 coins |
+| **Sell** | One deck piece, not the King and not `spent` | Pays `floor(0.5 × its current price)` — its type × rarity × this act's inflation (§2.2), whatever its durability. The piece leaves the run |
+
+Selling is available at any time in the shop, any number of times, and in the stage-end chooser
+when a promotion overflows the deck (beside merge and cut). It never restocks or regenerates the
+shop: in particular, selling the deck below 4 pieces does not create a recovery offer, which is
+decided on entry from the pieces lost in the stage (§3). Selling down to the King alone is allowed,
+with a warning.
+
+| Sell price examples | Buys for | Sells for |
+|---|---|---|
+| Normal knight, Act I | 8 | 4 |
+| Normal rook, Act I | 10 | 5 |
+| Normal queen, Act I | 16 | 8 |
+| Rare knight, Act II | 14 | 7 |
+| Legendary queen, Act III | 69 | 34 |
 
 Prices inflate per act by 20% and scale with rarity (§2.2,
 [05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)).
@@ -139,7 +174,8 @@ Prices inflate per act by 20% and scale with rarity (§2.2,
 
 1. Player selects an item.
 2. If the purchase needs a target (repair → piece; skill → loadout swap) a chooser appears.
-3. Engine validates: affordable, a free slot in the 8-piece deck (or a cut/merge chosen), targets valid.
+3. Engine validates: affordable, a free slot in the 8-piece deck (or a cut, sale or merge chosen),
+   targets valid. A sale validates that the piece is neither the King nor `spent`.
 4. On confirm: coins deducted, instance created or modified, stock slot marked `sold`.
 5. All state changes are immediate and **irreversible** — no undo in the shop.
 
@@ -211,7 +247,7 @@ Design notes:
 | Case | Resolution |
 |---|---|
 | No items affordable | Leave is the only action; next stage's spawned pawns still arrive for free |
-| Capacity full (8), tries to buy a piece | Blocked with an explicit chooser: cut a piece, or merge three identical pieces if possible; cuts are permanent and confirmed |
+| Capacity full (8), tries to buy a piece | Blocked with an explicit chooser: sell a piece, cut a piece, or merge three identical pieces if possible; sales and cuts are permanent and confirmed |
 | All non-king pieces spent, deck effectively empty | Recovery offer fires; run continues |
 | Repair target has no damage | Repair not offered in stock generation |
 | Duplicate skill purchase | Becomes a +1 charge upgrade at 50% price |
@@ -220,7 +256,9 @@ Design notes:
 | Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
 | Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
 | Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |
-| Deck over capacity from a promotion | The stage-end chooser (cut or merge) runs before the shop opens, so the shop always opens with a legal deck |
+| Deck over capacity from a promotion | The stage-end chooser (merge, sell or cut) runs before the shop opens, so the shop always opens with a legal deck and the coins from a sale can be spent at once |
+| Sells the deck down to the King | Allowed after a warning; the next stage is still solver-checked against the deck as it is |
+| Sells a piece whose lifeline was used | Sells at the normal price; lifeline has no resale value |
 | Merge would exceed the act ceiling | The Merge action is shown disabled with the reason ("Unique unlocks in Act II") |
 | Two identical pieces, wants to merge | Not enough: a merge needs three. The shop highlights pieces that would complete a set |
 | Shop opens on a lost stage | Impossible by definition — the run is over |

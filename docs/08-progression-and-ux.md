@@ -54,12 +54,12 @@ The HUD shows a live, per-plan value:
 
 ### 3.2 HUD layout
 
-**Deployment phase** — the board as generated, the deck tray, and the summon counter. Nothing is paid
-until START.
+**Deployment phase** — the board as generated, the deck tray, and the spawn-point counter. Nothing is
+paid until START.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ACT I · STAGE 2 · DEPLOYMENT     TURNS 8      SUMMON ●●○  2/3        │
+│ ACT I · STAGE 2 · DEPLOYMENT     TURNS 8      SPAWN 8/9 ◆◆◆◆◆◆◆◆◇    │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
@@ -70,7 +70,7 @@ until START.
 │     3  │  │  │♙ │  │  │  │  │  │      SPAWNED ♙c3 → Rare Knight      │
 │     2  │  │  │  │  │  │  │  │  │                                     │
 │     1  │♖ │  │  │♔ │  │♝ │  │  │                                     │
-│        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1,2)        │
+│        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1–4)        │
 │         a  b  c  d  e  f  g  h                                       │
 ├──────────────────────────────────────────────────────────────────────┤
 │  DECK  [♔ placed] [♖ ●● placed] [♝ Rar ●● placed] [♞ ●●] [♞ ●○]      │
@@ -94,7 +94,7 @@ until START.
 │     3  │  │  │  │  │  │  │  │  │                                     │
 │     2  │  │  │♙ │  │  │  │  │  │      YOU    ♖♙  6                   │
 │     1  │♖ │  │  │♔ │  │  │  │  │                                     │
-│        └──┴──┴──┴──┴──┴──┴──┴──┘    DECK LOCKED · 1/3 summoned       │
+│        └──┴──┴──┴──┴──┴──┴──┴──┘    DECK LOCKED · 8/9 spawn points   │
 │         a  b  c  d  e  f  g  h                                       │
 ├──────────────────────────────────────────────────────────────────────┤
 │  FOCUS ◉◉○  2/3      MOVES ●○  1 credit                              │
@@ -140,8 +140,11 @@ pawns are already on the board; the player's side is empty.
 - Deployment squares are tinted for the whole phase. Dragging a piece from the deck tray onto one
   places it; dragging it back, or onto another square, is free. The King must be placed before START
   is enabled.
-- The **summon counter** (`SUMMON ●●○ 2/3`) fills as pieces are placed; once full, the remaining
-  tray pieces are dimmed, not hidden. The King never counts.
+- Deployment squares are ranks 1–4, the player's half of the board; ranks 5–8 never accept a drop.
+- The **spawn-point counter** (`SPAWN 8/9`) fills by each piece's spawn cost as it is placed; every
+  tray piece shows its cost, and a piece that no longer fits the remaining points is dimmed, not
+  hidden. The King is free and never counts. Points left over are lost at START, and the counter
+  says so.
 - Hovering a square shows the threat overlay: which enemy pieces attack it, and the capture line
   that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
 - A square where the King would start in check is marked invalid with a king-safety icon; START names
@@ -184,7 +187,7 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | Moment | Teaching | Mechanism |
 |---|---|---|
 | Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
-| Run 1, Act I stage 2 | Choosing who to summon, and durability | The deck holds more pieces than the summon limit; the first START is prompted with its durability cost |
+| Run 1, Act I stage 2 | Choosing who to summon, spawn points, and durability | The deck holds more pieces than the spawn points pay for; the first START is prompted with its durability cost |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
 | Act I boss | Mating under turn pressure | One turn less than the rest of Act I; the coin preview's decay is highlighted once |
 | Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |

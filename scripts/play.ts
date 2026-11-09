@@ -20,8 +20,8 @@ const PIECE_NAMES: Record<string, PieceType> = {
 function buildStage(): StageState {
   const doc = parse(readFileSync(new URL('../content/examples/templates.yaml', import.meta.url), 'utf8')) as {
     templates: {
-      id: string; turnLimit: number; focusPool: number; summonLimit: number;
-      deploymentRanks: number[]; fixedEnemy: Record<string, string>;
+      id: string; turnLimit: number; focusPool: number; spawnPoints: number;
+      fixedEnemy: Record<string, string>;
       enemyPolicy: { type: 'scripted'; line: string[]; fallbackDepth: number };
     }[];
   };
@@ -32,7 +32,8 @@ function buildStage(): StageState {
     board[sq] = { pieceType: PIECE_NAMES[name]!, color: 'black' };
   }
   board.e1 = { pieceType: 'king', color: 'white', instanceId: 'p_king_01' };
-  board.a1 = { pieceType: 'rook', color: 'white', instanceId: 'p_rook_02' };
+  // Two starter minors: 3 + 3 spawn points, the template's whole budget of 6.
+  board.b1 = { pieceType: 'knight', color: 'white', instanceId: 'p_knight_02' };
   board.f1 = { pieceType: 'bishop', color: 'white', instanceId: 'p_bishop_03' };
   for (const sq of ['c3', 'f3']) {
     board[sq] = {
@@ -51,8 +52,7 @@ function buildStage(): StageState {
     focus: tpl.focusPool,
     focusPool: tpl.focusPool,
     moveCredits: 1,
-    summonLimit: tpl.summonLimit,
-    deploymentRanks: tpl.deploymentRanks,
+    spawnPoints: tpl.spawnPoints,
     modifiers: [],
     enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth },
     status: 'active',
@@ -103,7 +103,7 @@ function errorText(err: CommitError): string {
 }
 
 const HELP = [
-  'Type a move as from+to, e.g. a1a7, then answer y or n to the commit prompt.',
+  'Type a move as from+to, e.g. f1d3, then answer y or n to the commit prompt.',
   'Commands: help | undo-plan (discard the pending move) | quit',
 ].join('\n');
 
@@ -117,7 +117,7 @@ function main(): void {
     console.log(`\n${boardText(stage)}`);
     console.log(`turn ${stage.turnsUsed + 1}/${stage.turnLimit}   coins ${run.coins}   you are White (upper case)`);
   };
-  const prompt = (): void => console.log(pending ? 'commit? (y/n)' : 'move (e.g. a1a7), help, quit:');
+  const prompt = (): void => console.log(pending ? 'commit? (y/n)' : 'move (e.g. f1d3), help, quit:');
   const finish = (): void => {
     console.log(`\nstage ${stage.status}: ${stage.endReason}`);
     rl.close();
@@ -162,7 +162,7 @@ function main(): void {
     }
 
     const m = /^([a-h][1-8])([a-h][1-8])$/.exec(line);
-    if (!m) { console.log(`not a move: '${line}' (try a1a7, or help)`); prompt(); return; }
+    if (!m) { console.log(`not a move: '${line}' (try f1d3, or help)`); prompt(); return; }
     const queue: Action[] = [{ type: 'MOVE', from: m[1]!, to: m[2]! }];
     const sim = simulate(run, stage, queue, config);
     if (!sim.ok) { console.log(errorText(sim.error)); prompt(); return; }

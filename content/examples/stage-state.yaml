@@ -62,8 +62,7 @@ turnLimit: 8
 focus: 3
 focusPool: 3
 moveCredits: 0
-summonLimit: 3         # Act I; the King and the a1 rook were placed in the Deployment phase
-deploymentRanks: [1, 2]
+spawnPoints: 9         # Act I; the King (free) and the a1 rook (5) were placed in the Deployment phase
 modifiers:
   - modifierId: mod_0007
     primitive: suppress_piece

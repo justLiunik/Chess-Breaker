@@ -16,11 +16,12 @@ rules:
   playerColor: white            # player always moves first (open decision F)
   freeMovesPerTurn: 1           # the Free Move; only skills add credits
   focusPool: 3                  # refills each turn, no carryover
-  deploymentRanks: [1, 2]       # the King and summoned pieces are placed here, before turn 1
-  summonLimit:                  # deck pieces (King excluded) summoned in the Deployment phase
-    act1: 3
-    act2: 4
-    act3: 5                     # bosses use their act's limit; a template may lower it
+  deploymentRanks: [1, 2, 3, 4] # the player's half: the King and summons go here, never on ranks 5-8; templates cannot change it
+  spawnPoints:                  # summon budget per stage; total spawnCost of the summons must fit (docs/02 §5)
+    act1: { normal: 9, boss: 12 }
+    act2: { normal: 12, boss: 15 }
+    act3: { normal: 15, boss: 18 }  # boss = normal + 3; a template may lower its budget, never raise it
+  spawnPointsCarryOver: false   # unspent points are lost at Start
   summonCostsDurability: 1      # paid per non-King summon when the player presses Start
   deckLockedAfterStart: true    # no summoning once the first move is made (docs/02 §3)
   minMovesPerQueue: 1           # no pass: every queue contains at least one MOVE
@@ -60,6 +61,11 @@ economy:
     reroll: 2                   # after the free reroll
     freeRerollsPerVisit: 1
     maxRerollsPerVisit: 3
+    sell:                       # docs/07 §4 — sell a deck piece for coins; it leaves the run
+      priceFactor: 0.5          # of the piece's current shop price (rarity × act inflation); never above recoveryDiscount
+      rounding: floor
+      when: [shop, capacity_cut]  # in the shop, and as a third option beside merge/cut when a promotion overflows the deck
+      excludes: [king, spent]
 
   shop:
     slots: 5                    # 1–2 pieces, 3–4 piece or skill, 5 service (docs/07 §2)
@@ -69,39 +75,52 @@ economy:
 
 # ---------------------------------------------------------------------------
 # Pieces — mirror of content/examples/pieces.yaml values
+#
+# Durability is flat: every deck piece has durabilityMax 2 at every tier, except
+# the Legendary queen (1). Power per stage is gated by spawnCost against the
+# stage's spawnPoints instead (docs/06 §1). spawnCost mirrors chess value but is
+# its own key so it can be tuned without touching the AI's material weights.
 # ---------------------------------------------------------------------------
 pieces:
   king:
     value: 0
+    spawnCost: 0                # always placed, always free
     cost: null
     durabilityMax: null         # immortal
     purchasable: false
   pawn:
     value: 1
+    spawnCost: 1                # nominal: pawns are never in the deck, so never summoned
     cost: null                  # never sold — pawns only spawn on the stage (docs/06 §4.2)
     durabilityMax: null         # stage-only: never in the deck, never deployed
     purchasable: false
   knight:
     value: 3
+    spawnCost: 3
     cost: 8
     durabilityMax: 2
     purchasable: true
   bishop:
     value: 3
+    spawnCost: 3
+    spawnCostByRarity:
+      legendary: 5              # moves like a queen: costs like a rook (docs/06 §1)
     cost: 8
     durabilityMax: 2
-    durabilityMaxByRarity:
-      legendary: 1              # moves like a queen, so it deploys like one (docs/06 §1)
     purchasable: true
   rook:
     value: 5
+    spawnCost: 5
     cost: 10
     durabilityMax: 2
     purchasable: true
   queen:
     value: 9
+    spawnCost: 9                # a whole Act I budget
     cost: 16
-    durabilityMax: 1            # one deployment ever — a burst, not a soldier
+    durabilityMax: 2
+    durabilityMaxByRarity:
+      legendary: 1              # the one exception to flat durability: a glass cannon (docs/06 §1)
     purchasable: true
 
 # ---------------------------------------------------------------------------

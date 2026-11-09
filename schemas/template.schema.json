@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "id", "title", "act", "tier", "turnLimit",
-    "spawnedPawns", "deploymentRanks",
+    "spawnedPawns",
     "focusPool", "enemyPolicy", "preconditions"
   ],
   "additionalProperties": false,
@@ -16,11 +16,10 @@
     "act": { "type": "integer", "minimum": 1, "maximum": 3 },
     "tier": { "enum": ["normal", "boss"] },
     "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
-    "summonLimit": {
+    "spawnPoints": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 8,
-      "description": "Optional: lowers the act's summonLimit (economy.yaml rules.summonLimit) for this template. Deck pieces the player may summon in the Deployment phase, King excluded. Never raises it."
+      "description": "Optional: lowers the stage's spawn-point budget (economy.yaml rules.spawnPoints for this act and tier). Never raises it."
     },
     "enemyArmy": {
       "type": "object",
@@ -54,7 +53,7 @@
       "items": { "type": "integer", "minimum": 1, "maximum": 8 },
       "minItems": 1,
       "uniqueItems": true,
-      "description": "Ranks the enemy army may occupy."
+      "description": "Ranks the enemy army may occupy. Never a deployment rank (economy.yaml rules.deploymentRanks, ranks 1-4): the player's half belongs to the player."
     },
     "spawnedPawns": {
       "type": "object",
@@ -71,15 +70,9 @@
           "items": { "type": "integer", "minimum": 2, "maximum": 7 },
           "minItems": 1,
           "uniqueItems": true,
-          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone, and rank 8 must be reachable within the turn limit."
+          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone, and rank 8 must be reachable within the turn limit. May overlap the deployment ranks (1-4): a spawned pawn simply occupies its square."
         }
       }
-    },
-    "deploymentRanks": {
-      "type": "array",
-      "items": { "type": "integer", "minimum": 1, "maximum": 8 },
-      "minItems": 1,
-      "uniqueItems": true
     },
     "focusPool": { "type": "integer", "minimum": 1, "maximum": 9 },
     "enemyPolicy": { "$ref": "#/$defs/enemyPolicy" },

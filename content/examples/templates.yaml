@@ -3,7 +3,10 @@
 # A template fixes the SHAPE of an encounter (enemy composition, turn limit,
 # board sparsity) and leaves enemy placement to generation. The player's army
 # is never generated: in the Deployment phase the player places the King and
-# summons up to summonLimit pieces from their deck (docs/02 §5).
+# summons deck pieces whose total spawnCost fits the stage's spawn points, on
+# empty squares of ranks 1-4 (docs/02 §5). Both the budget (by act and tier)
+# and the deployment ranks are global rules in data/economy.yaml; a template may
+# only lower its budget with spawnPoints.
 #
 # Checkmate is the only way to clear a stage (docs/02 §7), so the one material
 # rule every template must satisfy is that enemyArmyValue sits inside the act
@@ -26,7 +29,6 @@ templates:
     spawnedPawns:
       count: [2, 2]
       ranks: [3, 4]
-    deploymentRanks: [1, 2]
     focusPool: 3
     enemyPolicy:
       type: best_move
@@ -50,7 +52,7 @@ templates:
     tier: normal
     turnLimit: 8
     placement: fixed
-    summonLimit: 2      # one fewer than Act I's 3: fewer choices on the very first stage
+    spawnPoints: 6      # Act I's 9 minus a minor: two summons at most on the very first stage
     fixedEnemy:
       e8: king
       a7: pawn
@@ -62,7 +64,6 @@ templates:
     spawnedPawns:
       count: [2, 2]
       ranks: [3, 4]
-    deploymentRanks: [1, 2]
     focusPool: 3
     enemyPolicy:
       type: scripted
@@ -96,7 +97,6 @@ templates:
     spawnedPawns:
       count: [1, 2]
       ranks: [3, 4]
-    deploymentRanks: [1, 2]
     focusPool: 3
     enemyPolicy:
       type: best_move
@@ -128,7 +128,6 @@ templates:
     spawnedPawns:
       count: [1, 2]
       ranks: [3, 4]
-    deploymentRanks: [1, 2]
     focusPool: 3
     enemyPolicy:
       type: best_move
@@ -161,7 +160,6 @@ templates:
     spawnedPawns:
       count: [1, 1]
       ranks: [4, 5]
-    deploymentRanks: [1, 2]
     focusPool: 3
     enemyPolicy:
       type: best_move

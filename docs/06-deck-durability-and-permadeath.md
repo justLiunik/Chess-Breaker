@@ -7,33 +7,45 @@ This is the game's long-run resource and its emotional core. Turns are the clock
 
 ## 1. The piece table
 
-| Piece | Value | Price (Act I, Normal) | Durability max | Notes |
-|---|---|---|---|---|
-| King | — | not sold | ∞ | Run identity; never destroyed |
-| Pawn | 1 | **not sold** | — | Never in the deck: spawned free by each stage; promotes into a deck piece ([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)) |
-| Knight | 3 | 8 | 2 | Standard mid-piece; widening jumps by rarity |
-| Bishop | 3 | 8 | 2 (Legendary: **1**) | Standard mid-piece; Ascension target; leaps allies by rarity |
-| Rook | 5 | 10 | 2 | Reach; leaps allies, then a two-piece battering ram by rarity |
-| Queen | 9 | 16 | **1** | One deployment ever — a burst, not a soldier; lifeline, then full sweep by rarity; Legendary is the rarest piece |
+| Piece | Value | Spawn cost | Price (Act I, Normal) | Durability max | Notes |
+|---|---|---|---|---|---|
+| King | — | 0 | not sold | ∞ | Run identity; never destroyed; always placed, always free |
+| Pawn | 1 | — | **not sold** | — | Never in the deck: spawned free by each stage; promotes into a deck piece ([02 §2.1](02-rules-framework.md#21-pawns-come-from-the-stage-never-the-deck)) |
+| Knight | 3 | 3 | 8 | 2 | Standard mid-piece; widening jumps by rarity |
+| Bishop | 3 | 3 (Legendary: **5**) | 8 | 2 | Standard mid-piece; Ascension target; leaps allies by rarity |
+| Rook | 5 | 5 | 10 | 2 | Reach; leaps allies, then a two-piece battering ram by rarity |
+| Queen | 9 | 9 | 16 | 2 (Legendary: **1**) | A whole Act I budget; lifeline, then full sweep by rarity; Legendary is the rarest piece |
 
 Rarity multiplies the price (×1 / ×1.5 / ×2 / ×3) and adds abilities to knights, bishops, rooks and
 queens ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)).
 
 ### The single most important design decision in this table
 
-**Durability is inversely correlated with piece power.** A queen is the strongest piece and can be
-deployed exactly once per purchase. A knight or bishop can be deployed twice.
+**Durability is flat and low; power is paid for in spawn points.** Every deck piece can be summoned
+**twice** — knight, bishop, rook or queen, at every tier — with one exception, the Legendary queen,
+which can be summoned **once**. Two summons is the whole life of a piece: the game is meant to feel
+unforgiving, and a deck runs down unless the player rations it.
 
-This makes every deck slot a real trade:
+What stops the queen from dominating every slot is the stage's **spawn-point budget**
+([02 §5](02-rules-framework.md#5-deployment)): a queen costs 9, a whole Act I budget, while three
+minors cost the same 9. That turns every deployment into a real trade:
 
-- A **reliable** deck of knights and bishops plays slowly but never collapses.
-- A **spiky** deck with queens wins specific stages spectacularly and then evaporates.
+- **A few strong pieces** spend little durability per point of power (a queen: 1 durability for 9
+  points), but one capture loses the whole investment.
+- **Many minors** spend durability fast (three minors: 3 durability for 9 points), but the risk of
+  capture is spread across them.
 - The correct answer changes per template, which is what makes deckbuilding a skill.
 
-If durability were flat, the queen would strictly dominate every slot and the deck would have one
-correct shape. It must not. **Rarity obeys the same rule:** a tier that makes a piece move like a
-queen also makes it deploy like one, which is why a Legendary bishop has a durability of 1. No tier
-ever raises durability.
+**Rarity follows the budget, not durability.** No tier ever raises durability or lowers spawn cost.
+A tier that makes a piece move like a queen makes it cost more to bring: a Legendary bishop costs 5
+spawn points instead of 3. The Legendary queen is the one piece whose durability drops — a glass
+cannon for the last stages of a run, with lifeline as its second life.
+
+**Why 2.** Act I income buys roughly one minor (two summons) per stage, while a full Act I budget
+spends three. At durability 1 a deck runs out by about the third stage; at 3 it rarely runs out at
+all. At 2 it runs down slowly unless the player brings less than the budget allows, repairs, or
+promotes — which is the pressure the game is built on. The numbers are provisional until the M6
+balance pass ([10](10-roadmap-and-milestones.md)).
 
 ## 2. Deck capacity
 
@@ -51,7 +63,8 @@ because every stage spawns its own pawns.
 
 Capacity is the run's power ceiling, and it is a hard one. With only eight slots, deck growth means
 **better pieces, not more pieces**: buying higher tiers, promoting pawns, and merging three pieces into
-one (§4.5). A full deck forces a choice on every purchase — cut, merge, or pass.
+one (§4.5). A full deck forces a choice on every purchase — sell, cut, merge, or pass. Selling pays
+half the piece's current price ([07 §4](07-shop-phase.md#4-purchases)); cutting pays nothing.
 
 ## 3. Piece instances
 
@@ -134,14 +147,15 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 | Piece | What its tier changes |
 |---|---|
 | Pawn | Only its promotion result: usually one tier above the pawn ([02 §2.2](02-rules-framework.md#22-promotion)) |
-| Bishop | Rare leaps allies (no capture on a leap) · Unique captures after a leap · Legendary moves like a queen, durability 1 ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
+| Bishop | Rare leaps allies (no capture on a leap) · Unique captures after a leap · Legendary moves like a queen and costs 5 spawn points ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Knight | Rare adds a 2-square straight leap · Unique adds a 2-square diagonal leap · Legendary gets a free second move each turn ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Rook | Rare leaps allies (no capture on a leap) · Unique adds a 1-square diagonal step · Legendary captures one piece after a leap and multi-captures two connected enemies on a non-leap move ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
-| Queen | Rare leaps allies (no capture on a leap) · Unique gains a once-per-run lifeline · Legendary captures after a leap and multi-captures on any move ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
+| Queen | Rare leaps allies (no capture on a leap) · Unique gains a once-per-run lifeline · Legendary captures after a leap and multi-captures on any move, durability 1 ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Every type | Shop price ×1 / ×1.5 / ×2 / ×3 ([05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)) |
 
-What rarity never changes: chess material value (salvage), the cost of summoning (1 durability,
-one slot of the summon limit), or repairs. Permadeath has exactly one exception: the Unique+ queen's once-per-run
+What rarity never changes: chess material value (salvage), the durability a summon spends (1), or
+repairs. It changes durability and spawn cost in exactly two places: the Legendary queen's
+durability is 1, and the Legendary bishop's spawn cost is 5 (§1). Permadeath has exactly one exception: the Unique+ queen's once-per-run
 lifeline (§6).
 
 ### 4.5 Merging
@@ -155,12 +169,12 @@ upgraded in place, so I12 still holds.
 | Inputs | **3** deck pieces of the **same type and the same tier** (e.g. three Normal Knights) |
 | Input state | All `in_deck` with durability ≥ 1; spent or captured pieces cannot be used |
 | Result | **1** piece of the same type, **one tier higher** (Normal → Rare → Unique → Legendary) |
-| Result durability | **Full** for the new type and tier (a Legendary bishop: 1) |
+| Result durability | **Full** for the new type and tier (2; a Legendary queen: 1) |
 | Result state | Fresh instance, `origin: merge`, nothing in `usedOnce` (a merged queen has its lifeline) |
 | Ceiling | Never above the act's rarity ceiling: Normal → Rare only in Act I, Rare → Unique from Act II, Unique → Legendary in Act III |
 | Excluded | The King (no rarity), pawns (never in the deck), and Legendary pieces (no higher tier) |
 | Cost | **Free** — the price is giving up three pieces for one |
-| When | In the shop, any number of times per visit; and in the stage-end cut chooser after a promotion overflows the deck |
+| When | In the shop, any number of times per visit; and in the stage-end chooser (merge, sell or cut) after a promotion overflows the deck |
 
 **Why three.** Two-for-one would make tiers cheap: a single shop purchase plus an owned piece would
 reach the next tier. Three-for-one means committing three of the eight deck slots to one piece type,
@@ -211,6 +225,9 @@ shop has not offered.
 5. A piece with 0 durability can still be **repaired** during the same stage it went spent? **No.**
    `spent` is final — this closes a repair-dodge loophole and keeps the 0-durability threshold
    meaningful. Repairs only apply to `in_deck` or `deployed` pieces with durability ≥ 1.
+   A consequence worth stating: a **Legendary queen can never be repaired**. Its durability is only
+   ever 1 (full) or 0 (spent), so it is a one-summon piece whose only second life is lifeline. There
+   is no paid restore for a spent piece, at any price.
 
 **Why "spent" rather than instant destruction:** a piece that vanishes the moment it is summoned is
 absurd to watch and removes the tension of playing out a stage with a doomed army. Marking it spent
@@ -235,7 +252,7 @@ permanently. Bringing less is always safe and always slower.
 
 | Property | Rule |
 |---|---|
-| Presence | Guaranteed in the deck; always placed by the player in the Deployment phase, free and outside the summon limit |
+| Presence | Guaranteed in the deck; always placed by the player in the Deployment phase, free: it costs no spawn points |
 | Capacity | Occupies no deck slot |
 | Durability | Infinite; never decremented, never spent |
 | Rarity | None — `null`, outside the rarity system (§4) |
@@ -291,18 +308,22 @@ Durability must be readable without opening a panel.
 | Case | Resolution |
 |---|---|
 | Deck contains only the King | The King and the spawned pawns are the whole army; the solver still had to find a mate, so the stage is winnable, but the UI offers abandon-run |
-| Summon onto an occupied or off-rank square | Not placeable (I8) |
+| Summon onto an occupied square, or onto ranks 5–8 | Not placeable (I8) |
+| Summons that cost more than the stage's spawn points | Start refused (I15); nothing paid, placements kept |
 | Start with the King in check | Start refused (I2); nothing paid, placements kept |
-| More pieces in the deck than the summon limit | The player chooses; the rest stay in the deck untouched |
+| More pieces in the deck than the spawn points can pay for | The player chooses; the rest stay in the deck untouched |
 | Captured while transformed (Ascension) | Piece destroyed normally; no reversion step |
 | Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
 | Captured Rare/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
-| Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must cut pieces until the deck fits (I9) |
+| Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must merge, sell or cut pieces until the deck fits (I9) |
+| Selling a piece | Only in the shop or the stage-end chooser; never the King or a `spent` piece; half its current price; it leaves the run like a cut piece ([07 §4](07-shop-phase.md#4-purchases)) |
 | Spawned pawn captured | Lost for this stage only; nothing leaves the deck |
 | Spawned pawn survives the stage without promoting | Discarded at stage end; nothing carries over |
 | Promoted piece in the same stage | Joins the deck at once but cannot be summoned — the deck is locked after Start (I15). First summonable next stage |
 | Legendary knight + Twin Step | Both apply: Twin Step adds a credit for any piece; the knight's bonus move is only for itself |
 | Ascension on a Rare/Unique bishop | It moves as a Normal queen for the turn; its leap abilities return when the transform reverts |
+| Ascension on a Legendary bishop | Not a legal target (`excludesRarity: [legendary]`): it already moves like a queen ([03 §5](03-skill-framework.md)) |
+| Lifeline on a spent queen | Fires anyway: the first capture returns it with 1 durability whatever it had left. For a Legendary queen (always spent once summoned) this is its only way to be summoned twice |
 | Legendary knight gives check, then tries to capture the king with its bonus move | Impossible: the king's square is never a legal destination (I3). The bonus move may go anywhere else |
 | Multi-capture whose second target is the enemy king | The move stops on the first capture; the king is in check; nothing else happens |
 | Legendary rook leaps an ally, then meets two connected enemies | Captures the first only — a rook never multi-captures after a leap. A Legendary queen would take both |

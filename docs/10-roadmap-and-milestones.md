@@ -72,8 +72,12 @@ must be resisted — that would silently delete the game's core mechanic.
 **Scope**
 - `PieceInstance` lifecycle (`in_deck` → `deployed` → `captured` | `spent`), including the
   fixed `rarity` field (null for the King).
-- Deployment phase: `startStage` with the King, up to `summonLimit` summons, durability spent at
-  Start, all-or-nothing validation, and the deck lock (I15).
+- Deployment phase: `startStage` with the King and summons whose total spawn cost fits
+  `spawnPoints`, all on ranks 1–4, durability spent at Start, all-or-nothing validation, and the deck
+  lock (I15).
+- Flat durability from `pieces.yaml` (2 for every deck piece, Legendary queen 1) and spawn costs
+  per type and rarity (Legendary bishop 5); the loader exposes `rules.deploymentRanks`,
+  `rules.spawnPoints` and `pieces.<type>.spawnCost`.
 - `ACTIVATE_SKILL` with `grant_move_credit`, `set_piece_type`, `suppress_piece`.
 - Duration semantics: `instant`, `this_turn`, `next_enemy_turn`.
 - Final R1→R5 ordering including revert-before-mate.
@@ -99,9 +103,10 @@ must be resisted — that would silently delete the game's core mechanic.
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
 - [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
 - [ ] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
-      not give check through an ally; Unique can; Legendary bishop moves like a queen with
-      durability 1; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
-- [ ] Ascension suspends rarity abilities and they return after the revert (test).
+      not give check through an ally; Unique can; Legendary bishop moves like a queen and costs 5
+      spawn points; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
+- [ ] Ascension suspends rarity abilities and they return after the revert, and it refuses a
+      Legendary bishop as a target (`excludesRarity`, test).
 - [ ] Rook and queen rows of `docs/02 §2.3` each have a test, including every multi-capture rule
       (adjacency, gap, king exception, rook-after-leap single capture, one credit, salvage for both).
 - [ ] A Legendary knight that gives check with its first move can never capture or land on the king
@@ -152,8 +157,9 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 - Stage reward math (base reward + unused-turn bonus) and salvage on capture.
 - Shop stock generation with recovery offer (no pawns are sold).
 - Rarity roll on random piece offers from the act-gated pool and rarity pricing (`docs/07 §2.1–2.2`).
-- Stage-end over-capacity cut after a promotion, before the shop opens.
-- Purchases: pieces, skills, skill upgrades, repairs, rerolls, bank & skip. Merging (3 → 1, free). Fixed
+- Stage-end over-capacity chooser after a promotion (merge, sell or cut), before the shop opens.
+- Purchases: pieces, skills (`status: mvp` only), skill upgrades, repairs, rerolls, bank & skip;
+  selling deck pieces at half their current price (`economy.services.sell`). Merging (3 → 1, free). Fixed
   8-piece deck — no capacity purchases.
 - `localStorage` save/resume with version gating.
 
@@ -162,7 +168,10 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
       every turn/act/tier combination, including the base-only final turn (table-driven test).
 - [ ] Merge: 3 identical pieces → 1 piece one tier up at full durability; refused above the act
       ceiling and for Legendary inputs; the deck never exceeds 8 outside a stage (tests).
-- [ ] Recovery offer never fires because of a merge, only after pieces are lost (test).
+- [ ] Recovery offer never fires because of a merge or a sale, only after pieces are lost (test).
+- [ ] A sale pays `floor(0.5 × current price)` for every type × tier × act, at any durability; it is
+      refused for the King and for `spent` pieces; the sold instance leaves `RunState.deck` (tests).
+- [ ] Buying any offer, recovery included, and selling it back never gains coins (property test).
 - [ ] Invariant I10 holds: preview equals payout for 1,000 random plans.
 - [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
 - [ ] The shop never offers a pawn (test).
@@ -212,14 +221,22 @@ sacrifice features before fidelity — reduce animation, not information.
 **Delivers:** tuned numbers, the expanded skill catalogue, boss enemy skills.
 
 **Scope**
-- Skill catalogue expansion across all seven categories, including the planning-effect primitive
-  class flagged in [03 §4](03-skill-framework.md#4-the-seven-categories).
+- The four catalogued skills of [03 §5](03-skill-framework.md) — Gallop, Phase Step, Recall,
+  Bulwark — and their primitives: `override_moveset`, `ignore_blockers`, `return_to_deck`,
+  `shield_piece`; each listed edge case covered by a test, and the shop stocking them once built.
+- Further catalogue expansion only after those land, including the planning-effect primitive class
+  flagged in [03 §4](03-skill-framework.md#4-the-seven-categories); candidates are in
+  [11 A](11-open-decisions.md#a-skill-catalogue-deferred-by-request).
 - Enemy skills on bosses (`enemyLoadout`).
 - Balance pass driven by the headless bot plus human playtests.
 - Art/audio first pass.
 
 **Acceptance criteria**
-- [ ] At least one skill from each of categories 1–4 and 7 shipped and tested.
+- [ ] At least one skill from each of categories 1–5 shipped and tested (Twin Step, Ascension,
+      Lockdown and Bulwark, Gallop and Phase Step, Recall).
+- [ ] Recall never refunds durability and its piece never re-enters the stage (I15); Bulwark's shield
+      is respected by R3's stalemate count and by `enemyMove` alike (tests).
+- [ ] Gallop and Phase Step revert at R1: neither ever mates through its override (test).
 - [ ] Bosses use at least one enemy skill each, and each boss is still provably solvable (M3 suite).
 - [ ] Balance targets: first-run Act I clear rate ≥ 70%; Act II clear rate 30–50%; median run 25–35 min.
 - [ ] No skill violates the §7 guardrail checklist (audit documented).
@@ -234,7 +251,9 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 
 | Risk | Likelihood | Impact | Mitigation | Milestone |
 |---|---|---|---|---|
-| Skills trivialize stages | High | High | Charge scarcity, summon limit, solver validation, boss skills | M2, M6 |
+| Skills trivialize stages | High | High | Charge scarcity, spawn-point budget, solver validation, boss skills | M2, M6 |
+| Bulwark makes a checking piece uncapturable and mates too easily | Medium | Medium | Intended edge, but bounded: 2 charges, once per turn, solver measures it; cut to 1 charge before touching cost | M6 |
+| Recall removes the sting of a bad deployment | Medium | Medium | 1 charge per stage, no durability refund, no re-entry (I15) | M6 |
 | Death spiral unfun | Medium | High | Spawned pawns, promotion, recovery offer, salvage, bank & skip | M4 |
 | Solver too slow | Medium | Medium | Single-agent search (enemy is deterministic), memoized enemy replies, template narrowing, caching, offline archetypes | M3 |
 | Enemy blind to multi-action turns looks dumb | Medium | Low | Intended (skills stay surprising); if playtests object, add a threat-awareness term for charged skills | M6 |
@@ -243,14 +262,16 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Deferred-validation rule "fixed" by a contributor | Medium | Critical | Documented in `docs/02` as core, covered by tests | M1 |
 | Content volume assumptions wrong | Low | Medium | Templates, not levels, scale content | M3 |
 | Chess library temptation | Medium | Medium | Explicit no-external-engine decision in `docs/09`; Stockfish allowed only as an offline, unshipped design tool | M1 |
-| Rarity power creep breaks the durability trade | Medium | High | Price multipliers; Legendary bishop durability 1; Legendary queen retention 0.2; act-gated ceilings; decision O constraints | M2, M4, M6 |
+| Rarity power creep breaks the spawn-point trade | Medium | High | Price multipliers; Legendary bishop spawn cost 5; Legendary queen durability 1 and retention 0.2; act-gated ceilings; decision O constraints. The Legendary bishop (queen moves, durability 2, 5 points) is the likeliest outlier: measure its solver win rate first | M2, M4, M6 |
+| Flat durability makes the queen the obvious buy | Medium | Medium | Spawn cost 9 (a whole Act I budget); re-check the 16-coin price now that a queen summons twice | M4, M6 |
+| Legendary knight is the strongest piece per spawn point (two moves a turn for 3 points) | Medium | Medium | Kept at 3 by decision; measure its solver win rate next to the Legendary bishop's (5) and raise it only on evidence | M3, M6 |
 | Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
 | Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune turn limits and enemy bands first in M6 | M3, M6 |
 | Base reward + no capacity sink inflates coins | Medium | Medium | Headless-bot tuning of `baseReward` before prices; merges as the main deck-growth path | M4, M6 |
 | Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
 | Deployment ply blows up the solver | Medium | High | Bounded candidate subsets and squares, sound-but-incomplete search, regeneration on miss; measure first | M3 |
-| A multi-piece deployment mates on turn 1 | Low | Medium | `no_first_turn_mate` checks single pieces; widen to pairs if playtests find turn-1 mates | M3, M6 |
-| Durability drains too fast without a free opening line | Medium | Medium | Summon limit, "bring less" as a real choice, repair price and durability tuning by the headless bot | M4, M6 |
+| A multi-piece deployment mates on turn 1 | Medium | Medium | Rank-4 summons sit close to the enemy zone: `no_first_turn_mate` checks single pieces and budget-fitting pairs; widen to triples if playtests find turn-1 mates | M3, M6 |
+| Flat durability 2 drains the deck too fast | Medium | High | Deliberate (unforgiving by design), but bounded: spawn points cap the drain per stage, "bring less" is a real choice, repairs, promotion; tune repair price and income, not durability, with the headless bot | M4, M6 |
 | Stalemate-as-loss feels like a trap | Medium | Medium | Preview always names it before commit; tutorial stage shows it once; enemy-has-moves precondition | M5, M6 |
 
 ## Dependencies

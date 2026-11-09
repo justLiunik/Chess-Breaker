@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "id", "name", "category", "ruleBroken", "text",
-    "trigger", "cost", "charges", "target", "effects", "status"
+    "trigger", "cost", "charges", "price", "target", "effects", "status"
   ],
   "additionalProperties": false,
   "properties": {
@@ -40,6 +40,11 @@
       "minimum": 1,
       "description": "Activations per STAGE. Refreshes at every stage start."
     },
+    "price": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Act I shop price in coins. Later acts apply economy.yaml priceInflationPerAct, as pieces do; a duplicate purchase (+1 charge) costs skills.duplicatePurchase.priceMultiplier of it (docs/07 §2)."
+    },
     "target": {
       "type": "object",
       "required": ["kind"],
@@ -51,6 +56,12 @@
         "excludes": {
           "type": "array",
           "items": { "enum": ["king", "pawn", "knight", "bishop", "rook", "queen"] }
+        },
+        "excludesRarity": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Rarity tiers that cannot be targeted, e.g. Ascension excludes a Legendary bishop, which already moves like a queen (docs/03 §5).",
+          "items": { "enum": ["normal", "rare", "unique", "legendary"] }
         }
       }
     },
@@ -74,6 +85,8 @@
               "remove_piece",
               "place_piece",
               "displace_piece",
+              "return_to_deck",
+              "shield_piece",
               "reveal_intent",
               "add_plan_undo"
             ]

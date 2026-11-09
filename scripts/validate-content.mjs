@@ -73,7 +73,9 @@ for (const [name, id] of Object.entries(SCHEMA_IDS)) {
 
 const formatAjvErrors = (file, where, errs) =>
   (errs ?? []).map(
-    (e) => `${file}${where ? ` → ${where}` : ''}: ${e.instancePath || '/'} ${e.message}`,
+    (e) =>
+      `${file}${where ? ` → ${where}` : ''}: ${e.instancePath || '/'} ${e.message}` +
+      (e.params?.additionalProperty ? ` ("${e.params.additionalProperty}")` : ''),
   );
 
 // ---------------------------------------------------------------------------
@@ -141,6 +143,48 @@ for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
 // Pass 2 — semantic invariants
 // ---------------------------------------------------------------------------
 
+// 2-skills. Skill catalogue (docs/03 §5–§7). An mvp skill may use only the
+// primitives the engine implements now; a future skill may use any declared
+// primitive. No skill may use a primitive the framework rejects outright.
+{
+  const MVP_PRIMITIVES = new Set(['grant_move_credit', 'set_piece_type', 'suppress_piece']);
+  const REJECTED_PRIMITIVES = new Set(['add_plan_undo', 'shield_king']); // no undo after commit; no king immunity
+  const skills = docs['skills.yaml']?.skills ?? [];
+  const seen = new Set();
+  let problems = 0;
+  for (const s of skills) {
+    if (seen.has(s.id)) {
+      fail(`skills.yaml:${s.id}: duplicate skill id`);
+      problems += 1;
+    }
+    seen.add(s.id);
+    for (const e of s.effects ?? []) {
+      if (s.status === 'mvp' && !MVP_PRIMITIVES.has(e.primitive)) {
+        fail(`skills.yaml:${s.id}: mvp skill uses ${e.primitive}, which the engine does not implement yet (mark it future)`);
+        problems += 1;
+      }
+      if (REJECTED_PRIMITIVES.has(e.primitive)) {
+        fail(`skills.yaml:${s.id}: ${e.primitive} is rejected by the guardrails (docs/03 §7)`);
+        problems += 1;
+      }
+      if (e.duration === 'permanent' && ['set_piece_type', 'override_moveset', 'ignore_blockers'].includes(e.primitive)) {
+        fail(`skills.yaml:${s.id}: a permanent ${e.primitive} silently rewrites deck value (docs/03 §7)`);
+        problems += 1;
+      }
+    }
+    if (s.target?.pieceType === 'king') {
+      fail(`skills.yaml:${s.id}: a skill may never target a king (docs/03 §7)`);
+      problems += 1;
+    }
+    if (s.target?.kind === 'enemy_piece' && !(s.target?.excludes ?? []).includes('king')) {
+      fail(`skills.yaml:${s.id}: an enemy-targeting skill must exclude the king (docs/03 §7)`);
+      problems += 1;
+    }
+  }
+  const mvp = skills.filter((s) => s.status === 'mvp').length;
+  if (problems === 0) ok(`skills.yaml: ${skills.length} skills (${mvp} mvp, ${skills.length - mvp} future) use allowed primitives`);
+}
+
 // 2a. Templates: act value band and turn-limit shape. (Checkmate is the only
 // win, so there is no material threshold to check — docs/02 §7.)
 const bossMultiplier = economy.stages?.enemyArmyValueBand?.bossMultiplier ?? 1.25;
@@ -165,7 +209,7 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
     const entries = Object.entries(t.fixedEnemy ?? {});
     const kings = entries.filter(([, type]) => type === 'king');
     if (kings.length !== 1) fail(`${t.id}: fixedEnemy must contain exactly one king, found ${kings.length}`);
-    const playerRanks = new Set([...(t.deploymentRanks ?? []), ...(t.spawnedPawns?.ranks ?? [])]);
+    const playerRanks = new Set([...(economy.rules?.deploymentRanks ?? []), ...(t.spawnedPawns?.ranks ?? [])]);
     for (const [square, type] of entries) {
       if (playerRanks.has(Number(square[1]))) fail(`${t.id}: fixed enemy ${type} on ${square} sits on a player deployment/spawn rank`);
       if (type !== 'king') {
@@ -310,8 +354,10 @@ const ceilingOf = (act) => tierRank(rarity.pool?.[`act${act}`]?.ceiling);
   if (problems === 0) ok('economy.yaml: rarity price multipliers rise with tier');
 }
 
-// 2a''. Pieces: definitions mirror data/economy.yaml, rarity abilities and
-// durability overrides respect the durability-vs-power rule (docs/06 §1).
+// 2a''. Pieces: definitions mirror data/economy.yaml. Durability is flat
+// across deck pieces (one durabilityMax for all, overrides may only lower it);
+// power is gated by spawnCost instead, whose overrides may only raise it
+// (docs/06 §1).
 const pieceDefs = new Map((docs['pieces.yaml']?.pieces ?? []).map((p) => [p.pieceType, p]));
 for (const [type, def] of pieceDefs) {
   const eco = economy.pieces?.[type];
@@ -319,7 +365,7 @@ for (const [type, def] of pieceDefs) {
     fail(`pieces.yaml:${type}: missing from data/economy.yaml → pieces`);
     continue;
   }
-  for (const key of ['value', 'cost', 'durabilityMax', 'purchasable']) {
+  for (const key of ['value', 'spawnCost', 'cost', 'durabilityMax', 'purchasable']) {
     if (eco[key] !== def[key]) fail(`pieces.yaml:${type}: ${key} ${def[key]} does not match economy.yaml (${eco[key]})`);
   }
   if (JSON.stringify(eco.durabilityMaxByRarity ?? {}) !== JSON.stringify(def.durabilityMaxByRarity ?? {})) {
@@ -330,9 +376,41 @@ for (const [type, def] of pieceDefs) {
       fail(`pieces.yaml:${type}: ${tier} durability ${d} exceeds Normal ${def.durabilityMax} — higher tiers must never be more durable`);
     }
   }
+  if (JSON.stringify(eco.spawnCostByRarity ?? {}) !== JSON.stringify(def.spawnCostByRarity ?? {})) {
+    fail(`pieces.yaml:${type}: spawnCostByRarity does not match economy.yaml`);
+  }
+  for (const [tier, c] of Object.entries(def.spawnCostByRarity ?? {})) {
+    if (typeof def.spawnCost === 'number' && c < def.spawnCost) {
+      fail(`pieces.yaml:${type}: ${tier} spawnCost ${c} is below Normal ${def.spawnCost} — a tier never makes a piece cheaper to summon`);
+    }
+  }
+}
+{
+  // Flat durability (docs/06 §1): every deck piece shares one durabilityMax.
+  const deckPieces = [...pieceDefs.values()].filter((d) => d.purchasable);
+  const maxes = new Set(deckPieces.map((d) => d.durabilityMax));
+  if (maxes.size !== 1) {
+    fail(`pieces.yaml: durability must be flat — deck pieces have durabilityMax ${[...maxes].join(', ')}; use durabilityMaxByRarity for exceptions`);
+  } else {
+    const exceptions = deckPieces.flatMap((d) =>
+      Object.entries(d.durabilityMaxByRarity ?? {}).map(([tier, v]) => `${tier} ${d.pieceType} ${v}`),
+    );
+    ok(`pieces.yaml: flat durability ${[...maxes][0]}${exceptions.length ? ` (exceptions: ${exceptions.join(', ')})` : ''}`);
+  }
+  if (pieceDefs.get('king') && pieceDefs.get('king').spawnCost !== 0) {
+    fail('pieces.yaml:king: spawnCost must be 0 (the King is always free)');
+  }
 }
 const durabilityMaxFor = (type, tier) =>
   pieceDefs.get(type)?.durabilityMaxByRarity?.[tier] ?? pieceDefs.get(type)?.durabilityMax;
+const spawnCostFor = (type, tier) =>
+  pieceDefs.get(type)?.spawnCostByRarity?.[tier] ?? pieceDefs.get(type)?.spawnCost;
+// The cheapest summon bounds how many pieces a budget can bring.
+const minSummonCost = Math.min(
+  ...[...pieceDefs.values()]
+    .filter((d) => d.purchasable)
+    .flatMap((d) => [d.spawnCost, ...Object.values(d.spawnCostByRarity ?? {})]),
+);
 ok(`pieces.yaml: ${pieceDefs.size} piece types mirror data/economy.yaml`);
 
 // Abilities are cumulative: a tier has its own entries plus every lower tier's.
@@ -495,29 +573,91 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
   if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, promotion reachable`);
 }
 
-// 2a'''''. Deployment phase, summoning and stalemate (docs/02 §3, §5, §7).
-// The player places the King and summons up to summonLimit deck pieces before
-// turn 1; the deck is locked after the first move; there is no pass; either
-// side's stalemate is a loss for the player.
+// 2a-sell. Selling deck pieces (docs/07 §4). The sell factor must stay at or
+// below the recovery discount, or buying the discounted recovery piece and
+// selling it back would print coins.
+{
+  const sell = economy.economy?.services?.sell;
+  const recovery = economy.economy?.shop?.recoveryDiscount;
+  let problems = 0;
+  if (!sell) {
+    fail('economy.yaml: economy.services.sell is missing (docs/07 §4)');
+    problems += 1;
+  } else {
+    if (!(typeof sell.priceFactor === 'number' && sell.priceFactor > 0 && sell.priceFactor < 1)) {
+      fail(`economy.yaml: economy.services.sell.priceFactor must be in (0, 1), got ${sell.priceFactor}`);
+      problems += 1;
+    } else if (typeof recovery === 'number' && sell.priceFactor > recovery) {
+      fail(`economy.yaml: economy.services.sell.priceFactor ${sell.priceFactor} exceeds recoveryDiscount ${recovery} — buy-and-sell would profit`);
+      problems += 1;
+    }
+    if (sell.rounding !== 'floor') {
+      fail('economy.yaml: economy.services.sell.rounding must be floor (a sale never rounds in the player\'s favour)');
+      problems += 1;
+    }
+    const allowedWhen = new Set(['shop', 'capacity_cut']);
+    const badWhen = (sell.when ?? []).filter((w) => !allowedWhen.has(w));
+    if (!Array.isArray(sell.when) || sell.when.length === 0 || badWhen.length > 0) {
+      fail(`economy.yaml: economy.services.sell.when must list only shop / capacity_cut${badWhen.length ? `, got ${badWhen.join(', ')}` : ''}`);
+      problems += 1;
+    }
+    for (const must of ['king', 'spent']) {
+      if (!(sell.excludes ?? []).includes(must)) {
+        fail(`economy.yaml: economy.services.sell.excludes must include ${must}`);
+        problems += 1;
+      }
+    }
+  }
+  if (problems === 0) ok(`economy.yaml: pieces sell for ${sell.priceFactor} of their current price (≤ recovery ${recovery}), in ${sell.when.join(' and ')}`);
+}
+
+// 2a'''''. Deployment phase, spawn points and stalemate (docs/02 §3, §5, §7).
+// The player places the King (free) and summons deck pieces whose total
+// spawnCost fits the stage's spawn points, on ranks 1-4 only; the deck is
+// locked after the first move; there is no pass; either side's stalemate is a
+// loss for the player.
 {
   const r = economy.rules ?? {};
   let problems = 0;
-  for (const stale of ['deploymentsPerTurn', 'openingPlacements', 'stalemateBehavior']) {
-    if (stale in r) {
-      fail(`economy.yaml: rules.${stale} was removed (Deployment phase replaces it, docs/02 §5)`);
+  const stale = {
+    deploymentsPerTurn: 'the Deployment phase replaces it, docs/02 §5',
+    openingPlacements: 'the Deployment phase replaces it, docs/02 §5',
+    stalemateBehavior: 'rules.stalemate replaces it, docs/02 §7',
+    summonLimit: 'rules.spawnPoints replaces it, docs/02 §5',
+  };
+  for (const [key, why] of Object.entries(stale)) {
+    if (key in r) {
+      fail(`economy.yaml: rules.${key} was removed (${why})`);
       problems += 1;
     }
   }
-  let previous = -1;
+  // The deployment ranks are exactly the player's half of the board.
+  const half = Array.from({ length: (r.boardSize ?? 8) / 2 }, (_, i) => i + 1);
+  if (JSON.stringify(r.deploymentRanks) !== JSON.stringify(half)) {
+    fail(`economy.yaml: rules.deploymentRanks must be the player's half [${half.join(', ')}], got ${JSON.stringify(r.deploymentRanks)}`);
+    problems += 1;
+  }
+  const previous = { normal: -1, boss: -1 };
   for (let act = 1; act <= actCount; act++) {
-    const limit = r.summonLimit?.[`act${act}`];
-    if (!Number.isInteger(limit) || limit < 0 || limit > (economy.deck?.capacity ?? 8)) {
-      fail(`economy.yaml: rules.summonLimit.act${act} must be an integer in 0..deck capacity`);
+    const sp = r.spawnPoints?.[`act${act}`] ?? {};
+    for (const tier of ['normal', 'boss']) {
+      const v = sp[tier];
+      if (!Number.isInteger(v) || v < minSummonCost) {
+        fail(`economy.yaml: rules.spawnPoints.act${act}.${tier} must be an integer >= the cheapest summon (${minSummonCost})`);
+        problems += 1;
+      } else if (v < previous[tier]) {
+        fail(`economy.yaml: rules.spawnPoints.act${act}.${tier} (${v}) is below act ${act - 1} (${previous[tier]})`);
+        problems += 1;
+      } else previous[tier] = v;
+    }
+    if (Number.isInteger(sp.normal) && Number.isInteger(sp.boss) && sp.boss < sp.normal) {
+      fail(`economy.yaml: rules.spawnPoints.act${act}.boss (${sp.boss}) is below its normal stages (${sp.normal})`);
       problems += 1;
-    } else if (limit < previous) {
-      fail(`economy.yaml: rules.summonLimit.act${act} (${limit}) is below act ${act - 1} (${previous})`);
-      problems += 1;
-    } else previous = limit;
+    }
+  }
+  if (r.spawnPointsCarryOver !== false) {
+    fail('economy.yaml: rules.spawnPointsCarryOver must be false (unspent points are lost at Start)');
+    problems += 1;
   }
   if (r.summonCostsDurability !== 1) {
     fail('economy.yaml: rules.summonCostsDurability must be 1 (durability = stages a piece can be brought, I7)');
@@ -535,27 +675,37 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
     fail('economy.yaml: rules.stalemate must be player_loses (docs/02 §7)');
     problems += 1;
   }
-  if (problems === 0) ok(`economy.yaml: summon limits ${[1, 2, 3].map((a) => r.summonLimit[`act${a}`]).join('/')}, deck locked after Start, no pass, stalemate loses`);
+  if (problems === 0) {
+    const budgets = [1, 2, 3].map((a) => `${r.spawnPoints[`act${a}`].normal}/${r.spawnPoints[`act${a}`].boss}`).join(' · ');
+    ok(`economy.yaml: spawn points ${budgets} on ranks ${r.deploymentRanks[0]}–${r.deploymentRanks.at(-1)}, deck locked after Start, no pass, stalemate loses`);
+  }
 
+  const deployRanks = r.deploymentRanks ?? [];
   for (const t of docs['templates.yaml']?.templates ?? []) {
-    const actLimit = r.summonLimit?.[`act${t.act}`];
-    const limit = t.summonLimit ?? actLimit;
-    if (t.summonLimit !== undefined && actLimit !== undefined && t.summonLimit > actLimit) {
-      fail(`${t.id}: summonLimit ${t.summonLimit} raises act ${t.act}'s limit ${actLimit}; a template may only lower it`);
+    const actBudget = r.spawnPoints?.[`act${t.act}`]?.[t.tier];
+    const budget = t.spawnPoints ?? actBudget;
+    if (t.spawnPoints !== undefined && actBudget !== undefined && t.spawnPoints > actBudget) {
+      fail(`${t.id}: spawnPoints ${t.spawnPoints} raises act ${t.act} ${t.tier}'s budget ${actBudget}; a template may only lower it`);
       continue;
     }
-    // King + every summon need a square in the deployment ranks.
-    const squares = 8 * (t.deploymentRanks ?? []).length;
-    if (limit !== undefined && squares < limit + 1) {
-      fail(`${t.id}: ${squares} deployment squares cannot hold the King plus ${limit} summons`);
+    // The player's half belongs to the player: no enemy may start there.
+    const enemyClash = (t.enemyZone ?? []).filter((rank) => deployRanks.includes(rank));
+    if (enemyClash.length > 0) {
+      fail(`${t.id}: enemyZone includes deployment rank(s) ${enemyClash.join(', ')}; the enemy starts on ranks 5-8 only`);
       continue;
     }
-    const clash = (t.spawnedPawns?.ranks ?? []).filter((rank) => (t.deploymentRanks ?? []).includes(rank));
-    if (clash.length > 0) {
-      fail(`${t.id}: spawnedPawns.ranks overlap deploymentRanks on rank(s) ${clash.join(', ')}`);
+    // King + the most summons the budget allows need free squares; spawned
+    // pawns on a deployment rank take squares away.
+    const pawnsInZone = (t.spawnedPawns?.ranks ?? []).some((rank) => deployRanks.includes(rank))
+      ? (t.spawnedPawns?.count?.[1] ?? 0)
+      : 0;
+    const squares = 8 * deployRanks.length - pawnsInZone;
+    const maxSummons = Math.floor((budget ?? 0) / minSummonCost);
+    if (budget !== undefined && squares < maxSummons + 1) {
+      fail(`${t.id}: ${squares} free deployment squares cannot hold the King plus ${maxSummons} summons`);
       continue;
     }
-    ok(`${t.id}: King + ${limit} summon(s) fit the deployment ranks`);
+    ok(`${t.id}: ${budget} spawn points (up to ${maxSummons} summons) fit ranks ${deployRanks[0]}–${deployRanks.at(-1)}`);
   }
 }
 
@@ -679,21 +829,25 @@ if (stage) {
   }
 
   // Deployment phase: only Stage Pieces stand on the board. Action phase: the
-  // King is present and at most summonLimit other Hero Pieces were summoned.
+  // Hero Pieces still on the board cost no more than the stage's spawn points
+  // (captured summons only lower the sum).
   const heroes = pieces.filter(([, p]) => p.color === 'white' && p.instanceId && p.pieceType !== 'king');
   if (stage.phase === 'deployment') {
     const placed = pieces.filter(([, p]) => p.color === 'white' && p.instanceId);
     if (placed.length > 0) fail(`stage-state.yaml: deployment phase, but Hero Pieces are already on ${placed.map(([sq]) => sq).join(', ')}`);
-  } else if (heroes.length > (stage.summonLimit ?? 0)) {
-    fail(`stage-state.yaml: ${heroes.length} summoned Hero Pieces exceed summonLimit ${stage.summonLimit} (I15)`);
   } else {
-    ok(`stage-state.yaml: ${heroes.length} of ${stage.summonLimit} summons on the board`);
+    const spent = heroes.reduce((sum, [, p]) => sum + (spawnCostFor(p.pieceType, p.rarity ?? 'normal') ?? 0), 0);
+    if (spent > (stage.spawnPoints ?? 0)) {
+      fail(`stage-state.yaml: summoned Hero Pieces cost ${spent} spawn points, over the stage's ${stage.spawnPoints} (I15)`);
+    } else {
+      ok(`stage-state.yaml: summons on the board cost ${spent} of ${stage.spawnPoints} spawn points`);
+    }
   }
   {
     const tpl = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
-    const expected = tpl ? (tpl.summonLimit ?? economy.rules?.summonLimit?.[`act${tpl.act}`]) : undefined;
-    if (expected !== undefined && stage.summonLimit !== expected) {
-      fail(`stage-state.yaml: summonLimit ${stage.summonLimit} does not match template ${tpl.id}'s ${expected}`);
+    const expected = tpl ? (tpl.spawnPoints ?? economy.rules?.spawnPoints?.[`act${tpl.act}`]?.[tpl.tier]) : undefined;
+    if (expected !== undefined && stage.spawnPoints !== expected) {
+      fail(`stage-state.yaml: spawnPoints ${stage.spawnPoints} does not match template ${tpl.id}'s ${expected}`);
     }
     if ((stage.status === 'active') !== (stage.endReason === undefined)) {
       fail('stage-state.yaml: endReason must be present exactly when status is not active');
@@ -720,8 +874,8 @@ if (stage) {
   if (stage.playerColor === 'white' && whiteKings.length === 1) {
     const [kingSquare] = whiteKings[0];
     const rank = Number(kingSquare[1]);
-    if (!(stage.deploymentRanks ?? []).includes(rank)) {
-      fail(`stage-state.yaml: player king on ${kingSquare} is outside deployment ranks ${stage.deploymentRanks}`);
+    if (stage.turnsUsed === 0 && !(economy.rules?.deploymentRanks ?? []).includes(rank)) {
+      fail(`stage-state.yaml: player king on ${kingSquare} is outside deployment ranks ${economy.rules?.deploymentRanks}`);
     }
   }
 
