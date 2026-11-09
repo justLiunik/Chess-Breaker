@@ -1434,6 +1434,7 @@ exports[`golden commitQueue scenarios > err invariant_violation without a White 
 exports[`golden commitQueue scenarios > err king_in_check_at_end 1`] = `
 {
   "error": {
+    "afterRevert": false,
     "checkers": [
       "h8",
     ],

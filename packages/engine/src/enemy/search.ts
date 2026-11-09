@@ -305,12 +305,14 @@ function hashable(turns: number): boolean {
  * Scores every legal Black move at the root, Black to move, in the stable order (captures by most
  * valuable victim / least valuable attacker, then checks, then from-index, then to-index). Moves that
  * tie the best score get exact scores; every other move gets an upper bound below the best.
+ * `frozen` (Lockdown) removes the moves of the pieces it marks at the root only: deeper plies are
+ * later turns, when the suppression has expired.
  */
 export function scoreRootMoves(
-  board: Int8Array, playerTurnsLeft: number, depth: number, config: EngineConfig,
+  board: Int8Array, playerTurnsLeft: number, depth: number, config: EngineConfig, frozen?: Uint8Array,
 ): { move: Move; score: number }[] {
   const b = board.slice();
-  const moves = legalMoves(b, 'black');
+  const moves = legalMoves(b, 'black', frozen);
   if (moves.length === 0) return [];
 
   const pv = config.pieceValues;

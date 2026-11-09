@@ -8,6 +8,7 @@ import { hash } from './rng';
 import { KING, PAWN, fromBoard } from './position';
 import { toSquare } from './square';
 import { applySkill, checkSkill } from './skills/check';
+import { pieceId } from './skills/registry';
 
 type Board = StageState['board'];
 
@@ -112,7 +113,10 @@ export function resolveQueue(
     ctx.moveCredits--;
   }
 
-  // R1 (expiry and revert of this_turn modifiers) arrives with the modifier stack.
+  // R1: this_turn modifiers expire before anything is judged (docs/02 §6).
+  const preRevert = ctx.board;
+  events.push(...expireAtR1(ctx));
+
   // R2: structural invariants on the end state.
   const b = fromBoard(ctx.board);
   for (const [color, code] of [['white', KING], ['black', -KING]] as const) {
@@ -126,7 +130,7 @@ export function resolveQueue(
     }
   }
 
-  // I2: the White king must not be attacked at the end of the queue.
+  // I2, on the reverted board: the White king must not be attacked at the end of the queue.
   const k = b.indexOf(KING);
   if (isAttacked(b, k, 'black')) {
     const checkers: number[] = [];
@@ -136,9 +140,13 @@ export function resolveQueue(
       const probe = b.map((v, j) => (v < 0 && j !== i ? PAWN : v)) as unknown as Int8Array;
       if (isAttacked(probe, k, 'black')) checkers.push(i);
     }
+    // The pre-revert board has no White king only if the king itself was transformed.
+    const before = fromBoard(preRevert);
+    const kb = before.indexOf(KING);
+    const afterRevert = kb < 0 || !isAttacked(before, kb, 'black');
     return {
       ok: false,
-      error: { kind: 'king_in_check_at_end', square: toSquare(k), checkers: checkers.map(toSquare) },
+      error: { kind: 'king_in_check_at_end', square: toSquare(k), checkers: checkers.map(toSquare), afterRevert },
     };
   }
 
@@ -153,4 +161,36 @@ export function resolveQueue(
       events,
     },
   };
+}
+
+/**
+ * R1: every `this_turn` modifier expires, and the piece carrying its `transformed.modifierId`
+ * reverts. A modifier whose target is no longer on the board (captured in the queue) is dropped
+ * without a revert. Other modifiers stay, unless their target is gone: a suppressed piece the
+ * player captured has nothing left to suppress.
+ */
+function expireAtR1(ctx: QueueCtx): GameEvent[] {
+  if (ctx.modifiers.length === 0) return [];
+  const events: GameEvent[] = [];
+  const board: Board = { ...ctx.board };
+  const onBoard = new Set(Object.values(board).map(pieceId));
+  const kept: StageState['modifiers'] = [];
+  for (const m of ctx.modifiers) {
+    if (m.duration === 'this_turn') {
+      const sq = Object.keys(board).find((s) => board[s]!.transformed?.modifierId === m.modifierId);
+      if (sq !== undefined) {
+        const { transformed: _, ...piece } = board[sq]!;
+        board[sq] = piece;
+        events.push({ type: 'transform_reverted', target: pieceId(piece) });
+      }
+      events.push({ type: 'modifier_expired', modifierId: m.modifierId });
+    } else if (m.target !== undefined && !onBoard.has(m.target)) {
+      events.push({ type: 'modifier_expired', modifierId: m.modifierId });
+    } else {
+      kept.push(m);
+    }
+  }
+  ctx.board = board;
+  ctx.modifiers = kept;
+  return events;
 }

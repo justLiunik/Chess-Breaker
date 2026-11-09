@@ -1,5 +1,9 @@
-import type { ActiveModifier, BoardPiece, GameEvent, Square } from '../types';
+import type { ActiveModifier, BoardPiece, GameEvent, Square, StageState } from '../types';
 import type { QueueCtx } from '../queue';
+import { toIndex } from '../square';
+
+/** The id a modifier targets: a Hero Piece's `instanceId`, else a Stage Piece's `stageId`. */
+export const pieceId = (p: BoardPiece): string => p.instanceId ?? p.stageId ?? '';
 
 export interface SkillEffect {
   primitive: ActiveModifier['primitive'];
@@ -69,3 +73,20 @@ export const PRIMITIVES: Record<ActiveModifier['primitive'], Handler | undefined
   reveal_intent: undefined,
   add_plan_undo: undefined,
 };
+
+/**
+ * 1 on the square of every piece a live `suppress_piece` modifier targets, found by id on the
+ * current board (pieces move; a target no longer on the board freezes nothing).
+ */
+export function frozenMask(stage: StageState): Uint8Array {
+  const mask = new Uint8Array(64);
+  const ids = new Set<string>();
+  for (const m of stage.modifiers) {
+    if (m.primitive === 'suppress_piece' && m.target !== undefined) ids.add(m.target);
+  }
+  if (ids.size === 0) return mask;
+  for (const [sq, piece] of Object.entries(stage.board)) {
+    if (ids.has(pieceId(piece))) mask[toIndex(sq)] = 1;
+  }
+  return mask;
+}

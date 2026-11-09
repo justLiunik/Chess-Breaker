@@ -7,6 +7,7 @@ import { hash } from './rng';
 import { KING, fromBoard } from './position';
 import { toSquare } from './square';
 import { resolveQueue } from './queue';
+import { frozenMask } from './skills/registry';
 
 export function simulate(
   run: RunState,
@@ -20,11 +21,11 @@ export function simulate(
   let nextRun = resolved.value.run;
   let next: StageState = resolved.value.stage;
 
-  // R3: evaluate Black's position.
+  // R3: evaluate Black's position, with suppressed pieces unable to move.
   const b = fromBoard(next.board);
   const checked = inCheck(b, 'black');
   let award: Award | null = null;
-  if (legalMoves(b, 'black').length === 0) {
+  if (legalMoves(b, 'black', frozenMask(next)).length === 0) {
     if (checked) {
       next = { ...next, status: 'won', endReason: 'checkmate' };
     } else {
@@ -79,8 +80,8 @@ function loseInstance(
 }
 
 /**
- * `simulate` followed by the enemy's reply (R5) and the start of the next turn. A stage that
- * `simulate` already ended gets no reply.
+ * `simulate` (Resolve to R4) followed by the enemy's reply (R5), the expiry of next_enemy_turn
+ * modifiers, and the start of the next turn. A stage that `simulate` already ended gets no reply.
  */
 export function commitQueue(
   run: RunState,
@@ -95,7 +96,7 @@ export function commitQueue(
   let next: StageState = sim.value.stage;
   let nextRun = sim.value.run;
 
-  // R5: the enemy replies.
+  // R5: the enemy replies; suppressed pieces do not move.
   const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
   if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
     events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
@@ -127,8 +128,12 @@ export function commitQueue(
     }
     next = { ...next, board };
   }
+  // After R5: next_enemy_turn modifiers expire.
+  const expired = next.modifiers.filter((m) => m.duration === 'next_enemy_turn');
+  for (const m of expired) events.push({ type: 'modifier_expired', modifierId: m.modifierId });
   next = {
     ...next,
+    modifiers: expired.length === 0 ? next.modifiers : next.modifiers.filter((m) => m.duration !== 'next_enemy_turn'),
     enemyPolicy: picked.policy,
     moveCredits: config.rules.freeMovesPerTurn,
     focus: next.focusPool,

@@ -1,10 +1,8 @@
-import type { Action, BoardPiece, CommitError, EngineConfig, GameEvent, Rarity } from '../types';
+import type { Action, CommitError, EngineConfig, GameEvent, Rarity } from '../types';
 import type { QueueCtx } from '../queue';
-import { PRIMITIVES } from './registry';
+import { PRIMITIVES, pieceId } from './registry';
 
 type SkillAction = Extract<Action, { type: 'ACTIVATE_SKILL' }>;
-
-const pieceId = (p: BoardPiece): string => p.instanceId ?? p.stageId ?? '';
 
 /** Spec §8.1: the checks for one ACTIVATE_SKILL, in order, against the queue's state at this step. */
 export function checkSkill(

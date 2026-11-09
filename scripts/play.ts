@@ -109,6 +109,8 @@ function eventText(e: GameEvent): string {
     case 'skill_activated': return `skill ${e.skillId} activated` + (e.target ? ` on ${e.target}` : '');
     case 'piece_transformed': return `${e.target} becomes a ${e.pieceType}`;
     case 'piece_suppressed': return `${e.target} is suppressed`;
+    case 'transform_reverted': return `${e.target} reverts to its own type`;
+    case 'modifier_expired': return `modifier ${e.modifierId} expires`;
   }
 }
 

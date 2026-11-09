@@ -180,15 +180,29 @@ describe('ACTIVATE_SKILL effects', () => {
     // c1 -> c5 is a queen's file move, impossible for a bishop.
     const r = simulate(deepFreeze(runWith('ascension')), s, [skill('ascension', 'c1'), mv('c1', 'c5')], config);
     if (!r.ok) throw new Error(JSON.stringify(r.error));
-    expect(r.value.stage.board.c5).toMatchObject({
-      pieceType: 'bishop', transformed: { pieceType: 'queen', modifierId: 'm1_0' },
+    // R1 has reverted the transform and expired its this_turn modifier by the end of the queue.
+    expect(r.value.stage.board.c5).toEqual({ pieceType: 'bishop', color: 'white', instanceId: id });
+    expect(r.value.stage.modifiers).toEqual([]);
+    expect(r.value.events).toContainEqual({ type: 'piece_transformed', target: id, pieceType: 'queen' });
+    expect(r.value.events).toContainEqual({ type: 'transform_reverted', target: id });
+    expect(r.value.events).toContainEqual({ type: 'modifier_expired', modifierId: 'm1_0' });
+    expect(refused(runWith('twin_step'), s, [mv('c1', 'c5')])).toMatchObject({ kind: 'illegal_move' });
+  });
+  it('set_piece_type records a this_turn modifier on the instanceId (seen before R1 expires it)', () => {
+    const s = stage();
+    const piece = s.board.c1!;
+    const ctx = {
+      run: runWith('ascension'), board: s.board, focus: 3, moveCredits: 1, modifiers: [], skillLog: [], turn: 1,
+    };
+    const effect = config.skills.ascension!.effects[0]!;
+    PRIMITIVES.set_piece_type!(ctx, {
+      skillId: 'ascension', effect, modifierId: 'm1_0', target: { square: 'c1', piece, id: piece.instanceId! },
     });
-    expect(r.value.stage.modifiers).toEqual([{
-      modifierId: 'm1_0', primitive: 'set_piece_type', source: 'ascension', target: id,
+    expect(ctx.modifiers).toEqual([{
+      modifierId: 'm1_0', primitive: 'set_piece_type', source: 'ascension', target: piece.instanceId,
       duration: 'this_turn', appliedOnTurn: 1,
     }]);
-    expect(r.value.events).toContainEqual({ type: 'piece_transformed', target: id, pieceType: 'queen' });
-    expect(refused(runWith('twin_step'), s, [mv('c1', 'c5')])).toMatchObject({ kind: 'illegal_move' });
+    expect(ctx.board.c1).toEqual({ ...piece, transformed: { pieceType: 'queen', modifierId: 'm1_0' } });
   });
   it('the registry implements exactly the three MVP primitives', () => {
     const implemented = Object.entries(PRIMITIVES).filter(([, h]) => h).map(([p]) => p).sort();

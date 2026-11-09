@@ -65,7 +65,7 @@ describe('resolveQueue errors', () => {
   it('king_in_check_at_end lists every checker sorted by index', () => {
     const s = stageOf({ e1: 'K', h8: 'k', e8: 'r', h4: 'b', a2: 'P' });
     const r = resolveQueue(run, s, [mv('a2', 'a3')], config);
-    expect(r).toEqual({ ok: false, error: { kind: 'king_in_check_at_end', square: 'e1', checkers: ['h4', 'e8'] } });
+    expect(r).toEqual({ ok: false, error: { kind: 'king_in_check_at_end', square: 'e1', checkers: ['h4', 'e8'], afterRevert: false } });
   });
   it('a piece behind another Black piece is not a checker', () => {
     const s = stageOf({ e1: 'K', h8: 'k', e5: 'r', e8: 'r', a2: 'P' });
@@ -82,7 +82,7 @@ describe('resolveQueue deferred validation', () => {
   });
   it('refuses the same first move alone', () => {
     const r = resolveQueue(run, s(), [mv('e1', 'd2')], config);
-    expect(r).toEqual({ ok: false, error: { kind: 'king_in_check_at_end', square: 'd2', checkers: ['d8'] } });
+    expect(r).toEqual({ ok: false, error: { kind: 'king_in_check_at_end', square: 'd2', checkers: ['d8'], afterRevert: false } });
   });
 });
 

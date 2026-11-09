@@ -88,8 +88,13 @@ export function legalMovesInPlace(b: Int8Array, color: Color, out: Move[], sf: S
   return out;
 }
 
-export function legalMoves(b: Int8Array, color: Color): Move[] {
-  return legalMovesInPlace(b.slice(), color, []);
+/**
+ * The legal moves of `color`. With `frozen`, a piece on a square where `frozen[i]` is 1 has no
+ * moves (Lockdown); it still attacks, blocks and can be captured, so other moves are unaffected.
+ */
+export function legalMoves(b: Int8Array, color: Color, frozen?: Uint8Array): Move[] {
+  const moves = legalMovesInPlace(b.slice(), color, []);
+  return frozen ? moves.filter((m) => frozen[m.from] !== 1) : moves;
 }
 
 /**

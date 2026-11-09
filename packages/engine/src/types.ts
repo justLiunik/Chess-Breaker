@@ -109,7 +109,13 @@ export type Action =
 export type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
 
 export type CommitError =
-  | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[] }
+  | {
+      kind: 'king_in_check_at_end';
+      square: Square;
+      checkers: Square[];
+      /** True when the King is attacked only on the board R1 reverted, not before the revert. */
+      afterRevert: boolean;
+    }
   | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
   | { kind: 'credits_exceeded'; atStep: number }
   | { kind: 'empty_queue' }
@@ -148,7 +154,9 @@ export type GameEvent =
   | { type: 'stage_started' }
   | { type: 'skill_activated'; skillId: string; target?: Square }
   | { type: 'piece_transformed'; target: string; pieceType: PieceType }
-  | { type: 'piece_suppressed'; target: string };
+  | { type: 'piece_suppressed'; target: string }
+  | { type: 'transform_reverted'; target: string }
+  | { type: 'modifier_expired'; modifierId: string };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
