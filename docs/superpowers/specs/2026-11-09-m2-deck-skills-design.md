@@ -170,7 +170,8 @@ then `stage_started`.
   queen whose tier has `lifeline` and whose `usedOnce` lacks it: then it stays, `status: 'captured'`,
   `usedOnce` gains `lifeline`, and `lifeline_saved` is emitted.
 - **A spawned pawn promotes.** A new instance joins `run.deck` immediately: `instanceId =
-  'p_' + hash(stageSeed, turnsUsed, square).toString(16)`, `pieceType` and `rarity` from
+  'p_' + hash(stageSeed, turnsUsed, atStep, square).toString(16)` (the queue step keeps two
+  promotions on one square in one turn, possible with Twin Step, apart), `pieceType` and `rarity` from
   `promotesTo`, full `durabilityMax` for that type and tier, `origin: 'promotion'`,
   `acquiredAtStage = actIndex * 3 + stageIndex`, `status: 'in_deck'`. It cannot be summoned this
   stage: `startStage` refuses outside the Deployment phase. The deck may exceed capacity until
