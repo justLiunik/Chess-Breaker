@@ -137,9 +137,66 @@ export type GameEvent =
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
+export type DeckType = 'knight' | 'bishop' | 'rook' | 'queen';
+
+export interface AbilityFlags {
+  /** 0 none · 1 may pass allies, no capture after · 2 may capture after */
+  leapAllies: 0 | 1 | 2;
+  /** Extra (df, dr) offsets, every symmetric image listed. */
+  leapers: [number, number][];
+  extraRays: ('orthogonal' | 'diagonal')[];
+  /** 0 none · 1 only on a move that passed no ally · 2 any move */
+  multiCapture: 0 | 1 | 2;
+  bonusSelfMove: boolean;
+  lifeline: boolean;
+}
+
+/** Cumulative abilities by tier index (normal, rare, unique, legendary). */
+export type AbilityTable = Record<DeckType, [AbilityFlags, AbilityFlags, AbilityFlags, AbilityFlags]>;
+
+export interface SkillDef {
+  id: string;
+  status: 'mvp' | 'future';
+  cost: number;
+  charges: number;
+  price: number;
+  target: {
+    kind: 'none' | 'own_piece' | 'enemy_piece' | 'board_square';
+    pieceType?: PieceType;
+    excludes?: PieceType[];
+    excludesRarity?: Rarity[];
+    must_be_on_board?: boolean;
+  };
+  effects: {
+    primitive: ActiveModifier['primitive'];
+    params?: Record<string, unknown>;
+    duration: ActiveModifier['duration'];
+  }[];
+  restrictions: ('once_per_turn' | 'distinct_targets' | 'requires_bishop_on_board')[];
+}
+
 export interface EngineConfig {
   /** `focusPool` is the default pool for stage generation (M3); the engine reads `stage.focusPool`. */
-  rules: { freeMovesPerTurn: number; focusPool: number; minMovesPerQueue: number };
+  rules: {
+    freeMovesPerTurn: number;
+    focusPool: number;
+    minMovesPerQueue: number;
+    deploymentRanks: number[];
+    summonCostsDurability: number;
+    spawnPoints: Record<'act1' | 'act2' | 'act3', { normal: number; boss: number }>;
+  };
+  pieces: Record<
+    'king' | DeckType,
+    {
+      spawnCost: number;
+      spawnCostByRarity: Partial<Record<Rarity, number>>;
+      durabilityMax: number | null;
+      durabilityMaxByRarity: Partial<Record<Rarity, number>>;
+    }
+  >;
+  abilities: AbilityTable;
+  skills: Record<string, SkillDef>;
+  deck: { capacity: number };
   pieceValues: Record<PieceType, number>;
   economy: {
     baseReward: { act1: number; act2: number; act3: number; bossMultiplier: number };

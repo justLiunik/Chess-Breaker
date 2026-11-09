@@ -17,9 +17,25 @@ describe('loadEngineConfig', () => {
     expect(config.enemyAI.search.quiescenceMaxDepth).toBe(2);
   });
 
+  it('maps rules, deck, pieces and skills', () => {
+    expect(config.rules.deploymentRanks).toEqual([1, 2, 3, 4]);
+    expect(config.rules.spawnPoints.act3.boss).toBe(18);
+    expect(config.rules.summonCostsDurability).toBe(1);
+    expect(config.skills.ascension?.target.excludesRarity).toEqual(['legendary']);
+    expect(config.deck.capacity).toBe(8);
+    expect(config.pieces.king.durabilityMax).toBeNull();
+    expect(config.pieces.queen.durabilityMaxByRarity.legendary).toBe(1);
+  });
+
+  it('throws an error naming a missing skills.yaml', () => {
+    expect(() => loadEngineConfig(undefined, undefined, '/nonexistent/skills.yaml')).toThrow(/skills\.yaml/);
+  });
+
   it('is deep-frozen', () => {
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.enemyAI.weights)).toBe(true);
+    expect(Object.isFrozen(config.skills.ascension?.target)).toBe(true);
+    expect(Object.isFrozen(config.abilities.knight[1].leapers)).toBe(true);
   });
 
   it('throws a named error when a section is missing', () => {
