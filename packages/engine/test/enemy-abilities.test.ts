@@ -119,20 +119,22 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
   it('make/unmake restores b and t exactly over a full search', () => {
     // Walks every line of the search's own generators three plies deep, Black first, on tier
     // boards, counting (not asserting per node, for speed) every departure from exact restoration.
-    const n = { nodes: 0, multi: 0, tieredCaptures: 0, bad: 0 };
+    const n = { nodes: 0, multi: 0, tieredCaptures: 0, whiteVanishes: 0, blackPromotesOnTier: 0, bad: 0 };
     const same = (x: Int8Array, y: Int8Array): boolean => x.every((v, i) => v === y[i]);
     const walk = (b: Int8Array, t: Int8Array, black: boolean, depth: number): void => {
       n.nodes++;
       // A tier sits only under a White piece.
       for (let sq = 0; sq < 64; sq++) if (b[sq]! <= 0 && t[sq] !== 0) n.bad++;
       if (depth === 0) return;
-      const moves: Move[] = legalMovesInPlace(b, black ? 'black' : 'white', [], newSafety(t, config.abilities));
+      const moves: Move[] = legalMovesInPlace(b, black ? 'black' : 'white', [], newSafety({ t, table: config.abilities }));
       for (const m of moves) {
         const bb = b.slice();
         const tt = t.slice();
         const key = zobristKey(b, black, 5, t);
         if (m.via >= 0) n.multi++;
         if (black && m.captured > 0 && t[m.to]! > 0) n.tieredCaptures++;
+        if (!black && m.promotion === 'removed') n.whiteVanishes++;
+        if (black && m.promotion === 'queen' && m.captured > 0 && t[m.to]! > 0) n.blackPromotesOnTier++;
         const saved = makeMoveTiered(b, t, m);
         if (b[m.to]! > 0 && t[m.to] !== tt[m.from]) n.bad++;
         walk(b, t, !black, depth - 1);
@@ -146,8 +148,10 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
       boards.push({ b: randomBoard('enemy-tier-walk', i, { tiers: t }), t });
     }
     // Multi-captures: the double-capture position, and the benchmark boards at Legendary.
+    // Promotions: a White pawn vanishing on c8, and axb1=Q taking a Rare rook.
     const stages = [
       stageWith({ g1: 'K', d1: 'Q:legendary', h8: 'k', d5: 'p', e6: 'p', d6: 'r', g7: 'p', h7: 'p' }),
+      stageWith({ h1: 'K', b1: 'R:rare', c7: 'P', h8: 'k', a2: 'p' }),
       ...RARITY_FENS.filter((r) => r.rarity === 'legendary').map((r) => rarityStage(r.fen, r.rarity)),
     ];
     for (const st of stages) boards.push({ b: fromBoard(st.board), t: tiersOf(st.board) });
@@ -163,6 +167,8 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
     expect(n.nodes).toBeGreaterThan(10_000);
     expect(n.multi).toBeGreaterThan(0);
     expect(n.tieredCaptures).toBeGreaterThan(0);
+    expect(n.whiteVanishes).toBeGreaterThan(0);
+    expect(n.blackPromotesOnTier).toBeGreaterThan(0);
   }, 120_000);
 
   it('Zobrist keys: tier-free keys are the M1 keys; a tier changes the key', () => {

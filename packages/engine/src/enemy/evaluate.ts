@@ -82,6 +82,17 @@ function markRays(b: Int8Array, set: number[][]): void {
   }
 }
 
+/** The weighted sum of the evaluation terms (docs/02 §8.1), shared by both evaluators. */
+function score(
+  w: EvalTable, escape: number, zoneAttacked: number, check: boolean, material: number, mobility: number,
+): number {
+  return escape * w.kingEscapeSquare
+    + zoneAttacked * w.kingZoneAttacked
+    + (check ? w.kingInCheck : 0)
+    + material * w.materialPerPoint
+    + mobility * w.mobilityPerMove;
+}
+
 /**
  * `evaluate` on a board it may use as scratch (restored before it returns). One pass sums the
  * material and marks every square White attacks (the same squares `isAttacked(…, 'white')` reports),
@@ -143,11 +154,7 @@ export function evaluateInPlace(b: Int8Array, w: EvalTable, t: Int8Array | null 
     }
   }
 
-  return escape * w.kingEscapeSquare
-    + zoneAttacked * w.kingZoneAttacked
-    + (check ? w.kingInCheck : 0)
-    + material * w.materialPerPoint
-    + mobility * w.mobilityPerMove;
+  return score(w, escape, zoneAttacked, check, material, mobility);
 }
 
 const TIERED_SAFETY = newSafety();
@@ -213,11 +220,7 @@ function evaluateTiered(b: Int8Array, w: EvalTable, t: Int8Array): number {
     }
   }
 
-  return escape * w.kingEscapeSquare
-    + zoneAttacked * w.kingZoneAttacked
-    + (check ? w.kingInCheck : 0)
-    + material * w.materialPerPoint
-    + mobility * w.mobilityPerMove;
+  return score(w, escape, zoneAttacked, check, material, mobility);
 }
 
 /** Whether lifting the Black piece on `sq` leaves the Black king on `k` attacked, abilities included. */

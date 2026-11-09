@@ -29,7 +29,7 @@ export function enemyMove(stage: StageState, seed: number, config: EngineConfig)
   const b = fromBoard(stage.board);
   const t = tiersOf(stage.board);
   const frozen = frozenMask(stage);
-  const legal = legalMoves(b, 'black', frozen, t, config.abilities);
+  const legal = legalMoves(b, 'black', frozen, { t, table: config.abilities });
   if (legal.length === 0) return { move: null, policy: { ...policy } };
   const fallbackDepth = config.enemyAI.search.defaultFallbackDepth;
 

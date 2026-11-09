@@ -24,15 +24,18 @@ function kingSquare(b: Int8Array, color: Color): number {
   return b.indexOf(code);
 }
 
+/** White's tier array beside a board, with the ability table it is read with. */
+export type Tiers = { t: Int8Array; table: AbilityTable };
+
 /**
- * Whether `color`'s king is attacked. With White's tier array `t` and the ability `table`, Black's
- * king is attacked as White's rarity abilities allow (docs/02 §2.3); White's never depends on them.
+ * Whether `color`'s king is attacked. With White's `tiers`, Black's king is attacked as White's
+ * rarity abilities allow (docs/02 §2.3); White's never depends on them.
  */
-export function inCheck(b: Int8Array, color: Color, t?: Int8Array, table?: AbilityTable): boolean {
+export function inCheck(b: Int8Array, color: Color, tiers?: Tiers): boolean {
   const k = kingSquare(b, color);
   if (k < 0) return false;
-  if (color === 'black' && t !== undefined && table !== undefined && hasTiers(t)) {
-    return abilityAttacked(b, t, k, table);
+  if (color === 'black' && tiers !== undefined && hasTiers(tiers.t)) {
+    return abilityAttacked(b, tiers.t, k, tiers.table);
   }
   return attackedBy(b, k, color === 'white' ? -1 : 1);
 }
@@ -59,10 +62,10 @@ export type Safety = {
   table: AbilityTable | null;
 };
 
-/** Legality scratch; ability-aware when given a tier array that has a tier, and the ability `table`. */
-export function newSafety(t?: Int8Array, table?: AbilityTable): Safety {
-  const tiered = t !== undefined && table !== undefined && hasTiers(t);
-  return { king: -1, tryAll: false, t: tiered ? t : null, table: tiered ? table : null };
+/** Legality scratch; ability-aware when given `tiers` with some tier set. */
+export function newSafety(tiers?: Tiers): Safety {
+  const tiered = tiers !== undefined && hasTiers(tiers.t);
+  return { king: -1, tryAll: false, t: tiered ? tiers.t : null, table: tiered ? tiers.table : null };
 }
 
 /** Fills `out` for the side of colour sign `s` (1 White, -1 Black) on `b`. */
@@ -175,13 +178,11 @@ function abilityLegalMovesInPlace(b: Int8Array, sf: Safety, out: Move[]): Move[]
 /**
  * The legal moves of `color`. With `frozen`, a piece on a square where `frozen[i]` is 1 has no
  * moves (Lockdown); it still attacks, blocks and can be captured, so other moves are unaffected.
- * With White's tier array `t` and the ability `table`, the moves follow the rarity abilities (White's
- * own moves, and Black's king safety); a tier-free `t` gives the M1 moves.
+ * With White's `tiers`, the moves follow the rarity abilities (White's own moves, and Black's king
+ * safety); tier-free `tiers` give the M1 moves.
  */
-export function legalMoves(
-  b: Int8Array, color: Color, frozen?: Uint8Array, t?: Int8Array, table?: AbilityTable,
-): Move[] {
-  const moves = legalMovesInPlace(b.slice(), color, [], t === undefined ? SAFETY : newSafety(t, table));
+export function legalMoves(b: Int8Array, color: Color, frozen?: Uint8Array, tiers?: Tiers): Move[] {
+  const moves = legalMovesInPlace(b.slice(), color, [], tiers === undefined ? SAFETY : newSafety(tiers));
   return frozen ? moves.filter((m) => frozen[m.from] !== 1) : moves;
 }
 

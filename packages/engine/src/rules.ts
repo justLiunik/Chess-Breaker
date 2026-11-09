@@ -23,10 +23,10 @@ export function simulate(
 
   // R3: evaluate Black's position, with suppressed pieces unable to move, against White's abilities.
   const b = fromBoard(next.board);
-  const t = tiersOf(next.board);
-  const checked = inCheck(b, 'black', t, config.abilities);
+  const tiers = { t: tiersOf(next.board), table: config.abilities };
+  const checked = inCheck(b, 'black', tiers);
   let award: Award | null = null;
-  if (legalMoves(b, 'black', frozenMask(next), t, config.abilities).length === 0) {
+  if (legalMoves(b, 'black', frozenMask(next), tiers).length === 0) {
     if (checked) {
       next = { ...next, status: 'won', endReason: 'checkmate' };
     } else {

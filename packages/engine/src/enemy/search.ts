@@ -384,7 +384,7 @@ export function scoreRootMoves(
 ): { move: Move; score: number }[] {
   const b = board.slice();
   const t = tiers !== undefined && hasTiers(tiers) ? tiers.slice() : null;
-  const moves = legalMoves(b, 'black', frozen, t ?? undefined, config.abilities);
+  const moves = legalMoves(b, 'black', frozen, t === null ? undefined : { t, table: config.abilities });
   if (moves.length === 0) return [];
 
   const pv = config.pieceValues;

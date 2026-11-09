@@ -231,7 +231,7 @@ describe('Black against White abilities, against the reference', () => {
   it('Black legal moves equal refLegalMoves on 2,000 tier boards, 1,000 more with Black in check from an ability', () => {
     let checked = 0;
     for (const { b, t, checked: c } of blackCases(1000, 1000)) {
-      expect(sortMoves(legalMoves(b, 'black', undefined, t, config.abilities)))
+      expect(sortMoves(legalMoves(b, 'black', undefined, { t, table: config.abilities })))
         .toEqual(sortMoves(refLegalMoves(b, 'black', t)));
       if (c) checked++;
     }
@@ -242,7 +242,7 @@ describe('Black against White abilities, against the reference', () => {
     const key = (m: { from: number; to: number; via: number }) => `${m.from}-${m.to}-${m.via}`;
     let multi = 0;
     for (const { b, t } of blackCases(2000, 0)) {
-      const fast = legalMoves(b, 'white', undefined, t, config.abilities).map(key).sort();
+      const fast = legalMoves(b, 'white', undefined, { t, table: config.abilities }).map(key).sort();
       expect(fast).toEqual(refLegalMoves(b, 'white', t).map(key).sort());
       if (fast.some((k) => !k.endsWith('--1'))) multi++;
     }
