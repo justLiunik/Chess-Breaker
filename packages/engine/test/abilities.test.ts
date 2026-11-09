@@ -21,6 +21,10 @@ describe('compileAbilities', () => {
     expect(t.bishop[2].extraRays).toEqual([]);
     expect(t.bishop[3].extraRays).toEqual(['orthogonal']);
   });
+  it('rook and queen leapAllies: none, no capture after (rare, unique), capture after (legendary)', () => {
+    expect(t.rook.map((f) => f.leapAllies)).toEqual([0, 1, 1, 2]);
+    expect(t.queen.map((f) => f.leapAllies)).toEqual([0, 1, 1, 2]);
+  });
   it('rook: unique adds diagonal step, legendary leapAllies 2 and multiCapture 1', () => {
     expect(t.rook[2].leapers).toHaveLength(4);
     expect(has(t.rook[2].leapers, 1, -1)).toBe(true);

@@ -199,6 +199,7 @@ function quiesce(
       if (captured === 0 || !safeMove(b, sf, side, from, to)) continue;
       captures.push({
         from, to, captured, promotion: code === PAWN * side ? promotionOf(side, to) : null,
+        via: -1, viaCaptured: 0,
       });
     }
   }

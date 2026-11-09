@@ -143,9 +143,14 @@ export function fenToStage(fen: string, overrides: Partial<StageState> = {}): St
 
 /**
  * A deterministic random board: one king per side, 2-14 other pieces, no pawn on rank 1 or 8,
- * neither king in check, or with `sideInCheck` set, exactly that side in check. The same (seed, i, option) always gives the same board.
+ * neither king in check, or with `sideInCheck` set, exactly that side in check (as M1 sees check).
+ * The same (seed, i, option) always gives the same board. With `tiers`, that array is filled with a
+ * random tier 0-3 for each White knight, bishop, rook and queen (0 elsewhere); the board is the same
+ * as without it.
  */
-export function randomBoard(seed: string, i: number, opts: { sideInCheck?: Color } = {}): Int8Array {
+export function randomBoard(
+  seed: string, i: number, opts: { sideInCheck?: Color; tiers?: Int8Array } = {},
+): Int8Array {
   let cursor = 0;
   const next = (n: number): number => {
     // The FNV hash's top bits barely move between consecutive cursors, so finish it with a
@@ -179,6 +184,12 @@ export function randomBoard(seed: string, i: number, opts: { sideInCheck?: Color
     const blackChecked = isAttacked(b, b.indexOf(-6), 'white');
     const want = opts.sideInCheck;
     if (want === undefined ? !whiteChecked && !blackChecked
-      : want === 'white' ? whiteChecked && !blackChecked : blackChecked && !whiteChecked) return b;
+      : want === 'white' ? whiteChecked && !blackChecked : blackChecked && !whiteChecked) {
+      const t = opts.tiers;
+      if (t !== undefined) {
+        for (let sq = 0; sq < 64; sq++) t[sq] = b[sq]! >= 2 && b[sq]! <= 5 ? next(4) : 0;
+      }
+      return b;
+    }
   }
 }

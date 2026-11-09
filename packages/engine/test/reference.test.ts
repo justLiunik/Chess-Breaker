@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Color } from '../src/types';
+import { abilityAttacked, abilityTargets } from '../src/abilities';
 import { evaluate } from '../src/enemy/evaluate';
 import { legalMoves } from '../src/legality';
 import { isAttacked } from '../src/movegen';
 import { config, randomBoard } from './helpers';
-import { refAttacked, refLegalMoves } from './reference/movegen';
+import { refAttacked, refLegalMoves, refPseudoMoves } from './reference/movegen';
 import { refEvaluate } from './reference/evaluate';
 
 const sortMoves = (ms: { from: number; to: number }[]) =>
@@ -24,6 +25,64 @@ function moveCases(): { b: Int8Array; color: Color }[] {
     for (let i = 0; i < CHECK_BOARDS; i++) cases.push({ b: randomBoard(`ref-${color}-check`, i, { sideInCheck: color }), color });
   }
   return cases;
+}
+
+/** 15,000 so that a king on Y behind X (the rarest feature, about 1 board in 270) appears 50 times. */
+const TIER_BOARDS = 15000;
+
+/** Random boards with a random tier on each White knight, bishop, rook and queen. */
+function tierCases(): { b: Int8Array; t: Int8Array }[] {
+  const cases: { b: Int8Array; t: Int8Array }[] = [];
+  for (let i = 0; i < TIER_BOARDS; i++) {
+    const t = new Int8Array(64);
+    const b = randomBoard('ref-tier', i, { tiers: t });
+    cases.push({ b, t });
+  }
+  return cases;
+}
+
+const TYPE_NAMES = [null, null, 'knight', 'bishop', 'rook', 'queen'] as const;
+const DIAGONAL_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
+const ORTHOGONAL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+/**
+ * Coverage only: walks each tiered White slider's lines with its ability flags and reports whether
+ * a Rare leap meets an enemy it may not capture, a Unique-style leap captures, or a multi-capture
+ * line ends with the Black king directly beyond the first capture.
+ */
+function sliderFeatures(b: Int8Array, t: Int8Array) {
+  const out = { rareLeapBlocked: false, uniqueCaptureAfterLeap: false, kingOnYBehindX: false };
+  for (let from = 0; from < 64; from++) {
+    const code = b[from]!;
+    const name = TYPE_NAMES[code];
+    if (code < 3 || t[from] === 0 || !name || name === 'knight') continue;
+    const f = config.abilities[name][t[from] as 1 | 2 | 3];
+    const diag = code !== 4 || f.extraRays.includes('diagonal');
+    const ortho = code !== 3 || f.extraRays.includes('orthogonal');
+    const dirs = [...(diag ? DIAGONAL_DIRS : []), ...(ortho ? ORTHOGONAL_DIRS : [])];
+    for (const [df, dr] of dirs) {
+      let passed = false;
+      for (let x = (from & 7) + df, y = (from >> 3) + dr; x >= 0 && x < 8 && y >= 0 && y < 8; x += df, y += dr) {
+        const v = b[x + 8 * y]!;
+        if (v === 0) continue;
+        if (v > 0) {
+          if (f.leapAllies === 0) break;
+          passed = true;
+          continue;
+        }
+        if (v === -6) break;
+        if (passed && f.leapAllies === 1) out.rareLeapBlocked = true;
+        if (passed && f.leapAllies === 2) out.uniqueCaptureAfterLeap = true;
+        const capture = !passed || f.leapAllies === 2;
+        const multi = f.multiCapture === 2 || (f.multiCapture === 1 && !passed);
+        const nx = x + df;
+        const ny = y + dr;
+        if (capture && multi && nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && b[nx + 8 * ny] === -6) out.kingOnYBehindX = true;
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 describe('fast engine against the slow reference', () => {
@@ -80,6 +139,38 @@ describe('fast engine against the slow reference', () => {
         }
       }
     }
+  });
+
+  it('White ability moves and White attack maps match the reference on boards with random tiers', () => {
+    const table = config.abilities;
+    const key = (m: { from: number; to: number; via: number }) => `${m.from}-${m.to}-${m.via}`;
+    for (const { b, t } of tierCases()) {
+      const fast: string[] = [];
+      for (let from = 0; from < 64; from++) {
+        if (b[from]! <= 0) continue;
+        for (const { to, via } of abilityTargets(b, t, from, table)) fast.push(key({ from, to, via }));
+      }
+      expect(fast.sort()).toEqual(refPseudoMoves(b, 'white', t).map(key).sort());
+      const fastMap: boolean[] = [];
+      const refMap: boolean[] = [];
+      for (let sq = 0; sq < 64; sq++) {
+        fastMap.push(abilityAttacked(b, t, sq, table));
+        refMap.push(refAttacked(b, sq, 'white', t));
+      }
+      expect(fastMap).toEqual(refMap);
+    }
+  });
+
+  it('the tier boards exercise every ability (counted with the reference)', () => {
+    const n = { rareLeapBlocked: 0, uniqueCaptureAfterLeap: 0, multiCapture: 0, kingOnYBehindX: 0 };
+    for (const { b, t } of tierCases()) {
+      const f = sliderFeatures(b, t);
+      if (f.rareLeapBlocked) n.rareLeapBlocked++;
+      if (f.uniqueCaptureAfterLeap) n.uniqueCaptureAfterLeap++;
+      if (f.kingOnYBehindX) n.kingOnYBehindX++;
+      if (refPseudoMoves(b, 'white', t).some((m) => m.via >= 0)) n.multiCapture++;
+    }
+    for (const [name, count] of Object.entries(n)) expect(count, name).toBeGreaterThanOrEqual(50);
   });
 
   it('evaluate matches the reference, with Black not in check and in check', () => {

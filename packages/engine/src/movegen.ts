@@ -11,6 +11,10 @@ export type Move = {
   to: number;
   captured: number;
   promotion: 'queen' | 'removed' | null;
+  /** A multi-capture's first captured square (the mover ends on `to`, directly beyond it), else -1. */
+  via: number;
+  /** The code captured on `via`, else 0. */
+  viaCaptured: number;
 };
 
 const KNIGHT_D = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]] as const;
@@ -216,7 +220,9 @@ export function pseudoMoves(b: Int8Array, color: Color): Move[] {
     const n = targetsInto(b, from, TARGETS);
     for (let i = 0; i < n; i++) {
       const to = TARGETS[i]!;
-      moves.push({ from, to, captured: b[to]!, promotion: isPawn ? promotionOf(s, to) : null });
+      moves.push({
+        from, to, captured: b[to]!, promotion: isPawn ? promotionOf(s, to) : null, via: -1, viaCaptured: 0,
+      });
     }
   }
   return moves;
@@ -262,6 +268,7 @@ export function isAttacked(b: Int8Array, sq: number, by: Color): boolean {
 
 export function makeMove(b: Int8Array, m: Move): void {
   const code = b[m.from]!;
+  if (m.via >= 0) b[m.via] = 0;
   b[m.to] = m.promotion === 'queen' ? -QUEEN : m.promotion === 'removed' ? 0 : code;
   b[m.from] = 0;
 }
@@ -270,4 +277,5 @@ export function unmakeMove(b: Int8Array, m: Move): void {
   const moved = m.promotion === 'queen' ? -PAWN : m.promotion === 'removed' ? PAWN : b[m.to]!;
   b[m.from] = moved;
   b[m.to] = m.captured;
+  if (m.via >= 0) b[m.via] = m.viaCaptured;
 }
