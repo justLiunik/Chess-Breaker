@@ -88,31 +88,31 @@ must be resisted — that would silently delete the game's core mechanic.
 - The no-legal-queue check after R5 widened to skills (a skill-enabled escape is a legal queue).
 
 **Acceptance criteria**
-- [ ] Twin Step, Ascension and Lockdown behave exactly as specified in `docs/03 §5`, including every
+- [x] Twin Step, Ascension and Lockdown behave exactly as specified in `docs/03 §5`, including every
       listed edge case, each covered by a test.
-- [ ] A temporary queen never delivers checkmate (asserted by test).
-- [ ] A revert that exposes the player's king is refused at commit with a named cause.
-- [ ] Durability 0 → `spent` → removed at stage end, never earlier (test).
-- [ ] `startStage` spends exactly 1 durability per summon, nothing for the King or for pieces left
+- [x] A temporary queen never delivers checkmate (asserted by test).
+- [x] A revert that exposes the player's king is refused at commit with a named cause.
+- [x] Durability 0 → `spent` → removed at stage end, never earlier (test).
+- [x] `startStage` spends exactly 1 durability per summon, nothing for the King or for pieces left
       in the deck, and refuses every case in [09 §9](09-technical-architecture.md#9-testing-strategy)
       without spending anything (test).
-- [ ] No action or skill can bring a deck piece onto the board after Start (I15, test).
-- [ ] A Lockdown that leaves the enemy without a legal move is scored at R3: checkmate if in check,
+- [x] No action or skill can bring a deck piece onto the board after Start (I15, test).
+- [x] A Lockdown that leaves the enemy without a legal move is scored at R3: checkmate if in check,
       stalemate (a loss) otherwise (test).
-- [ ] Captured instance is permanently absent from `RunState.deck` (test).
+- [x] Captured instance is permanently absent from `RunState.deck` (test).
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
 - [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
-- [ ] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
+- [x] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
       not give check through an ally; Unique can; Legendary bishop moves like a queen and costs 5
       spawn points; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
-- [ ] Ascension suspends rarity abilities and they return after the revert, and it refuses a
+- [x] Ascension suspends rarity abilities and they return after the revert, and it refuses a
       Legendary bishop as a target (`excludesRarity`, test).
-- [ ] Rook and queen rows of `docs/02 §2.3` each have a test, including every multi-capture rule
+- [x] Rook and queen rows of `docs/02 §2.3` each have a test, including every multi-capture rule
       (adjacency, gap, king exception, rook-after-leap single capture, one credit, salvage for both).
-- [ ] A Legendary knight that gives check with its first move can never capture or land on the king
+- [x] A Legendary knight that gives check with its first move can never capture or land on the king
       with its bonus move (test).
-- [ ] Lifeline fires once per queen instance and returns it at stage end with 1 durability (test).
-- [ ] Promotion never consumes randomness: the created piece always equals the pawn's `promotesTo` (test).
+- [x] Lifeline fires once per queen instance and returns it at stage end with 1 durability (test).
+- [x] Promotion never consumes randomness: the created piece always equals the pawn's `promotesTo` (test).
 
 **Risks:** duration semantics creep. Any new duration requires a `docs/03` update first.
 

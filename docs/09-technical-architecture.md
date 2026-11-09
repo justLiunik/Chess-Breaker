@@ -131,6 +131,8 @@ interface BoardPiece {
   color: Color;
   instanceId?: string;             // present only for Hero Pieces; rarity is read from the deck
                                    // instance. Absent = Stage Piece.
+  stageId?: string;                // Stage Pieces only ('s01', 's02', ... in square-index order); ids
+                                   // that skills, modifiers and capture events use instead of squares
   spawned?: true;                  // a spawned pawn (player-side Stage Piece), docs/02 §2.1
   rarity?: Rarity;                 // spawned pawns only; enemy pieces are implicitly Normal (I13)
   promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
@@ -150,6 +152,7 @@ interface StageState {
   moveCredits: number;             // reset to freeMovesPerTurn each turn
   spawnPoints: number;             // summon budget: total spawnCost of the summons (King free); ranks are rules.deploymentRanks
   modifiers: ActiveModifier[];
+  skillLog: { skillId: string; turn: number; targetId?: string }[];   // every accepted ACTIVATE_SKILL: once_per_turn and already_targeted read it
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
   endReason?: 'checkmate' | 'enemy_stalemated' | 'out_of_turns' | 'player_mated' | 'player_stalemated';
@@ -309,9 +312,11 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | `engine/board` | Square math, move generation per piece type and rarity ability (data-driven from `pieces.yaml`) | Know about durability or skills |
 | `engine/legality` | Per-action legality, check detection and `hasLegalQueue` (not the end-state invariants, which `engine/queue` checks) | Know about transitions/durations |
 | `engine/queue` | `resolveQueue` (Resolve, R1, R2, I2) and `applyPlayerMove`: sequential cost accounting and per-step legality | Decide win conditions |
-| `engine/deployment` | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
+| `engine/deployment` (`deployment.ts`) | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
+| stage end (`stage-end.ts`) | `endStage`: deck write-back after a won stage (return, remove spent, lifeline) | Run on a stage that is not won |
 | `engine/rules` | `simulate` and `commitQueue` (R3–R5): stage end evaluation (checkmate, stalemate, turns, no legal queue) and the enemy reply | Render or animate |
-| `engine/skills` | Primitive interpretation, modifier stack, expiry | Add per-skill special cases |
+| `engine/skills` (`skills/check.ts`, `skills/registry.ts`) | `check.ts`: the ordered `ACTIVATE_SKILL` checks; `registry.ts`: primitive interpretation, modifier stack, expiry | Add per-skill special cases |
+| `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups | Be consulted by name in `engine/rules` |
 | `engine/enemy` | `enemyMove(stage, seed, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `gen` | Templates, generation pipeline, solver | Be imported by the web app |
@@ -352,10 +357,15 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
 | Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
+| Deck lifecycle | `deck-lifecycle.test.ts`, `stage-end.test.ts`: a captured instance leaves `run.deck` at once; `endStage` returns deployed pieces with their durability, removes `spent` ones only then; promotion adds exactly `promotesTo` at full durability; I15 over 500 chained random queues |
+| Skills | `skills.test.ts`, `modifiers.test.ts`: every `ACTIVATE_SKILL` check in spec 8.1 order (earlier wins), effects of Twin Step, Ascension and Lockdown, R1 revert, R3 suppression, R5 root mask, a temporary queen never mates |
+| `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, no charges or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards |
+| Rarity abilities | `abilities*.test.ts`, `enemy-abilities.test.ts`: per-tier tables from `pieces.yaml`, ability-aware attack squares, the Legendary knight bonus move in the queue, abilities suspended while Ascension holds, the enemy search models abilities |
+| Reference differential | `reference.test.ts`: the optimised move generator is checked against a slow, independent reference implementation on the same positions |
 | Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
 | Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
-| Deployment phase | `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
+| Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues, skills included |
@@ -363,7 +373,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Generation | 10k-stage solvability and precondition suite ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)) |
 | Content | `npm run validate` — schema conformance of every content file |
 | Replay | Golden run files: fixed seed + recorded queues must reproduce identical outcomes |
-| Enemy speed | `npm run bench`: depth-4 median < 50 ms on sparse, stage-like positions (Node in M1; re-measured in the browser in M5). Kept out of `npm test` so timing never flakes a normal run |
+| Enemy speed | `npm run bench`: depth-4 median < 50 ms on sparse, stage-like positions (Node in M1; re-measured in the browser in M5). `GAME_FENS` must stay within 1.1x the same-machine M1 baseline + 50 ms (Ruling R14); rarity boards are report-only. Kept out of `npm test` so timing never flakes a normal run |
 | Enemy AI | Golden positions: same position + seed → same move; mate-in-1 for the enemy is always taken; an unavoidable enemy mate is delayed as long as possible; quiescence never hangs a piece just past the horizon; scripted line → fallback when its move turns illegal or the line ends; transposition table on/off gives identical moves |
 
 ## 10. Performance notes
@@ -382,7 +392,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | `npm test` | Vitest across workspaces (excludes the benchmark) | **M1** |
 | `npm run bench` | Enemy depth-4 timing benchmark, run on its own | **M1** |
 | `npm run typecheck` | `tsc` over packages and scripts | **M1** |
-| `npm run play` | Terminal playground: one Act I stage against the enemy | **M1** |
+| `npm run play` | Terminal playground: place the King and two minors (Deployment phase, `startStage`), then play one Act I stage against the enemy | **M1**, M2 |
 | `npm run dev` | Vite dev server for `apps/web` | M5 |
 | `npm run build` | Production build | M5 |
 | `npm run gen:report` | Template health report from the solver | M3 |

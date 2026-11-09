@@ -168,8 +168,8 @@ Rules that apply to every ability:
   capture normally and land on any square not occupied by an allied piece.
 - **Attacks follow moves.** A piece gives check and controls squares along exactly the moves it could
   make. A Rare bishop, rook or queen does **not** attack through an ally (its leaping moves cannot
-  capture); a Unique or Legendary bishop and a Legendary rook or queen do. Multi-capture never adds
-  attacked squares beyond Y.
+  capture); a Unique or Legendary bishop and a Legendary rook or queen do. Multi-capture adds no
+  attacked square: a king on Y is never in check through X.
 - **The king is never captured — by any ability.** No rarity ability can capture or land on a king's
   square (I3). In particular, a **Legendary knight that gives check with its first move can never use
   its bonus move to capture the king**: the king's square is simply not a legal destination. After
