@@ -1,4 +1,7 @@
-import type { Color, EngineConfig, MoveRejection, Square, StageState } from './types';
+import type { Action, Color, EngineConfig, MoveRejection, RunState, Square, StageState } from './types';
+import type { QueueCtx } from './queue';
+import { applyPlayerMove, resolveQueue } from './queue';
+import { applySkill, checkSkill } from './skills/check';
 import * as position from './position';
 import { isSquare, toIndex, toSquare } from './square';
 import * as movegen from './movegen';
@@ -149,6 +152,60 @@ export function legalPlayerMoves(stage: StageState, from: Square): Square[] {
   return pieceTargets(b, f).map(toSquare);
 }
 
-export function hasLegalQueue(stage: StageState, _config: EngineConfig): boolean {
-  return legalMoves(fromBoard(stage.board), 'white').length > 0;
+/**
+ * Whether the player has a legal queue (spec 8.4): some ordered set of distinct usable skills, each
+ * with a target, followed by up to the resulting credits in moves, that `resolveQueue` accepts.
+ * Candidates are built from the queue's own checks (`checkSkill`, `legalPlayerMoves`) and always
+ * judged by `resolveQueue`, so "legal" means exactly what commit means. Stops at the first success.
+ */
+export function hasLegalQueue(run: RunState, stage: StageState, config: EngineConfig): boolean {
+  const skillIds = run.loadout
+    .filter((l) => l.charges >= 1 && config.skills[l.skillId]?.status === 'mvp')
+    .map((l) => l.skillId);
+  const squares = Object.keys(stage.board);
+  const queue: Action[] = [];
+
+  const movesFrom = (board: StageState['board'], credits: number): boolean => {
+    if (credits < 1) return false;
+    const here = { ...stage, board };
+    for (const from of Object.keys(board)) {
+      if (board[from]!.color !== 'white') continue;
+      for (const to of legalPlayerMoves(here, from)) {
+        queue.push({ type: 'MOVE', from, to });
+        const done = resolveQueue(run, stage, queue, config).ok
+          || (credits > 1 && movesFrom(applyPlayerMove(board, from, to, config).board, credits - 1));
+        queue.pop();
+        if (done) return true;
+      }
+    }
+    return false;
+  };
+
+  const skillsFrom = (ctx: QueueCtx, used: Set<string>): boolean => {
+    if (movesFrom(ctx.board, ctx.moveCredits)) return true;
+    for (const skillId of skillIds) {
+      if (used.has(skillId)) continue;
+      const kind = config.skills[skillId]!.target.kind;
+      const color = kind === 'own_piece' ? 'white' : kind === 'enemy_piece' ? 'black' : null;
+      const targets = kind === 'none' ? [undefined] : squares.filter((sq) => color === null || ctx.board[sq]?.color === color);
+      for (const target of targets) {
+        const action: Action = { type: 'ACTIVATE_SKILL', skillId, ...(target !== undefined && { target }) };
+        const next = { ...ctx };
+        if (checkSkill(next, action, queue.length, config)) continue;
+        applySkill(next, action, queue.length, config);
+        queue.push(action);
+        used.add(skillId);
+        const done = skillsFrom(next, used);
+        used.delete(skillId);
+        queue.pop();
+        if (done) return true;
+      }
+    }
+    return false;
+  };
+
+  return skillsFrom({
+    run, board: stage.board, focus: stage.focus, moveCredits: stage.moveCredits,
+    modifiers: stage.modifiers, skillLog: stage.skillLog, turn: stage.turnsUsed + 1,
+  }, new Set());
 }

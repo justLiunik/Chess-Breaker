@@ -143,7 +143,7 @@ export function commitQueue(
   const b = fromBoard(next.board);
   const checked = inCheck(b, 'white');
   if (checked) events.push({ type: 'check', king: 'white', square: toSquare(b.indexOf(KING)) });
-  if (!hasLegalQueue(next, config)) {
+  if (!hasLegalQueue(nextRun, next, config)) {
     const endReason = checked ? 'player_mated' : 'player_stalemated';
     next = { ...next, status: 'lost', endReason };
     events.push({ type: 'stage_lost', endReason });

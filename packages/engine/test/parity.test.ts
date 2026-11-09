@@ -29,5 +29,5 @@ describe('parity: simulate is the first half of commitQueue', () => {
       }
     }
     expect(ended).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });

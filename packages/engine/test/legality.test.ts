@@ -6,7 +6,7 @@ import { toSquare } from '../src/square';
 import {
   checkPlayerMove, hasLegalQueue, inCheck, legalMoves, legalPlayerMoves,
 } from '../src/legality';
-import { config, deepFreeze, stageOf } from './helpers';
+import { config, deepFreeze, runOf, stageOf } from './helpers';
 import type { StageState } from '../src/types';
 
 const st = (p: Record<string, string>) => stageOf(p);
@@ -48,14 +48,14 @@ describe('legalPlayerMoves', () => {
 
 describe('hasLegalQueue', () => {
   it('stalemate is false', () => {
-    expect(hasLegalQueue(st({ a1: 'K', b3: 'q', c3: 'k' }), config)).toBe(false);
+    expect(hasLegalQueue(runOf(), st({ a1: 'K', b3: 'q', c3: 'k' }), config)).toBe(false);
   });
   it('mate is false', () => {
-    expect(hasLegalQueue(st({ a1: 'K', b2: 'q', c3: 'k' }), config)).toBe(false);
+    expect(hasLegalQueue(runOf(), st({ a1: 'K', b2: 'q', c3: 'k' }), config)).toBe(false);
   });
   it('example stage-state is true', () => {
     const doc = parse(readFileSync(new URL('../../../content/examples/stage-state.yaml', import.meta.url), 'utf8'));
     const s = deepFreeze(doc) as StageState;
-    expect(hasLegalQueue(s, config)).toBe(true);
+    expect(hasLegalQueue(runOf(), { ...s, moveCredits: config.rules.freeMovesPerTurn }, config)).toBe(true);
   });
 });

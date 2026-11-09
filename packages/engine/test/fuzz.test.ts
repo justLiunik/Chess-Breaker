@@ -66,7 +66,7 @@ describe('fuzz: queue invariants', () => {
         if (c.ok) {
           expect(kings(c.value.stage.board)).toEqual({ white: 1, black: 1 });
           // After the reply White may be in check, but an active stage always has a legal queue.
-          if (c.value.stage.status === 'active') expect(hasLegalQueue(c.value.stage, config)).toBe(true);
+          if (c.value.stage.status === 'active') expect(hasLegalQueue(c.value.run, c.value.stage, config)).toBe(true);
         }
       }
     }
