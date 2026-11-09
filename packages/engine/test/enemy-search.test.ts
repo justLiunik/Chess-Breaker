@@ -134,7 +134,10 @@ describe('mateBound', () => {
     expect(mateBound(config)).toBe(75000);
   });
 
-  it('keeps mate scores ply-adjusted when playerMated is raised', () => {
+  // The bound only affects the TT's node-relative storage, and a TT key includes the turns left, which
+// fixes the ply of a node within one search, so the adjustment cannot change a root score; this test
+// therefore pins the derived value and that mates still score by distance, not the TT behaviour.
+  it('follows the configured terminal scores, and mates still score by distance', () => {
     const big: EngineConfig = {
       ...config,
       enemyAI: {
