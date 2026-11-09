@@ -101,6 +101,8 @@ function eventText(e: GameEvent): string {
     case 'enemy_move': return `enemy moves ${e.from}-${e.to}`;
     case 'enemy_fell_back': return `enemy script ended or was blocked (cursor ${e.cursor}); it now searches`;
     case 'turn_started': return `turn ${e.turn} begins`;
+    case 'piece_summoned': return `${e.instanceId} is summoned to ${e.square}`;
+    case 'stage_started': return 'the stage begins';
   }
 }
 

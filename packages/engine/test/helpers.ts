@@ -69,6 +69,19 @@ export function stageOf(
   } as StageState);
 }
 
+/** A stage in the Deployment phase: `stageOf` without White Hero Pieces, with 9 spawn points. */
+export function deploymentStageOf(
+  pieces: Record<Square, string>,
+  overrides: Partial<StageState> = {},
+): StageState {
+  const base = stageOf(pieces);
+  const board: Record<Square, BoardPiece> = {};
+  for (const [sq, piece] of Object.entries(base.board)) {
+    if (!(piece.color === 'white' && piece.instanceId !== undefined)) board[sq] = { ...piece };
+  }
+  return deepFreeze({ ...base, board, phase: 'deployment', spawnPoints: 9, ...overrides } as StageState);
+}
+
 export function runOf(overrides: Partial<RunState> = {}): RunState {
   const mk = (id: string, pieceType: 'knight' | 'bishop') => ({
     instanceId: id, pieceType, rarity: 'normal' as const, durability: 2, durabilityMax: 2,

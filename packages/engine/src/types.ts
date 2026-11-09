@@ -138,7 +138,9 @@ export type GameEvent =
   | { type: 'stage_lost'; endReason: EndReason }
   | { type: 'enemy_move'; from: Square; to: Square }
   | { type: 'enemy_fell_back'; cursor: number }
-  | { type: 'turn_started'; turn: number };
+  | { type: 'turn_started'; turn: number }
+  | { type: 'piece_summoned'; instanceId: string; square: Square }
+  | { type: 'stage_started' };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
