@@ -115,6 +115,7 @@ export type CommitError =
   | { kind: 'empty_queue' }
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
   | { kind: 'stage_not_active' }
+  | { kind: 'stage_not_won'; status: StageState['status'] }
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   | { kind: 'durability_unavailable'; instanceId: string }
   | { kind: 'invalid_deployment'; to: Square; reason: string }
@@ -141,6 +142,8 @@ export type GameEvent =
   | { type: 'turn_started'; turn: number }
   | { type: 'piece_summoned'; instanceId: string; square: Square }
   | { type: 'lifeline_saved'; instanceId: string }
+  | { type: 'piece_returned'; instanceId: string; durability: number | null }
+  | { type: 'piece_removed'; instanceId: string; reason: 'spent' }
   | { type: 'stage_started' };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };

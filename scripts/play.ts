@@ -103,6 +103,8 @@ function eventText(e: GameEvent): string {
     case 'turn_started': return `turn ${e.turn} begins`;
     case 'piece_summoned': return `${e.instanceId} is summoned to ${e.square}`;
     case 'lifeline_saved': return `${e.instanceId} is saved by its lifeline`;
+    case 'piece_returned': return `${e.instanceId} returns to the deck`;
+    case 'piece_removed': return `${e.instanceId} is spent and removed from the deck`;
     case 'stage_started': return 'the stage begins';
   }
 }
