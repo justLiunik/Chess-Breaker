@@ -102,6 +102,7 @@ function eventText(e: GameEvent): string {
     case 'enemy_fell_back': return `enemy script ended or was blocked (cursor ${e.cursor}); it now searches`;
     case 'turn_started': return `turn ${e.turn} begins`;
     case 'piece_summoned': return `${e.instanceId} is summoned to ${e.square}`;
+    case 'lifeline_saved': return `${e.instanceId} is saved by its lifeline`;
     case 'stage_started': return 'the stage begins';
   }
 }

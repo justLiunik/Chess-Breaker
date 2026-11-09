@@ -55,6 +55,29 @@ export function simulate(
   return { ok: true, value: { run: nextRun, stage: next, events, award } };
 }
 
+const TIERS = ['normal', 'rare', 'unique', 'legendary'] as const;
+
+/** An enemy capture of a Hero Piece: the instance leaves the deck, unless a lifeline saves it (docs/06). */
+function loseInstance(
+  run: RunState,
+  instanceId: string,
+  config: EngineConfig,
+): { run: RunState; saved: boolean } {
+  const inst = run.deck.find((i) => i.instanceId === instanceId);
+  if (!inst) return { run, saved: false };
+  if (
+    inst.pieceType !== 'king' && inst.rarity !== null
+    && config.abilities[inst.pieceType][TIERS.indexOf(inst.rarity)]!.lifeline
+    && !inst.usedOnce?.includes('lifeline')
+  ) {
+    const deck = run.deck.map((i) => (i.instanceId === instanceId
+      ? { ...i, status: 'captured' as const, usedOnce: [...(i.usedOnce ?? []), 'lifeline' as const] }
+      : i));
+    return { run: { ...run, deck }, saved: true };
+  }
+  return { run: { ...run, deck: run.deck.filter((i) => i.instanceId !== instanceId) }, saved: false };
+}
+
 /**
  * `simulate` followed by the enemy's reply (R5) and the start of the next turn. A stage that
  * `simulate` already ended gets no reply.
@@ -70,6 +93,7 @@ export function commitQueue(
 
   const events = [...sim.value.events];
   let next: StageState = sim.value.stage;
+  let nextRun = sim.value.run;
 
   // R5: the enemy replies.
   const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
@@ -86,7 +110,14 @@ export function commitQueue(
     if (taken) {
       events.push({
         type: 'capture', square: to, pieceType: taken.pieceType, color: taken.color, salvage: 0,
+        ...(taken.instanceId !== undefined && { instanceId: taken.instanceId }),
+        ...(taken.stageId !== undefined && { stageId: taken.stageId }),
       });
+      if (taken.instanceId !== undefined) {
+        const lost = loseInstance(nextRun, taken.instanceId, config);
+        nextRun = lost.run;
+        if (lost.saved) events.push({ type: 'lifeline_saved', instanceId: taken.instanceId });
+      }
     }
     if (mover.pieceType === 'pawn' && to.endsWith('1')) {
       board[to] = { ...mover, pieceType: 'queen' };
@@ -112,5 +143,5 @@ export function commitQueue(
     next = { ...next, status: 'lost', endReason };
     events.push({ type: 'stage_lost', endReason });
   }
-  return { ok: true, value: { run: sim.value.run, stage: next, events, award: null } };
+  return { ok: true, value: { run: nextRun, stage: next, events, award: null } };
 }

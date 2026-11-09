@@ -18,6 +18,7 @@ exports[`golden commitQueue scenarios > capture with salvage 1`] = `
         "pieceType": "knight",
         "salvage": 1,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -984,6 +985,7 @@ exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
       },
       {
         "color": "white",
+        "instanceId": "p_rook_a1",
         "pieceType": "rook",
         "salvage": 0,
         "square": "a3",
@@ -1255,6 +1257,7 @@ exports[`golden commitQueue scenarios > enemy stalemated 1`] = `
         "pieceType": "pawn",
         "salvage": 0,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -1749,6 +1752,7 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
         "type": "move",
       },
       {
+        "instanceId": "p_61865fae",
         "promotesTo": {
           "pieceType": "knight",
           "rarity": "normal",
@@ -1817,6 +1821,16 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
           "instanceId": "p_bishop_05",
           "origin": "starter",
           "pieceType": "bishop",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_61865fae",
+          "origin": "promotion",
+          "pieceType": "knight",
           "rarity": "normal",
           "status": "in_deck",
         },
@@ -2790,6 +2804,7 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
         "pieceType": "knight",
         "salvage": 1,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -2804,6 +2819,7 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
         "pieceType": "rook",
         "salvage": 1,
         "square": "b7",
+        "stageId": "s02",
         "type": "capture",
       },
       {

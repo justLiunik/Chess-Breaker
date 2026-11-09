@@ -130,8 +130,8 @@ export interface Award {
 
 export type GameEvent =
   | { type: 'move'; from: Square; to: Square; pieceType: PieceType; color: Color }
-  | { type: 'capture'; square: Square; pieceType: PieceType; color: Color; salvage: number }
-  | { type: 'pawn_promoted'; square: Square; promotesTo: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity } }
+  | { type: 'capture'; square: Square; pieceType: PieceType; color: Color; salvage: number; instanceId?: string; stageId?: string }
+  | { type: 'pawn_promoted'; square: Square; promotesTo: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity }; instanceId: string }
   | { type: 'enemy_promoted'; square: Square }
   | { type: 'check'; king: Color; square: Square }
   | { type: 'stage_won'; award: Award }
@@ -140,6 +140,7 @@ export type GameEvent =
   | { type: 'enemy_fell_back'; cursor: number }
   | { type: 'turn_started'; turn: number }
   | { type: 'piece_summoned'; instanceId: string; square: Square }
+  | { type: 'lifeline_saved'; instanceId: string }
   | { type: 'stage_started' };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };

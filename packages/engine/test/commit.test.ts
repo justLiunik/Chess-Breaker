@@ -50,7 +50,7 @@ describe('commitQueue', () => {
     expect(cap.run.coins).toBe(7);
     expect(cap.stage.board.c1).toEqual({ pieceType: 'rook', color: 'black', stageId: capStage.board.c8!.stageId });
     expect(cap.events).toContainEqual({
-      type: 'capture', square: 'c1', pieceType: 'bishop', color: 'white', salvage: 0,
+      type: 'capture', square: 'c1', pieceType: 'bishop', color: 'white', salvage: 0, instanceId: 'p_bishop_c1',
     });
   });
 
@@ -58,7 +58,7 @@ describe('commitQueue', () => {
     const stage = stageOf({ g1: 'K', a1: 'R', e8: 'k', a8: 'r' }, { enemyPolicy: scripted(['a8a2']) });
     const v = ok(commitQueue(runOf(), stage, mv('a1', 'a2'), config));
     expect(v.events).toContainEqual({
-      type: 'capture', square: 'a2', pieceType: 'rook', color: 'white', salvage: 0,
+      type: 'capture', square: 'a2', pieceType: 'rook', color: 'white', salvage: 0, instanceId: 'p_rook_a1',
     });
     expect(v.stage.board.a2).toEqual({ pieceType: 'rook', color: 'black', stageId: stage.board.a8!.stageId });
   });

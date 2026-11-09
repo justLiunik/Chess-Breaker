@@ -122,6 +122,7 @@ describe('resolveQueue success', () => {
     expect(r.value.stage.board['c7']).toBeUndefined();
     expect(r.value.events).toContainEqual({
       type: 'pawn_promoted', square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' },
+      instanceId: expect.stringMatching(/^p_[0-9a-f]+$/),
     });
   });
 });
