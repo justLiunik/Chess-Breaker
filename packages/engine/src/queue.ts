@@ -1,11 +1,11 @@
 import type {
   Action, BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, Square, StageState,
 } from './types';
-import { checkPlayerMove } from './legality';
+import { planPlayerMove } from './legality';
 import { durabilityMaxOf } from './abilities';
 import { isAttacked } from './movegen';
 import { hash } from './rng';
-import { KING, PAWN, fromBoard } from './position';
+import { KING, PAWN, TIERS, fromBoard } from './position';
 import { toSquare } from './square';
 import { applySkill, checkSkill } from './skills/check';
 import { pieceId } from './skills/registry';
@@ -25,11 +25,41 @@ export interface QueueCtx {
   turn: number;
 }
 
+/**
+ * The Legendary knight bonus (docs/02 §4) as the queue tracks it, by `instanceId`: 'earned' once the
+ * piece has made a paid MOVE this turn (its next MOVE is free), 'spent' once it has made that free one.
+ */
+export type BonusLedger = Map<string, 'earned' | 'spent'>;
+
+/** Whether `piece` carries a bonus-move ability: a White Hero Piece, not transformed (tier 0 then). */
+function hasBonusMove(piece: BoardPiece, config: EngineConfig): boolean {
+  if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) return false;
+  if (piece.rarity === undefined || piece.pieceType === 'pawn' || piece.pieceType === 'king') return false;
+  return config.abilities[piece.pieceType][TIERS.indexOf(piece.rarity) as 0 | 1 | 2 | 3]?.bonusSelfMove === true;
+}
+
+/** Whether the next MOVE by `piece` is its free bonus move. */
+export function freeBonus(ledger: BonusLedger, piece: BoardPiece, config: EngineConfig): boolean {
+  return hasBonusMove(piece, config) && ledger.get(piece.instanceId!) === 'earned';
+}
+
+/** Records a MOVE by `piece`: a free one spends the bonus; a paid one earns it, once per turn. */
+export function recordMove(ledger: BonusLedger, piece: BoardPiece, config: EngineConfig, free: boolean): void {
+  if (!hasBonusMove(piece, config)) return;
+  if (free) ledger.set(piece.instanceId!, 'spent');
+  else if (!ledger.has(piece.instanceId!)) ledger.set(piece.instanceId!, 'earned');
+}
+
+/**
+ * Plays a MOVE on `board`. A multi-capture's first square `via` is derived from the board when not
+ * given (null forces a single capture); both captured pieces emit a `capture` event, X then Y.
+ */
 export function applyPlayerMove(
   board: Board,
   from: Square,
   to: Square,
   config: EngineConfig,
+  via?: Square | null,
 ): { board: Board; events: GameEvent[]; salvage: number; promoted?: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> } } {
   const mover = board[from] as BoardPiece;
   const next: Board = { ...board };
@@ -40,15 +70,19 @@ export function applyPlayerMove(
   let salvage = 0;
   let promoted: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> } | undefined;
 
-  const captured = board[to];
-  if (captured && captured.color === 'black') {
+  const first = via === undefined ? planPlayerMove(board, from, to, config).via : via;
+  for (const sq of first === null ? [to] : [first, to]) {
+    const captured = board[sq];
+    if (!captured || captured.color !== 'black') continue;
     const { enabled, divisor } = config.economy.salvage;
-    salvage = enabled ? Math.floor(config.pieceValues[captured.pieceType] / divisor) : 0;
+    const worth = enabled ? Math.floor(config.pieceValues[captured.pieceType] / divisor) : 0;
+    salvage += worth;
     events.push({
-      type: 'capture', square: to, pieceType: captured.pieceType, color: captured.color, salvage,
+      type: 'capture', square: sq, pieceType: captured.pieceType, color: captured.color, salvage: worth,
       ...(captured.instanceId !== undefined && { instanceId: captured.instanceId }),
       ...(captured.stageId !== undefined && { stageId: captured.stageId }),
     });
+    if (sq !== to) delete next[sq];
   }
 
   if (mover.pieceType === 'pawn' && mover.color === 'white' && to.endsWith('8')) {
@@ -81,6 +115,7 @@ export function resolveQueue(
   };
   const events: GameEvent[] = [];
   let salvage = 0;
+  const ledger: BonusLedger = new Map();
   const promotions: PieceInstance[] = [];
   for (let atStep = 0; atStep < queue.length; atStep++) {
     const action = queue[atStep]!;
@@ -90,12 +125,14 @@ export function resolveQueue(
       events.push(...applySkill(ctx, action, atStep, config));
       continue;
     }
-    if (ctx.moveCredits < 1) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
-    const reason = checkPlayerMove(ctx.board, action.from, action.to);
+    const mover = ctx.board[action.from];
+    const free = mover !== undefined && freeBonus(ledger, mover, config);
+    if (!free && ctx.moveCredits < 1) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
+    const { reason, via } = planPlayerMove(ctx.board, action.from, action.to, config);
     if (reason) {
       return { ok: false, error: { kind: 'illegal_move', atStep, from: action.from, to: action.to, reason } };
     }
-    const applied = applyPlayerMove(ctx.board, action.from, action.to, config);
+    const applied = applyPlayerMove(ctx.board, action.from, action.to, config, via);
     ctx.board = applied.board;
     events.push(...applied.events);
     if (applied.promoted) {
@@ -110,7 +147,8 @@ export function resolveQueue(
       events.push({ type: 'pawn_promoted', square, promotesTo, instanceId });
     }
     salvage += applied.salvage;
-    ctx.moveCredits--;
+    recordMove(ledger, mover!, config, free);
+    if (!free) ctx.moveCredits--;
   }
 
   // R1: this_turn modifiers expire before anything is judged (docs/02 §6).

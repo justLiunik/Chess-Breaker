@@ -34,7 +34,7 @@ export function tiersOf(board: StageState['board']): Int8Array {
   const t = new Int8Array(64);
   for (const [sq, piece] of Object.entries(board)) {
     if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) continue;
-    if (piece.rarity !== undefined) t[toIndex(sq)] = TIERS.indexOf(piece.rarity);
+    if (piece.rarity !== undefined) t[toIndex(sq)] = Math.max(0, TIERS.indexOf(piece.rarity));
   }
   return t;
 }

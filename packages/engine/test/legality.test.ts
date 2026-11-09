@@ -14,20 +14,20 @@ const st = (p: Record<string, string>) => stageOf(p);
 describe('checkPlayerMove', () => {
   const s = st({ e1: 'K', a1: 'R', b1: 'N', a3: 'P', a8: 'k', h1: 'r' });
   it('reports each reason in order', () => {
-    expect(checkPlayerMove(s.board, 'c3', 'c4')).toBe('no_piece');
-    expect(checkPlayerMove(s.board, 'a8', 'a7')).toBe('not_your_piece');
-    expect(checkPlayerMove(s.board, 'a1', 'b1')).toBe('own_piece');
-    expect(checkPlayerMove(s.board, 'a1', 'c5')).toBe('unreachable');
-    expect(checkPlayerMove(s.board, 'a1', 'a2')).toBe(null);
+    expect(checkPlayerMove(s.board, 'c3', 'c4', config)).toBe('no_piece');
+    expect(checkPlayerMove(s.board, 'a8', 'a7', config)).toBe('not_your_piece');
+    expect(checkPlayerMove(s.board, 'a1', 'b1', config)).toBe('own_piece');
+    expect(checkPlayerMove(s.board, 'a1', 'c5', config)).toBe('unreachable');
+    expect(checkPlayerMove(s.board, 'a1', 'a2', config)).toBe(null);
   });
   it('king_square for rook onto the black king along an open file', () => {
     const t = st({ e1: 'K', h1: 'R', h8: 'k' });
-    expect(checkPlayerMove(t.board, 'h1', 'h8')).toBe('king_square');
+    expect(checkPlayerMove(t.board, 'h1', 'h8', config)).toBe('king_square');
   });
   it('ignores check: king may step into check per action', () => {
     const t = st({ e1: 'K', a2: 'r', h8: 'k' });
-    expect(checkPlayerMove(t.board, 'e1', 'e2')).toBe(null);
-    expect(legalPlayerMoves(t, 'e1')).toContain('e2');
+    expect(checkPlayerMove(t.board, 'e1', 'e2', config)).toBe(null);
+    expect(legalPlayerMoves(t, 'e1', config)).toContain('e2');
     const moves = legalMoves(fromBoard(t.board), 'white').map((m) => toSquare(m.to));
     expect(moves).not.toContain('e2');
     expect(inCheck(fromBoard(st({ e1: 'K', e8: 'r', h8: 'k' }).board), 'white')).toBe(true);
@@ -37,12 +37,12 @@ describe('checkPlayerMove', () => {
 describe('legalPlayerMoves', () => {
   it('lists exactly the reachable squares', () => {
     const t = st({ e1: 'K', a1: 'R', a4: 'P', d1: 'n', h8: 'k' });
-    expect([...legalPlayerMoves(t, 'a1')].sort()).toEqual(['a2', 'a3', 'b1', 'c1', 'd1']);
+    expect([...legalPlayerMoves(t, 'a1', config)].sort()).toEqual(['a2', 'a3', 'b1', 'c1', 'd1']);
   });
   it('is empty for a malformed or empty square', () => {
     const t = st({ e1: 'K', a1: 'R', h8: 'k' });
-    expect(legalPlayerMoves(t, 'a1x')).toEqual([]);
-    expect(legalPlayerMoves(t, 'c3')).toEqual([]);
+    expect(legalPlayerMoves(t, 'a1x', config)).toEqual([]);
+    expect(legalPlayerMoves(t, 'c3', config)).toEqual([]);
   });
 });
 

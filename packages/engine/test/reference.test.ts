@@ -4,7 +4,12 @@ import { abilityAttacked, abilityTargets } from '../src/abilities';
 import { evaluate } from '../src/enemy/evaluate';
 import { legalMoves } from '../src/legality';
 import { isAttacked } from '../src/movegen';
-import { config, randomBoard } from './helpers';
+import { config, randomBoard, runOf, stageOf } from './helpers';
+import { legalPlayerMoves } from '../src/legality';
+import { resolveQueue } from '../src/queue';
+import { TIERS } from '../src/position';
+import { toIndex, toSquare } from '../src/square';
+import type { Action } from '../src/types';
 import { refAttacked, refLegalMoves, refPseudoMoves } from './reference/movegen';
 import { refEvaluate } from './reference/evaluate';
 
@@ -183,4 +188,67 @@ describe('fast engine against the slow reference', () => {
       expect(evaluate(b, config)).toBe(refEvaluate(b, config));
     }
   });
+});
+
+describe('White legal moves with tiers against the reference', () => {
+  const LETTER = [' ', 'P', 'N', 'B', 'R', 'Q', 'K'];
+
+  /** The stage a tier board stands for: White Hero Pieces carry their tier's rarity. */
+  function stageFrom(b: Int8Array, t: Int8Array) {
+    const pieces: Record<string, string> = {};
+    for (let i = 0; i < 64; i++) {
+      if (b[i] === 0) continue;
+      const letter = LETTER[Math.abs(b[i]!)]!;
+      pieces[toSquare(i)] = b[i]! > 0 ? letter : letter.toLowerCase();
+    }
+    const base = stageOf(pieces);
+    const board = { ...base.board };
+    for (let i = 0; i < 64; i++) {
+      const piece = board[toSquare(i)];
+      if (piece && piece.color === 'white' && piece.instanceId !== undefined && t[i]! > 0) {
+        board[toSquare(i)] = { ...piece, rarity: TIERS[t[i]!]! };
+      }
+    }
+    return { ...base, board };
+  }
+
+  /** The fast side: `legalPlayerMoves` candidates, each judged by the queue as a one-move turn. */
+  function fastLegal(b: Int8Array, t: Int8Array): string[] {
+    const stage = stageFrom(b, t);
+    const out: string[] = [];
+    for (let from = 0; from < 64; from++) {
+      if (b[from]! <= 0) continue;
+      for (const to of legalPlayerMoves(stage, toSquare(from), config)) {
+        const move: Action = { type: 'MOVE', from: toSquare(from), to };
+        if (resolveQueue(runOf(), stage, [move], config).ok) out.push(`${from}-${toIndex(to)}`);
+      }
+    }
+    return out.sort();
+  }
+
+  const WHITE_BOARDS = 1500;
+  const CHECK_TIER_BOARDS = 1000;
+
+  function boards(): { b: Int8Array; t: Int8Array; checked: boolean }[] {
+    const out: { b: Int8Array; t: Int8Array; checked: boolean }[] = [];
+    for (let i = 0; i < WHITE_BOARDS; i++) {
+      const t = new Int8Array(64);
+      out.push({ b: randomBoard('ref-tier-legal', i, { tiers: t }), t, checked: false });
+    }
+    for (let i = 0; i < CHECK_TIER_BOARDS; i++) {
+      const t = new Int8Array(64);
+      out.push({ b: randomBoard('ref-tier-legal-check', i, { sideInCheck: 'white', tiers: t }), t, checked: true });
+    }
+    return out;
+  }
+
+  it('the fast legal moves equal refLegalMoves on 2,500 tier boards, 1,000 with White in check', () => {
+    let pinnedOrEvading = 0;
+    for (const { b, t, checked } of boards()) {
+      const ref = [...new Set(refLegalMoves(b, 'white', t).map((m) => `${m.from}-${m.to}`))].sort();
+      expect(fastLegal(b, t)).toEqual(ref);
+      if (checked) pinnedOrEvading++;
+    }
+    expect(pinnedOrEvading).toBe(CHECK_TIER_BOARDS);
+  }, 120_000);
 });

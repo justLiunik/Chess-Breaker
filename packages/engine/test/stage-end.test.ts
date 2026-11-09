@@ -118,7 +118,7 @@ describe('I15: no queue adds a Hero Piece to the board after startStage', () => 
         const whites = Object.entries(board).filter(([, p]) => p.instanceId !== undefined).map(([sq]) => sq);
         if (whites.length === 0) break;
         const from = whites[pick(whites.length)]!;
-        const tos = legalPlayerMoves({ ...current.stage, board }, from);
+        const tos = legalPlayerMoves({ ...current.stage, board }, from, config);
         if (tos.length === 0) continue;
         const to = tos[pick(tos.length)]!;
         queue.push({ type: 'MOVE', from, to });

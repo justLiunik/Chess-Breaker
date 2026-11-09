@@ -27,7 +27,7 @@ function replay(stage: StageState, queue: Action[]): { made: number; board: Stag
   let made = 0;
   for (const a of queue) {
     if (a.type !== 'MOVE') break;
-    expect(checkPlayerMove(board, a.from, a.to)).toBeNull(); // I4
+    expect(checkPlayerMove(board, a.from, a.to, config)).toBeNull(); // I4
     board = applyPlayerMove(board, a.from, a.to, config).board;
     made++;
   }

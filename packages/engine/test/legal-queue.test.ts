@@ -64,7 +64,7 @@ function bruteForce(run: RunState, stage: StageState): boolean {
       const here = { ...stage, board: ctx.board };
       for (const from of Object.keys(ctx.board)) {
         if (ctx.board[from]!.color !== 'white') continue;
-        for (const to of legalPlayerMoves(here, from)) {
+        for (const to of legalPlayerMoves(here, from, config)) {
           queue.push({ type: 'MOVE', from, to });
           const next = { ...ctx, board: applyPlayerMove(ctx.board, from, to, config).board, moveCredits: ctx.moveCredits - 1 };
           const done = go(next, skills, moves + 1);

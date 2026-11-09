@@ -1,16 +1,18 @@
 import type { Action, Color, EngineConfig, MoveRejection, RunState, Square, StageState } from './types';
-import type { QueueCtx } from './queue';
-import { applyPlayerMove, resolveQueue } from './queue';
+import type { BonusLedger, QueueCtx } from './queue';
+import { applyPlayerMove, freeBonus, recordMove, resolveQueue } from './queue';
 import { applySkill, checkSkill } from './skills/check';
 import * as position from './position';
 import { isSquare, toIndex, toSquare } from './square';
 import * as movegen from './movegen';
+import { abilityTargets, hasTiers } from './abilities';
 import type { Move } from './movegen';
 
 // Imported bindings are copied into module constants once: vitest's module runner turns every use
 // of an imported binding into a getter call, which made the search's hot loops ~1.8x slower under
 // test than under plain Node.
-const { KING, PAWN, QUEEN, fromBoard } = position;
+const { KING, PAWN, QUEEN, fromBoard, tiersOf } = position;
+const TYPE_OF = [undefined, undefined, 'knight', 'bishop', 'rook', 'queen'] as const;
 const {
   attackedAfterMove, attackedBy, onLine, pieceTargets, promotionOf, pseudoMoves, targetsInto,
 } = movegen;
@@ -127,29 +129,77 @@ const COUNT_BUF = new Int8Array(32);
 /** Side output of `countLegalInPlace`. */
 export const COUNTS = { king: 0 };
 
-export function checkPlayerMove(
-  board: StageState['board'], from: Square, to: Square,
-): MoveRejection | null {
-  if (!isSquare(from)) return 'no_piece';
-  if (!isSquare(to)) return 'unreachable';
-  const piece = board[from];
-  if (!piece) return 'no_piece';
-  if (piece.color !== 'white') return 'not_your_piece';
-  const dest = board[to];
-  const destType = dest ? (dest.transformed?.pieceType ?? dest.pieceType) : null;
-  if (dest && dest.color === 'black' && destType === 'king') return 'king_square';
-  if (dest && dest.color === 'white') return 'own_piece';
-  const b = fromBoard(board);
-  if (!pieceTargets(b, toIndex(from)).includes(toIndex(to))) return 'unreachable';
-  return null;
+/** A destination of a player's piece and, for a multi-capture ending on it, the first captured square (else -1). */
+type PlayerTarget = { to: number; via: number };
+
+/**
+ * The destinations of the piece on `from`, one per square: the M1 targets when the board has no
+ * tiers, else the ability targets. A square reachable both as a single move and as a multi-capture's
+ * second square counts as the single move.
+ */
+function playerTargets(b: Int8Array, t: Int8Array, from: number, config: EngineConfig): PlayerTarget[] {
+  if (!hasTiers(t)) return pieceTargets(b, from).map((to) => ({ to, via: -1 }));
+  const byTo = new Map<number, PlayerTarget>();
+  for (const m of abilityTargets(b, t, from, config.abilities)) {
+    const prev = byTo.get(m.to);
+    if (prev === undefined || (prev.via >= 0 && m.via < 0)) byTo.set(m.to, m);
+  }
+  return [...byTo.values()];
 }
 
-export function legalPlayerMoves(stage: StageState, from: Square): Square[] {
+/** Whether an enemy piece stands strictly between `from` and `to` on one rank, file or diagonal. */
+function enemyBetween(b: Int8Array, from: number, to: number): boolean {
+  const df = (to & 7) - (from & 7);
+  const dr = (to >> 3) - (from >> 3);
+  if (!(df === 0 || dr === 0 || Math.abs(df) === Math.abs(dr))) return false;
+  const step = Math.sign(df) + 8 * Math.sign(dr);
+  for (let i = from + step; i !== to; i += step) if (b[i]! < 0) return true;
+  return false;
+}
+
+/**
+ * Judges a player's `MOVE` and, when it is legal, names the square it captures first: the `via` of
+ * a multi-capture ending on `to` (docs/02 §2.3), else null. An own piece beyond an enemy on a
+ * multi-capturing piece's line is a bad Y, `unreachable`, not `own_piece`.
+ */
+export function planPlayerMove(
+  board: StageState['board'], from: Square, to: Square, config: EngineConfig,
+): { reason: MoveRejection | null; via: Square | null } {
+  const refuse = (reason: MoveRejection) => ({ reason, via: null });
+  if (!isSquare(from)) return refuse('no_piece');
+  if (!isSquare(to)) return refuse('unreachable');
+  const piece = board[from];
+  if (!piece) return refuse('no_piece');
+  if (piece.color !== 'white') return refuse('not_your_piece');
+  const dest = board[to];
+  const destType = dest ? (dest.transformed?.pieceType ?? dest.pieceType) : null;
+  if (dest && dest.color === 'black' && destType === 'king') return refuse('king_square');
+  const b = fromBoard(board);
+  const t = tiersOf(board);
+  const f = toIndex(from);
+  const x = toIndex(to);
+  if (dest && dest.color === 'white') {
+    const type = TYPE_OF[b[f]!];
+    const multi = type !== undefined && t[f]! > 0 && config.abilities[type][t[f] as 1 | 2 | 3].multiCapture > 0;
+    return refuse(multi && enemyBetween(b, f, x) ? 'unreachable' : 'own_piece');
+  }
+  const target = playerTargets(b, t, f, config).find((m) => m.to === x);
+  if (target === undefined) return refuse('unreachable');
+  return { reason: null, via: target.via >= 0 ? toSquare(target.via) : null };
+}
+
+export function checkPlayerMove(
+  board: StageState['board'], from: Square, to: Square, config: EngineConfig,
+): MoveRejection | null {
+  return planPlayerMove(board, from, to, config).reason;
+}
+
+export function legalPlayerMoves(stage: StageState, from: Square, config: EngineConfig): Square[] {
   if (!isSquare(from)) return [];
   const b = fromBoard(stage.board);
   const f = toIndex(from);
   if (b[f]! <= 0) return [];
-  return pieceTargets(b, f).map(toSquare);
+  return playerTargets(b, tiersOf(stage.board), f, config).map((m) => toSquare(m.to));
 }
 
 /**
@@ -165,15 +215,24 @@ export function hasLegalQueue(run: RunState, stage: StageState, config: EngineCo
   const squares = Object.keys(stage.board);
   const queue: Action[] = [];
 
-  const movesFrom = (board: StageState['board'], credits: number): boolean => {
-    if (credits < 1) return false;
+  const movesFrom = (board: StageState['board'], credits: number, ledger: BonusLedger): boolean => {
     const here = { ...stage, board };
     for (const from of Object.keys(board)) {
-      if (board[from]!.color !== 'white') continue;
-      for (const to of legalPlayerMoves(here, from)) {
+      const piece = board[from]!;
+      if (piece.color !== 'white') continue;
+      const free = freeBonus(ledger, piece, config);
+      if (credits < 1 && !free) continue;
+      for (const to of legalPlayerMoves(here, from, config)) {
         queue.push({ type: 'MOVE', from, to });
-        const done = resolveQueue(run, stage, queue, config).ok
-          || (credits > 1 && movesFrom(applyPlayerMove(board, from, to, config).board, credits - 1));
+        let done = resolveQueue(run, stage, queue, config).ok;
+        if (!done) {
+          const nextLedger: BonusLedger = new Map(ledger);
+          recordMove(nextLedger, piece, config, free);
+          const left = free ? credits : credits - 1;
+          if (left >= 1 || [...nextLedger.values()].includes('earned')) {
+            done = movesFrom(applyPlayerMove(board, from, to, config).board, left, nextLedger);
+          }
+        }
         queue.pop();
         if (done) return true;
       }
@@ -182,7 +241,7 @@ export function hasLegalQueue(run: RunState, stage: StageState, config: EngineCo
   };
 
   const skillsFrom = (ctx: QueueCtx, used: Set<string>): boolean => {
-    if (movesFrom(ctx.board, ctx.moveCredits)) return true;
+    if (movesFrom(ctx.board, ctx.moveCredits, new Map())) return true;
     for (const skillId of skillIds) {
       if (used.has(skillId)) continue;
       const kind = config.skills[skillId]!.target.kind;
