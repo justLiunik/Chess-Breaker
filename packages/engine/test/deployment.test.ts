@@ -67,6 +67,54 @@ describe('startStage refusals (each spends nothing; inputs are frozen)', () => {
   });
 });
 
+describe('startStage check order (spec 7.2: the earlier failure wins)', () => {
+  const withDeck = (f: (d: RunState['deck']) => RunState['deck']): RunState => {
+    const run = runOf();
+    return deepFreeze({ ...run, deck: f(run.deck) });
+  };
+  it('stage_not_active beats wrong_phase', () => {
+    refused(runOf(), deploymentStageOf({ e8: 'k' }, { status: 'won', phase: 'action' }), [K], { kind: 'stage_not_active' });
+  });
+  it('not_in_deck beats a bad square in the same placement', () => {
+    refused(runOf(), stage(), [K, P('p_nope', 'd5')], { kind: 'invalid_deployment', to: 'd5', reason: 'not_in_deck' });
+  });
+  it('durability_unavailable beats outside_zone', () => {
+    const run = withDeck((d) => d.map((p) => (p.instanceId === 'p_knight_02' ? { ...p, durability: 0 } : p)));
+    refused(run, stage(), [K, P('p_knight_02', 'd5')], { kind: 'durability_unavailable', instanceId: 'p_knight_02' });
+  });
+  it('an invalid first placement beats a later duplicate', () => {
+    refused(runOf(), stage(), [K, P('p_knight_02', 'd5'), P('p_knight_03', 'd1'), P('p_knight_03', 'f1')],
+      { kind: 'invalid_deployment', to: 'd5', reason: 'outside_zone' });
+  });
+  it('king_missing beats spawn_points_exceeded', () => {
+    refused(runOf(), stage(), [P('p_knight_02', 'a1'), P('p_bishop_04', 'b1'), P('p_bishop_05', 'c1'), P('p_knight_03', 'd1')],
+      { kind: 'invalid_deployment', to: 'a1', reason: 'king_missing' });
+  });
+  it('spawn_points_exceeded beats king_in_check', () => {
+    const run = withDeck((d) => d.map((p) => (p.instanceId === 'p_bishop_04' ? { ...p, rarity: 'legendary' as const } : p)));
+    refused(run, deploymentStageOf({ e8: 'k', e7: 'r' }),
+      [K, P('p_bishop_04', 'a1'), P('p_knight_02', 'b1'), P('p_knight_03', 'c1')],
+      { kind: 'spawn_points_exceeded', budget: 9, cost: 11 });
+  });
+});
+
+describe('startStage edge cases', () => {
+  it('refuses empty placements as king_missing', () => {
+    refused(runOf(), stage(), [], { kind: 'invalid_deployment', to: '', reason: 'king_missing' });
+  });
+  it('refuses a malformed square as outside_zone without throwing', () => {
+    refused(runOf(), stage(), [K, P('p_knight_02', 'zz')], { kind: 'invalid_deployment', to: 'zz', reason: 'outside_zone' });
+    refused(runOf(), stage(), [K, P('p_knight_02', 'e')], { kind: 'invalid_deployment', to: 'e', reason: 'outside_zone' });
+  });
+  it('refuses the King placed twice as duplicate', () => {
+    refused(runOf(), stage(), [K, P('p_king_01', 'd1')], { kind: 'invalid_deployment', to: 'd1', reason: 'duplicate' });
+  });
+  it('refuses two non-King pieces on one square as occupied', () => {
+    refused(runOf(), stage(), [K, P('p_knight_02', 'd1'), P('p_knight_03', 'd1')],
+      { kind: 'invalid_deployment', to: 'd1', reason: 'occupied' });
+  });
+});
+
 describe('startStage success', () => {
   const run0 = runOf({ loadout: [{ skillId: 'x', charges: 0, chargesMax: 3 }] });
   const go = () => {

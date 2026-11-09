@@ -44,6 +44,7 @@ export function startStage(
 
   const kings = placed.filter((p) => p.instance.pieceType === 'king');
   if (kings.length !== 1) {
+    // `to` is the first placement's square, or '' when there are no placements.
     return refuse({ kind: 'invalid_deployment', to: placements[0]?.to ?? '', reason: 'king_missing' });
   }
 
