@@ -835,6 +835,36 @@ if (stage) {
     }
   }
 
+  // Stage Pieces (no instanceId) carry a unique stageId; Hero Pieces never do.
+  // Modifiers and the skill log identify pieces by instanceId ?? stageId.
+  const stageIdSquares = new Map();
+  for (const [square, piece] of pieces) {
+    if (piece.instanceId && piece.stageId) {
+      fail(`stage-state.yaml:${square}: a Hero Piece (instanceId) must not carry a stageId`);
+    } else if (!piece.instanceId && !piece.stageId) {
+      fail(`stage-state.yaml:${square}: Stage Piece missing stageId`);
+    }
+    if (piece.stageId) {
+      if (stageIdSquares.has(piece.stageId)) {
+        fail(`stage-state.yaml:${square}: stageId "${piece.stageId}" is already used on ${stageIdSquares.get(piece.stageId)}`);
+      } else {
+        stageIdSquares.set(piece.stageId, square);
+      }
+    }
+  }
+  const skillLog = stage.skillLog ?? [];
+  for (const mod of stage.modifiers ?? []) {
+    const logged = skillLog.some((e) => e.skillId === mod.source && e.targetId === mod.target && e.turn === mod.appliedOnTurn);
+    if (!logged) {
+      fail(`stage-state.yaml: modifier ${mod.modifierId} (${mod.source} on ${mod.target}, turn ${mod.appliedOnTurn}) has no matching skillLog entry`);
+    }
+  }
+  for (const entry of skillLog) {
+    if (entry.turn > (stage.turnsUsed ?? 0) + 1) {
+      fail(`stage-state.yaml: skillLog entry ${entry.skillId} is on turn ${entry.turn}, past turn ${(stage.turnsUsed ?? 0) + 1}`);
+    }
+  }
+
   // Deployment phase: only Stage Pieces stand on the board. Action phase: the
   // Hero Pieces still on the board cost no more than the stage's spawn points
   // (captured summons only lower the sum).

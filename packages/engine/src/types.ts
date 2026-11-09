@@ -7,6 +7,8 @@ export interface BoardPiece {
   pieceType: PieceType;
   color: Color;
   instanceId?: string;
+  /** Stable id of a Stage Piece (no instanceId): s01, s02, ... Hero Pieces are identified by instanceId instead. */
+  stageId?: string;
   spawned?: true;
   rarity?: Rarity;
   promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
@@ -31,6 +33,7 @@ export interface ActiveModifier {
     | 'place_piece' | 'displace_piece' | 'return_to_deck' | 'shield_piece'
     | 'reveal_intent' | 'add_plan_undo';
   source?: string;
+  /** Id of the targeted piece: its `instanceId ?? stageId`, not a square (squares change as pieces move). */
   target?: string;
   duration: 'instant' | 'this_turn' | 'next_enemy_turn' | 'permanent';
   appliedOnTurn?: number;
@@ -53,6 +56,8 @@ export interface StageState {
   /** Summon budget: the summons' total spawnCost must fit (docs/02 §5). Deployment ranks are global (rules.deploymentRanks). */
   spawnPoints: number;
   modifiers: ActiveModifier[];
+  /** Skills used this stage, in order; restrictions such as distinct_targets read it. */
+  skillLog: { skillId: string; turn: number; targetId?: string }[];
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';
   endReason?: EndReason;

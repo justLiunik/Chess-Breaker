@@ -41,6 +41,13 @@ function buildStage(): StageState {
       promotesTo: { pieceType: 'knight', rarity: 'normal' },
     };
   }
+  // Stage Pieces get stageIds s01, s02, ... in square-index order (a1 first).
+  const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
+  let stageCount = 0;
+  for (const sq of Object.keys(board).sort((a, b) => index(a) - index(b))) {
+    const piece = board[sq]!;
+    if (piece.instanceId === undefined) piece.stageId = `s${String(++stageCount).padStart(2, '0')}`;
+  }
   return {
     stageSeed: '9C41-0B77',
     templateId: tpl.id,
@@ -54,6 +61,7 @@ function buildStage(): StageState {
     moveCredits: 1,
     spawnPoints: tpl.spawnPoints,
     modifiers: [],
+    skillLog: [],
     enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth },
     status: 'active',
   };

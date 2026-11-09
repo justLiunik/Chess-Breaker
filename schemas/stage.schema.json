@@ -7,7 +7,7 @@
   "required": [
     "stageSeed", "templateId", "playerColor", "phase", "board", "turnsUsed", "turnLimit",
     "focus", "focusPool", "moveCredits", "spawnPoints",
-    "modifiers", "enemyPolicy", "status"
+    "modifiers", "skillLog", "enemyPolicy", "status"
   ],
   "additionalProperties": false,
   "properties": {
@@ -40,6 +40,20 @@
       "type": "array",
       "description": "Active skill effects. Expiry is ordered by duration in docs/02 §6.",
       "items": { "$ref": "#/$defs/activeModifier" }
+    },
+    "skillLog": {
+      "type": "array",
+      "description": "Skills used this stage, in order. Restrictions such as distinct_targets read it; every live modifier has a matching entry.",
+      "items": {
+        "type": "object",
+        "required": ["skillId", "turn"],
+        "additionalProperties": false,
+        "properties": {
+          "skillId": { "type": "string" },
+          "turn": { "type": "integer", "minimum": 1 },
+          "targetId": { "type": "string", "description": "The targeted piece: its instanceId or stageId." }
+        }
+      }
     },
     "enemyPolicy": {
       "type": "object",
@@ -89,6 +103,11 @@
         "instanceId": {
           "type": "string",
           "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces have no instance."
+        },
+        "stageId": {
+          "type": "string",
+          "pattern": "^s[0-9]{2,}$",
+          "description": "Stable id of a Stage Piece (enemy pieces and spawned pawns); unique on the board. Hero Pieces have an instanceId instead."
         },
         "spawned": {
           "const": true,
@@ -159,7 +178,7 @@
           ]
         },
         "source": { "type": "string", "description": "Skill id that created it." },
-        "target": { "type": "string", "description": "Square or piece the modifier applies to." },
+        "target": { "type": "string", "description": "Id of the piece the modifier applies to: its instanceId or stageId." },
         "duration": { "enum": ["instant", "this_turn", "next_enemy_turn", "permanent"] },
         "appliedOnTurn": { "type": "integer", "minimum": 1 }
       }

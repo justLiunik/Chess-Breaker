@@ -19,7 +19,7 @@ describe('commitQueue', () => {
       enemyPolicy: scripted(['h7h6']), moveCredits: 1, focus: 0, turnsUsed: 2,
     });
     const v = ok(commitQueue(runOf(), stage, mv('a1', 'a2'), config));
-    expect(v.stage.board.h6).toEqual({ pieceType: 'pawn', color: 'black' });
+    expect(v.stage.board.h6).toEqual({ pieceType: 'pawn', color: 'black', stageId: stage.board.h7!.stageId });
     expect(v.stage.board.h7).toBeUndefined();
     expect(v.stage.turnsUsed).toBe(3);
     expect(v.stage.enemyPolicy.cursor).toBe(1);
@@ -42,12 +42,13 @@ describe('commitQueue', () => {
       enemyPolicy: scripted(['b2b1']),
     });
     const v = ok(commitQueue(runOf({ coins: 7 }), stage, mv('a1', 'a2'), config));
-    expect(v.stage.board.b1).toEqual({ pieceType: 'queen', color: 'black' });
+    expect(v.stage.board.b1).toEqual({ pieceType: 'queen', color: 'black', stageId: stage.board.b2!.stageId });
     expect(v.events).toContainEqual({ type: 'enemy_promoted', square: 'b1' });
-    const cap = ok(commitQueue(runOf({ coins: 7 }), stageOf(
-      { g3: 'K', a1: 'R', e8: 'k', c8: 'r', c1: 'B' }, { enemyPolicy: scripted(['c8c1']) }), mv('a1', 'a2'), config));
+    const capStage = stageOf(
+      { g3: 'K', a1: 'R', e8: 'k', c8: 'r', c1: 'B' }, { enemyPolicy: scripted(['c8c1']) });
+    const cap = ok(commitQueue(runOf({ coins: 7 }), capStage, mv('a1', 'a2'), config));
     expect(cap.run.coins).toBe(7);
-    expect(cap.stage.board.c1).toEqual({ pieceType: 'rook', color: 'black' });
+    expect(cap.stage.board.c1).toEqual({ pieceType: 'rook', color: 'black', stageId: capStage.board.c8!.stageId });
     expect(cap.events).toContainEqual({
       type: 'capture', square: 'c1', pieceType: 'bishop', color: 'white', salvage: 0,
     });
@@ -59,7 +60,7 @@ describe('commitQueue', () => {
     expect(v.events).toContainEqual({
       type: 'capture', square: 'a2', pieceType: 'rook', color: 'white', salvage: 0,
     });
-    expect(v.stage.board.a2).toEqual({ pieceType: 'rook', color: 'black' });
+    expect(v.stage.board.a2).toEqual({ pieceType: 'rook', color: 'black', stageId: stage.board.a8!.stageId });
   });
 
   it('emits enemy_fell_back once, when the script cannot be played', () => {

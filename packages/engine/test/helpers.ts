@@ -19,6 +19,16 @@ const LETTERS: Record<string, PieceType> = {
   k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
 };
 
+/** Gives each Stage Piece (no instanceId) a stageId s01, s02, ... in square-index order (a1 first). */
+export function assignStageIds(board: Record<Square, BoardPiece>): void {
+  const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
+  let n = 0;
+  for (const sq of Object.keys(board).sort((a, b) => index(a) - index(b))) {
+    const piece = board[sq]!;
+    if (piece.instanceId === undefined) piece.stageId = `s${String(++n).padStart(2, '0')}`;
+  }
+}
+
 export function stageOf(
   pieces: Record<Square, string>,
   overrides: Partial<StageState> = {},
@@ -38,6 +48,7 @@ export function stageOf(
       board[sq] = { pieceType, color: 'white', instanceId: `p_${pieceType}_${sq}` };
     }
   }
+  assignStageIds(board);
   return deepFreeze({
     stageSeed: '9C41-0B77',
     templateId: 'tpl-act1-open-field',
@@ -51,6 +62,7 @@ export function stageOf(
     moveCredits: 1,
     spawnPoints: 9,
     modifiers: [],
+    skillLog: [],
     enemyPolicy: { type: 'best_move', depth: 2 },
     status: 'active',
     ...overrides,

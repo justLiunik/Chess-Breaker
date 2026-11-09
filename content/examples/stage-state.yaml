@@ -30,6 +30,7 @@ board:
   c4:
     pieceType: pawn
     color: white
+    stageId: s01
     spawned: true
     rarity: rare
     promotesTo:
@@ -38,24 +39,31 @@ board:
   a7:
     pieceType: pawn
     color: black
+    stageId: s03
   b7:
     pieceType: pawn
     color: black
+    stageId: s04
   c7:
     pieceType: pawn
     color: black
+    stageId: s05
   g7:
     pieceType: pawn
     color: black
+    stageId: s06
   h7:
     pieceType: pawn
     color: black
+    stageId: s07
   e8:
     pieceType: king
     color: black
+    stageId: s08
   f6:
     pieceType: knight
     color: black
+    stageId: s02
 
 turnsUsed: 2
 turnLimit: 8
@@ -67,9 +75,14 @@ modifiers:
   - modifierId: mod_0007
     primitive: suppress_piece
     source: lockdown
-    target: b7
+    target: s04
     duration: next_enemy_turn
     appliedOnTurn: 2
+
+skillLog:
+  - skillId: lockdown
+    turn: 2
+    targetId: s04
 
 enemyPolicy:
   type: best_move
