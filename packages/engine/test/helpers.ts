@@ -2,7 +2,7 @@ import { loadEngineConfig } from '@checkbreaker/content';
 import { rng } from '../src/rng';
 import { isAttacked } from '../src/movegen';
 import type {
-  BoardPiece, EngineConfig, PieceType, RunState, Square, StageState,
+  BoardPiece, Color, EngineConfig, PieceType, RunState, Square, StageState,
 } from '../src/types';
 
 export const config: EngineConfig = loadEngineConfig();
@@ -118,14 +118,19 @@ export function fenToStage(fen: string, overrides: Partial<StageState> = {}): St
 
 /**
  * A deterministic random board: one king per side, 2-14 other pieces, no pawn on rank 1 or 8,
- * neither king in check. The same (seed, i) always gives the same board.
+ * neither king in check, or with `sideInCheck` set, exactly that side in check. The same (seed, i, option) always gives the same board.
  */
-export function randomBoard(seed: string, i: number): Int8Array {
+export function randomBoard(seed: string, i: number, opts: { sideInCheck?: Color } = {}): Int8Array {
   let cursor = 0;
   const next = (n: number): number => {
-    const r = rng(`${seed}|${i}`, cursor);
-    cursor = r.next;
-    return Math.floor(r.value * n);
+    // The FNV hash's top bits barely move between consecutive cursors, so finish it with a
+    // murmur-style mix before scaling.
+    let h = rng(`${seed}|${i}`, cursor).value * 2 ** 32 >>> 0;
+    cursor++;
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return Math.floor(((h >>> 0) / 2 ** 32) * n);
   };
   for (;;) {
     const b = new Int8Array(64);
@@ -145,6 +150,10 @@ export function randomBoard(seed: string, i: number): Int8Array {
       const type = 1 + next(5);
       place(next(2) === 0 ? type : -type, type === 1);
     }
-    if (!isAttacked(b, b.indexOf(6), 'black') && !isAttacked(b, b.indexOf(-6), 'white')) return b;
+    const whiteChecked = isAttacked(b, b.indexOf(6), 'black');
+    const blackChecked = isAttacked(b, b.indexOf(-6), 'white');
+    const want = opts.sideInCheck;
+    if (want === undefined ? !whiteChecked && !blackChecked
+      : want === 'white' ? whiteChecked && !blackChecked : blackChecked && !whiteChecked) return b;
   }
 }
