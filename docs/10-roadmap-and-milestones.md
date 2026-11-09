@@ -101,7 +101,7 @@ must be resisted — that would silently delete the game's core mechanic.
       stalemate (a loss) otherwise (test).
 - [x] Captured instance is permanently absent from `RunState.deck` (test).
 - [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
-- [ ] Ascension and repairs never change a piece's rarity; the King's rarity is always `null` (I12).
+- [x] Ascension never changes a piece's rarity; the King's rarity is always `null` (I12; `skills.test.ts`).
 - [x] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
       not give check through an ally; Unique can; Legendary bishop moves like a queen and costs 5
       spawn points; Rare/Unique knight leap sets; Legendary knight bonus move once per turn, itself only.
@@ -176,6 +176,7 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 - [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
 - [ ] The shop never offers a pawn (test).
 - [ ] Recovery offer fires exactly when non-king deck < 4 and disappears at 4 (test).
+- [ ] Repairs never change a piece's rarity (I12, test).
 - [ ] 10,000 seeded shop visits per act, rerolls included, never offer a tier above that act's
       ceiling; no Act I visit offers Unique or higher; recovery offers are always Normal (I14).
 - [ ] Prices match `docs/07 §2.2` for every type × tier × act (table-driven test).

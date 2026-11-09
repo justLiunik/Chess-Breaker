@@ -3,7 +3,9 @@ import { resolveQueue } from '../src/queue';
 import { commitQueue, simulate } from '../src/rules';
 import { PRIMITIVES } from '../src/skills/registry';
 import type { Action, CommitError, RunState, StageState } from '../src/types';
-import { config, deepFreeze, runOf, stageOf } from './helpers';
+import { startStage } from '../src/deployment';
+import { endStage } from '../src/stage-end';
+import { config, deepFreeze, deploymentStageOf, runOf, stageOf } from './helpers';
 
 const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
 const skill = (skillId: string, target?: string): Action => ({
@@ -252,5 +254,34 @@ describe('ACTIVATE_SKILL check order (earlier check wins)', () => {
   it('a credit granted mid-queue applies from its step on: MOVE, Twin Step, MOVE is legal', () => {
     const r = simulate(runWith('twin_step'), stage(), [mv('a1', 'a2'), skill('twin_step'), mv('a2', 'a3')], config);
     expect(r.ok).toBe(true);
+  });
+});
+
+describe('I12: rarity is fixed at creation', () => {
+  it("Ascension never changes a Rare bishop's rarity, and the King's rarity stays null through startStage and endStage", () => {
+    const base = runOf({ loadout: [slot('ascension')] });
+    const rare = deepFreeze({
+      ...base, deck: base.deck.map((p) => (p.instanceId === 'p_bishop_04' ? { ...p, rarity: 'rare' as const } : p)),
+    });
+    const started = startStage(rare, deploymentStageOf({ e8: 'k', a8: 'r' }), [
+      { instanceId: 'p_king_01', to: 'e1' }, { instanceId: 'p_bishop_04', to: 'c1' },
+    ], config);
+    if (!started.ok) throw new Error(JSON.stringify(started.error));
+    const { run, stage: s0 } = started.value;
+    expect(s0.board.c1).toMatchObject({ pieceType: 'bishop', rarity: 'rare' });
+    expect(run.deck.find((p) => p.instanceId === 'p_king_01')!.rarity).toBeNull();
+
+    // c1 -> c5 is a queen move: the bishop is a queen for this step, then R1 reverts it.
+    const r = simulate(run, deepFreeze({ ...s0, focus: 3 }), [skill('ascension', 'c1'), mv('c1', 'c5')], config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.events).toContainEqual({ type: 'piece_transformed', target: 'p_bishop_04', pieceType: 'queen' });
+    expect(r.value.events).toContainEqual({ type: 'transform_reverted', target: 'p_bishop_04' });
+    expect(r.value.stage.board.c5).toMatchObject({ pieceType: 'bishop', rarity: 'rare', instanceId: 'p_bishop_04' });
+    expect(r.value.run.deck.find((p) => p.instanceId === 'p_bishop_04')!.rarity).toBe('rare');
+
+    const ended = endStage(r.value.run, deepFreeze({ ...r.value.stage, status: 'won' as const }), config);
+    if (!ended.ok) throw new Error(JSON.stringify(ended.error));
+    expect(ended.value.run.deck.find((p) => p.instanceId === 'p_king_01')!.rarity).toBeNull();
+    expect(ended.value.run.deck.find((p) => p.instanceId === 'p_bishop_04')!.rarity).toBe('rare');
   });
 });
