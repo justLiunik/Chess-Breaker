@@ -5,7 +5,7 @@ import { evaluate } from '../src/enemy/evaluate';
 import { legalMoves } from '../src/legality';
 import { isAttacked } from '../src/movegen';
 import { config, randomBoard, runOf, stageOf } from './helpers';
-import { legalPlayerMoves } from '../src/legality';
+import { legalPlayerMoves, planPlayerMove } from '../src/legality';
 import { resolveQueue } from '../src/queue';
 import { TIERS } from '../src/position';
 import { toIndex, toSquare } from '../src/square';
@@ -226,6 +226,16 @@ describe('White legal moves with tiers against the reference', () => {
     return out.sort();
   }
 
+  /** Whether the straight move from `from` to `to` passes over a White piece. */
+  function leapsAlly(b: Int8Array, from: number, to: number): boolean {
+    const df = (to & 7) - (from & 7);
+    const dr = (to >> 3) - (from >> 3);
+    if (!(df === 0 || dr === 0 || Math.abs(df) === Math.abs(dr))) return false;
+    const step = Math.sign(df) + 8 * Math.sign(dr);
+    for (let i = from + step; i !== to; i += step) if (b[i]! > 0) return true;
+    return false;
+  }
+
   const WHITE_BOARDS = 1500;
   const CHECK_TIER_BOARDS = 1000;
 
@@ -243,12 +253,22 @@ describe('White legal moves with tiers against the reference', () => {
   }
 
   it('the fast legal moves equal refLegalMoves on 2,500 tier boards, 1,000 with White in check', () => {
-    let pinnedOrEvading = 0;
+    const n = { multiCapture: 0, allyLeap: 0, checkedWithMoves: 0 };
     for (const { b, t, checked } of boards()) {
       const ref = [...new Set(refLegalMoves(b, 'white', t).map((m) => `${m.from}-${m.to}`))].sort();
-      expect(fastLegal(b, t)).toEqual(ref);
-      if (checked) pinnedOrEvading++;
+      const fast = fastLegal(b, t);
+      expect(fast).toEqual(ref);
+      const stage = stageFrom(b, t);
+      const plans = fast.map((k) => {
+        const [from, to] = k.split('-').map(Number) as [number, number];
+        return { from, to, via: planPlayerMove(stage.board, toSquare(from), toSquare(to), config).via };
+      });
+      if (plans.some((p) => p.via !== null)) n.multiCapture++;
+      if (plans.some((p) => leapsAlly(b, p.from, p.to))) n.allyLeap++;
+      if (checked && fast.length > 0) n.checkedWithMoves++;
     }
-    expect(pinnedOrEvading).toBe(CHECK_TIER_BOARDS);
+    expect(n.multiCapture).toBeGreaterThanOrEqual(20);
+    expect(n.allyLeap).toBeGreaterThanOrEqual(50);
+    expect(n.checkedWithMoves).toBeGreaterThanOrEqual(50);
   }, 120_000);
 });

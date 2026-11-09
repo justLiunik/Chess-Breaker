@@ -1,4 +1,4 @@
-import type { AbilityFlags, AbilityTable, DeckType, EngineConfig, Rarity } from './types';
+import type { BoardPiece, AbilityFlags, AbilityTable, DeckType, EngineConfig, Rarity } from './types';
 import * as movegen from './movegen';
 import * as position from './position';
 
@@ -334,4 +334,11 @@ export function abilityAttacked(b: Int8Array, t: Int8Array, sq: number, table: A
     if (m !== undefined && m.extraLeapAdj !== null && m.extraLeapAdj[p * 64 + sq] === 1) return true;
   }
   return false;
+}
+
+/** Whether `piece` has a bonus move (the Legendary knight): a Hero Piece of a tier whose flags say so. */
+export function hasBonusMove(piece: BoardPiece, config: EngineConfig): boolean {
+  const tier = position.tierOfPiece(piece);
+  if (tier === 0 || piece.pieceType === 'pawn' || piece.pieceType === 'king') return false;
+  return config.abilities[piece.pieceType][tier as 1 | 2 | 3].bonusSelfMove;
 }

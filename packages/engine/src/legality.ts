@@ -12,7 +12,6 @@ import type { Move } from './movegen';
 // of an imported binding into a getter call, which made the search's hot loops ~1.8x slower under
 // test than under plain Node.
 const { KING, PAWN, QUEEN, fromBoard, tiersOf } = position;
-const TYPE_OF = [undefined, undefined, 'knight', 'bishop', 'rook', 'queen'] as const;
 const {
   attackedAfterMove, attackedBy, onLine, pieceTargets, promotionOf, pseudoMoves, targetsInto,
 } = movegen;
@@ -147,20 +146,9 @@ function playerTargets(b: Int8Array, t: Int8Array, from: number, config: EngineC
   return [...byTo.values()];
 }
 
-/** Whether an enemy piece stands strictly between `from` and `to` on one rank, file or diagonal. */
-function enemyBetween(b: Int8Array, from: number, to: number): boolean {
-  const df = (to & 7) - (from & 7);
-  const dr = (to >> 3) - (from >> 3);
-  if (!(df === 0 || dr === 0 || Math.abs(df) === Math.abs(dr))) return false;
-  const step = Math.sign(df) + 8 * Math.sign(dr);
-  for (let i = from + step; i !== to; i += step) if (b[i]! < 0) return true;
-  return false;
-}
-
 /**
  * Judges a player's `MOVE` and, when it is legal, names the square it captures first: the `via` of
- * a multi-capture ending on `to` (docs/02 §2.3), else null. An own piece beyond an enemy on a
- * multi-capturing piece's line is a bad Y, `unreachable`, not `own_piece`.
+ * a multi-capture ending on `to` (docs/02 §2.3), else null.
  */
 export function planPlayerMove(
   board: StageState['board'], from: Square, to: Square, config: EngineConfig,
@@ -178,11 +166,7 @@ export function planPlayerMove(
   const t = tiersOf(board);
   const f = toIndex(from);
   const x = toIndex(to);
-  if (dest && dest.color === 'white') {
-    const type = TYPE_OF[b[f]!];
-    const multi = type !== undefined && t[f]! > 0 && config.abilities[type][t[f] as 1 | 2 | 3].multiCapture > 0;
-    return refuse(multi && enemyBetween(b, f, x) ? 'unreachable' : 'own_piece');
-  }
+  if (dest && dest.color === 'white') return refuse('own_piece');
   const target = playerTargets(b, t, f, config).find((m) => m.to === x);
   if (target === undefined) return refuse('unreachable');
   return { reason: null, via: target.via >= 0 ? toSquare(target.via) : null };

@@ -2,10 +2,10 @@ import type {
   Action, BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, Square, StageState,
 } from './types';
 import { planPlayerMove } from './legality';
-import { durabilityMaxOf } from './abilities';
+import { durabilityMaxOf, hasBonusMove } from './abilities';
 import { isAttacked } from './movegen';
 import { hash } from './rng';
-import { KING, PAWN, TIERS, fromBoard } from './position';
+import { KING, PAWN, fromBoard } from './position';
 import { toSquare } from './square';
 import { applySkill, checkSkill } from './skills/check';
 import { pieceId } from './skills/registry';
@@ -31,13 +31,6 @@ export interface QueueCtx {
  */
 export type BonusLedger = Map<string, 'earned' | 'spent'>;
 
-/** Whether `piece` carries a bonus-move ability: a White Hero Piece, not transformed (tier 0 then). */
-function hasBonusMove(piece: BoardPiece, config: EngineConfig): boolean {
-  if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) return false;
-  if (piece.rarity === undefined || piece.pieceType === 'pawn' || piece.pieceType === 'king') return false;
-  return config.abilities[piece.pieceType][TIERS.indexOf(piece.rarity) as 0 | 1 | 2 | 3]?.bonusSelfMove === true;
-}
-
 /** Whether the next MOVE by `piece` is its free bonus move. */
 export function freeBonus(ledger: BonusLedger, piece: BoardPiece, config: EngineConfig): boolean {
   return hasBonusMove(piece, config) && ledger.get(piece.instanceId!) === 'earned';
@@ -51,15 +44,14 @@ export function recordMove(ledger: BonusLedger, piece: BoardPiece, config: Engin
 }
 
 /**
- * Plays a MOVE on `board`. A multi-capture's first square `via` is derived from the board when not
- * given (null forces a single capture); both captured pieces emit a `capture` event, X then Y.
+ * Plays a MOVE on `board`. A multi-capture's first square is derived from the board (planPlayerMove);
+ * both captured pieces emit a `capture` event, X then Y.
  */
 export function applyPlayerMove(
   board: Board,
   from: Square,
   to: Square,
   config: EngineConfig,
-  via?: Square | null,
 ): { board: Board; events: GameEvent[]; salvage: number; promoted?: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> } } {
   const mover = board[from] as BoardPiece;
   const next: Board = { ...board };
@@ -70,7 +62,7 @@ export function applyPlayerMove(
   let salvage = 0;
   let promoted: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> } | undefined;
 
-  const first = via === undefined ? planPlayerMove(board, from, to, config).via : via;
+  const first = planPlayerMove(board, from, to, config).via;
   for (const sq of first === null ? [to] : [first, to]) {
     const captured = board[sq];
     if (!captured || captured.color !== 'black') continue;
@@ -128,11 +120,11 @@ export function resolveQueue(
     const mover = ctx.board[action.from];
     const free = mover !== undefined && freeBonus(ledger, mover, config);
     if (!free && ctx.moveCredits < 1) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
-    const { reason, via } = planPlayerMove(ctx.board, action.from, action.to, config);
+    const { reason } = planPlayerMove(ctx.board, action.from, action.to, config);
     if (reason) {
       return { ok: false, error: { kind: 'illegal_move', atStep, from: action.from, to: action.to, reason } };
     }
-    const applied = applyPlayerMove(ctx.board, action.from, action.to, config, via);
+    const applied = applyPlayerMove(ctx.board, action.from, action.to, config);
     ctx.board = applied.board;
     events.push(...applied.events);
     if (applied.promoted) {

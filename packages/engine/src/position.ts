@@ -25,6 +25,12 @@ export function fromBoard(board: StageState['board']): Int8Array {
   return b;
 }
 
+/** The tier of a White Hero Piece on the board: 0 when transformed, not a Hero Piece, or of unknown rarity. */
+export function tierOfPiece(piece: StageState['board'][string]): number {
+  if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) return 0;
+  return piece.rarity === undefined ? 0 : Math.max(0, TIERS.indexOf(piece.rarity));
+}
+
 /**
  * The tier array beside `fromBoard`'s codes: the tier of each White Hero Piece (one with an
  * `instanceId`) that is not transformed, 0 everywhere else. A Hero Piece without `rarity` is Normal.
@@ -32,9 +38,6 @@ export function fromBoard(board: StageState['board']): Int8Array {
  */
 export function tiersOf(board: StageState['board']): Int8Array {
   const t = new Int8Array(64);
-  for (const [sq, piece] of Object.entries(board)) {
-    if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) continue;
-    if (piece.rarity !== undefined) t[toIndex(sq)] = Math.max(0, TIERS.indexOf(piece.rarity));
-  }
+  for (const [sq, piece] of Object.entries(board)) t[toIndex(sq)] = tierOfPiece(piece);
   return t;
 }

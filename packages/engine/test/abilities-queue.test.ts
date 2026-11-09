@@ -57,32 +57,32 @@ describe('multi-capture in the queue (Legendary rook: X then Y on its line)', ()
     expect(r.value.stage.board.a5?.pieceType).toBe('queen');
   });
 
-  it('a bad Y: empty, an ally, off the line -> unreachable; the enemy king -> king_square', () => {
+  it('a bad Y: empty, off the line -> unreachable; an ally -> own_piece; the enemy king -> king_square', () => {
     const base = { e1: 'K', h8: 'k', a1: 'R:legendary', a4: 'b' };
     const reason = (extra: Record<Square, string>, to: string) => {
       const e = refusal(stageWith({ ...base, ...extra }), [mv('a1', to)]);
       return e.kind === 'illegal_move' ? e.reason : e.kind;
     };
     expect(reason({}, 'a5')).toBe('unreachable'); // Y empty
-    expect(reason({ a5: 'P' }, 'a5')).toBe('unreachable'); // Y an ally
+    expect(reason({ a5: 'P' }, 'a5')).toBe('own_piece'); // Y an ally (R12: always own_piece)
     expect(reason({ a5: 'q' }, 'b5')).toBe('unreachable'); // off the line
     expect(reason({ a5: 'q', a6: 'q' }, 'a6')).toBe('unreachable'); // two enemies in a row: a6 is not a legal Y
     expect(reason({ a5: 'k', h8: 'q' }, 'a5')).toBe('king_square'); // the king directly behind X
   });
 
-  it('a piece without multi-capture, or an adjacent ally, keeps own_piece', () => {
+  it('an ally destination is own_piece for any piece', () => {
     const plain = stageWith({ e1: 'K', h8: 'k', a1: 'R:normal', a4: 'b', a5: 'P' });
     expect(refusal(plain, [mv('a1', 'a5')])).toMatchObject({ reason: 'own_piece' });
     const adjacent = stageWith({ e1: 'K', h8: 'k', a1: 'R:legendary', a2: 'P' });
     expect(refusal(adjacent, [mv('a1', 'a2')])).toMatchObject({ reason: 'own_piece' });
   });
 
-  it('applyPlayerMove derives the same multi-capture when via is not passed', () => {
+  it('applyPlayerMove derives the multi-capture itself', () => {
     const s = stageWith(spec);
     const applied = applyPlayerMove(s.board, 'a1', 'a5', config);
     expect(captures(applied.events)).toHaveLength(2);
     expect(applied.salvage).toBe(4);
-    expect(captures(applyPlayerMove(s.board, 'a1', 'a5', config, null).events)).toHaveLength(1);
+    expect(captures(applyPlayerMove(s.board, 'a1', 'a4', config).events)).toHaveLength(1);
   });
 });
 
@@ -115,6 +115,11 @@ describe('Legendary knight bonus move', () => {
     const r = resolve(stageWith(knights, { moveCredits: 2 }), [mv('b1', 'c3'), mv('a1', 'a2'), mv('c3', 'e4')]);
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     expect(r.value.stage.moveCredits).toBe(0);
+  });
+
+  it('the bonus is not retroactive: it cannot pay an earlier move by another piece', () => {
+    expect(refusal(stageWith(knights), [mv('a1', 'a2'), mv('b1', 'c3'), mv('c3', 'e4')]))
+      .toEqual({ kind: 'credits_exceeded', atStep: 1 });
   });
 
   it('the bonus does not carry to the next turn', () => {
