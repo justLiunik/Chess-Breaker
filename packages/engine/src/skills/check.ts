@@ -30,7 +30,8 @@ export function checkSkill(
 
   if (def.target.kind === 'none') return null;
   const piece = action.target === undefined ? undefined : ctx.board[action.target];
-  if (!piece) return invalid('no_target');
+  // A piece with neither id cannot be targeted (pieceId).
+  if (!piece || pieceId(piece) === null) return invalid('no_target');
   const wantColor = def.target.kind === 'own_piece' ? 'white' : def.target.kind === 'enemy_piece' ? 'black' : null;
   if (wantColor !== null && piece.color !== wantColor) return invalid('wrong_target');
   if (def.target.pieceType !== undefined && piece.pieceType !== def.target.pieceType) return invalid('wrong_target');
@@ -54,10 +55,11 @@ export function applySkill(
   config: EngineConfig,
 ): GameEvent[] {
   const def = config.skills[action.skillId]!;
-  const piece = action.target === undefined ? undefined : ctx.board[action.target];
-  const target = piece && action.target !== undefined
-    ? { square: action.target, piece, id: pieceId(piece) }
-    : undefined;
+  // A target given to a `kind: none` skill is ignored.
+  const square = def.target.kind === 'none' ? undefined : action.target;
+  const piece = square === undefined ? undefined : ctx.board[square];
+  const id = piece === undefined ? null : pieceId(piece);
+  const target = piece !== undefined && square !== undefined && id !== null ? { square, piece, id } : undefined;
 
   ctx.focus -= def.cost;
   ctx.run = {
@@ -69,7 +71,7 @@ export function applySkill(
   }];
 
   const events: GameEvent[] = [{
-    type: 'skill_activated', skillId: action.skillId, ...(action.target !== undefined && { target: action.target }),
+    type: 'skill_activated', skillId: action.skillId, ...(square !== undefined && { target: square }),
   }];
   const modifierId = `m${ctx.turn}_${atStep}`;
   for (const effect of def.effects) {

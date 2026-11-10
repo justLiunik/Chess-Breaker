@@ -4,8 +4,9 @@ import { parse } from 'yaml';
 import { fromBoard } from '../src/position';
 import { toSquare } from '../src/square';
 import {
-  checkPlayerMove, hasLegalQueue, inCheck, legalMoves, legalPlayerMoves,
+  checkPlayerMove, inCheck, legalMoves, legalPlayerMoves,
 } from '../src/legality';
+import { hasLegalQueue } from '../src/legal-queue';
 import { config, deepFreeze, runOf, stageOf } from './helpers';
 import type { StageState } from '../src/types';
 

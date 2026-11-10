@@ -1,7 +1,8 @@
 import type {
   Action, Award, CommitError, EngineConfig, GameEvent, Result, RunState, StageState,
 } from './types';
-import { hasLegalQueue, inCheck, legalMoves } from './legality';
+import { inCheck, legalMoves } from './legality';
+import { hasLegalQueue } from './legal-queue';
 import { enemyMove } from './enemy/policy';
 import { hash } from './rng';
 import { KING, fromBoard, tiersOf } from './position';

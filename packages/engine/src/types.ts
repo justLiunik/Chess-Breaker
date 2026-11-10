@@ -124,7 +124,11 @@ export type CommitError =
   | { kind: 'stage_not_won'; status: StageState['status'] }
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   | { kind: 'durability_unavailable'; instanceId: string }
-  | { kind: 'invalid_deployment'; to: Square; reason: string }
+  | {
+      kind: 'invalid_deployment';
+      to: Square;
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate';
+    }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
   | { kind: 'invalid_target'; atStep: number; skillId: string; target?: string; reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }

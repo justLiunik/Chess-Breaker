@@ -51,7 +51,7 @@ export function startStage(
   let cost = 0;
   for (const { instance } of placed) {
     if (instance.pieceType !== 'king') {
-      cost += spawnCostOf(config, instance.pieceType, instance.rarity ?? 'normal');
+      cost += spawnCostOf(instance.pieceType, instance.rarity ?? 'normal', config);
     }
   }
   if (cost > stage.spawnPoints) {

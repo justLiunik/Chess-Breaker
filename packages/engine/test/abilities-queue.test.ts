@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasLegalQueue } from '../src/legality';
+import { hasLegalQueue } from '../src/legal-queue';
 import { applyPlayerMove, resolveQueue } from '../src/queue';
 import type { Action, CommitError, GameEvent, Rarity, Square, StageState } from '../src/types';
 import { config, deepFreeze, runOf, stageOf } from './helpers';

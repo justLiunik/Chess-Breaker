@@ -94,16 +94,30 @@ export function compileAbilities(rarityAbilities: RarityAbilities): AbilityTable
   return table;
 }
 
-export function spawnCostOf(config: EngineConfig, type: 'king' | DeckType, rarity: Rarity): number {
+/**
+ * A multi-capture's second square Y lies two or more squares out along a line the piece slides on.
+ * Move generation lists each destination once, so no single move may land on such a square: no
+ * leaper offset may lie on a sliding line at distance 2 or more while the tier multi-captures.
+ */
+function assertSingleMoveNeverOnY(type: DeckType, tier: Rarity, f: AbilityFlags): void {
+  if (f.multiCapture === 0) return;
+  const diagonal = type === 'bishop' || type === 'queen' || f.extraRays.includes('diagonal');
+  const orthogonal = type === 'rook' || type === 'queen' || f.extraRays.includes('orthogonal');
+  for (const [df, dr] of f.leapers) {
+    const far = Math.max(Math.abs(df), Math.abs(dr)) >= 2;
+    const onLine = (df === 0 || dr === 0) ? orthogonal : Math.abs(df) === Math.abs(dr) && diagonal;
+    if (far && onLine) {
+      throw new Error(`rarity abilities of a ${tier} ${type}: leaper (${df}, ${dr}) is a single move onto a multi-capture square`);
+    }
+  }
+}
+
+export function spawnCostOf(type: 'king' | DeckType, rarity: Rarity, config: EngineConfig): number {
   const p = config.pieces[type];
   return p.spawnCostByRarity[rarity] ?? p.spawnCost;
 }
 
-export function durabilityMaxOf(
-  config: EngineConfig,
-  type: 'king' | DeckType,
-  rarity: Rarity,
-): number | null {
+export function durabilityMaxOf(type: 'king' | DeckType, rarity: Rarity, config: EngineConfig): number | null {
   const p = config.pieces[type];
   return p.durabilityMaxByRarity[rarity] ?? p.durabilityMax;
 }

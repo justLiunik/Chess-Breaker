@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { commitQueue, simulate } from '../src/rules';
 import { applyPlayerMove } from '../src/queue';
-import { checkPlayerMove, hasLegalQueue, inCheck } from '../src/legality';
+import { checkPlayerMove, inCheck } from '../src/legality';
+import { hasLegalQueue } from '../src/legal-queue';
 import { KING, fromBoard } from '../src/position';
 import type { Action, StageState } from '../src/types';
 import { config, deepFreeze } from './helpers';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveQueue } from '../src/queue';
 import { commitQueue, simulate } from '../src/rules';
-import { PRIMITIVES } from '../src/skills/registry';
+import { PRIMITIVES, pieceId } from '../src/skills/registry';
 import type { Action, CommitError, RunState, StageState } from '../src/types';
 import { startStage } from '../src/deployment';
 import { endStage } from '../src/stage-end';
@@ -283,5 +283,57 @@ describe('I12: rarity is fixed at creation', () => {
     if (!ended.ok) throw new Error(JSON.stringify(ended.error));
     expect(ended.value.run.deck.find((p) => p.instanceId === 'p_king_01')!.rarity).toBeNull();
     expect(ended.value.run.deck.find((p) => p.instanceId === 'p_bishop_04')!.rarity).toBe('rare');
+  });
+});
+
+describe('targets and durations at the edges', () => {
+  /** `config` plus test-only skills: an instant suppress and an instant transform. */
+  const cfg = {
+    ...config,
+    skills: {
+      ...config.skills,
+      flash: {
+        ...config.skills.lockdown!, id: 'flash',
+        effects: [{ primitive: 'suppress_piece' as const, duration: 'instant' as const }],
+      },
+      blink: {
+        ...config.skills.ascension!, id: 'blink',
+        effects: [{ primitive: 'set_piece_type' as const, params: { pieceType: 'queen' }, duration: 'instant' as const }],
+      },
+    },
+  };
+
+  it('an instant modifier applies and ends at once: nothing is stored', () => {
+    const r = simulate(deepFreeze(runWith('flash')), stage(), [skill('flash', 'a8'), mv('a1', 'a2')], cfg);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.stage.modifiers).toEqual([]);
+    expect(r.value.events.some((e) => e.type === 'modifier_expired')).toBe(false);
+  });
+
+  it('an instant transform ends before any move reads it: the bishop still moves as a bishop', () => {
+    const run = deepFreeze(runWith('blink'));
+    const r = simulate(run, stage(), [skill('blink', 'c1'), mv('c1', 'c5')], cfg);
+    expect(r.ok ? null : r.error).toMatchObject({ kind: 'illegal_move', atStep: 1, reason: 'unreachable' });
+    const ok = simulate(run, stage(), [skill('blink', 'c1'), mv('c1', 'd2')], cfg);
+    if (!ok.ok) throw new Error(JSON.stringify(ok.error));
+    expect(ok.value.stage.modifiers).toEqual([]);
+    expect(ok.value.stage.board.d2).toEqual(stage().board.c1);
+  });
+
+  it('a target given to a kind: none skill is ignored', () => {
+    const r = simulate(deepFreeze(runWith('twin_step')), stage(), [skill('twin_step', 'a8'), mv('a1', 'a2'), mv('a2', 'a3')], config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.stage.skillLog).toEqual([{ skillId: 'twin_step', turn: 1 }]);
+    expect(r.value.events[0]).toEqual({ type: 'skill_activated', skillId: 'twin_step' });
+  });
+
+  it('a piece with neither id has no pieceId and cannot be targeted', () => {
+    expect(pieceId({ pieceType: 'rook', color: 'black' })).toBeNull();
+    const s = stage();
+    const { stageId: _, ...bare } = s.board.a8!;
+    const noIds = deepFreeze({ ...s, board: { ...s.board, a8: bare } });
+    expect(refused(runWith('lockdown'), noIds, [skill('lockdown', 'a8'), mv('a1', 'a2')])).toEqual({
+      kind: 'invalid_target', atStep: 0, skillId: 'lockdown', target: 'a8', reason: 'no_target',
+    });
   });
 });

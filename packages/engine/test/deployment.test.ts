@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { startStage } from '../src/deployment';
 import { config, deepFreeze, deploymentStageOf, runOf } from './helpers';
-import type { RunState, StageState } from '../src/types';
+import type { CommitError, RunState, StageState } from '../src/types';
 
 const stage = (): StageState => deploymentStageOf({ e8: 'k' });
 const P = (instanceId: string, to: string) => ({ instanceId, to });
@@ -154,5 +154,13 @@ describe('startStage success', () => {
     expect(r.ok && r.value.events).toEqual([
       { type: 'piece_summoned', instanceId: 'p_king_01', square: 'e1' }, { type: 'stage_started' },
     ]);
+  });
+});
+
+describe('invalid_deployment reasons', () => {
+  it('are typed as the spec §5.3 union (checked by npm run typecheck)', () => {
+    expectTypeOf<Extract<CommitError, { kind: 'invalid_deployment' }>['reason']>().toEqualTypeOf<
+      'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate'
+    >();
   });
 });

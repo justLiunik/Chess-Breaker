@@ -53,13 +53,13 @@ describe('compileAbilities', () => {
 
 describe('lookups', () => {
   it('spawnCostOf', () => {
-    expect(spawnCostOf(config, 'bishop', 'legendary')).toBe(5);
-    expect(spawnCostOf(config, 'bishop', 'unique')).toBe(3);
-    expect(spawnCostOf(config, 'knight', 'legendary')).toBe(3);
+    expect(spawnCostOf('bishop', 'legendary', config)).toBe(5);
+    expect(spawnCostOf('bishop', 'unique', config)).toBe(3);
+    expect(spawnCostOf('knight', 'legendary', config)).toBe(3);
   });
   it('durabilityMaxOf', () => {
-    expect(durabilityMaxOf(config, 'queen', 'legendary')).toBe(1);
-    expect(durabilityMaxOf(config, 'queen', 'rare')).toBe(2);
-    expect(durabilityMaxOf(config, 'king', 'normal')).toBeNull();
+    expect(durabilityMaxOf('queen', 'legendary', config)).toBe(1);
+    expect(durabilityMaxOf('queen', 'rare', config)).toBe(2);
+    expect(durabilityMaxOf('king', 'normal', config)).toBeNull();
   });
 });

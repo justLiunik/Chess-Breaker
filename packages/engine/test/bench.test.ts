@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { fromBoard, tiersOf } from '../src/position';
 import { scoreRootMoves } from '../src/enemy/search';
+import { hasLegalQueue } from '../src/legal-queue';
 import type { StageState } from '../src/types';
-import { GAME_FENS, MIDGAME_FENS, RARITY_FENS, config, fenToStage, rarityStage } from './helpers';
+import { GAME_FENS, MIDGAME_FENS, RARITY_FENS, config, fenToStage, rarityStage, runOf, stageOf } from './helpers';
 
 const WARMUP = 3;
 const RUNS = 20;
@@ -57,5 +58,35 @@ describe('depth-4 enemy search speed', () => {
     for (const fen of MIDGAME_FENS) {
       console.log(`depth 4 median ${medianMs(fenToStage(fen)).toFixed(1)} ms  ${fen} (middle game)`);
     }
+  });
+});
+
+// The final M2 review's worst case: White is mated, so hasLegalQueue must exhaust every queue that
+// Twin Step, Ascension and Lockdown allow before it answers false (7.8 s before the fix).
+const MATED = {
+  h1: 'K', g2: 'P', h2: 'P', a1: 'r', h8: 'k',
+  b2: 'p', c2: 'p', d2: 'p', e2: 'p', f2: 'p',
+  a3: 'p', b3: 'p', c3: 'p', d3: 'p', e3: 'p', f3: 'p', g3: 'p', h3: 'p',
+  g4: 'n', a6: 'N', c6: 'N', e6: 'B', b5: 'B', d6: 'R', f6: 'R', d7: 'Q',
+};
+const HLQ_BOUND_MS = 400; // about 2x the 190 ms median measured on this machine after the fix
+
+describe('hasLegalQueue speed', () => {
+  it(`a mated board with all three launch skills: under ${HLQ_BOUND_MS} ms (median of 5)`, { timeout: 120_000 }, () => {
+    const stage = stageOf(MATED);
+    const run = runOf({
+      loadout: ['twin_step', 'ascension', 'lockdown'].map((skillId) => ({ skillId, charges: 3, chargesMax: 3 })),
+    });
+    expect(hasLegalQueue(run, stage, config)).toBe(false); // warm-up, and the answer
+    const times: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const t0 = performance.now();
+      hasLegalQueue(run, stage, config);
+      times.push(performance.now() - t0);
+    }
+    times.sort((x, y) => x - y);
+    const ms = times[2]!;
+    console.log(`hasLegalQueue mated, three skills: median ${ms.toFixed(1)} ms (bound ${HLQ_BOUND_MS} ms)`);
+    expect(ms).toBeLessThan(HLQ_BOUND_MS);
   });
 });
