@@ -1,4 +1,4 @@
-import type { BoardPiece, AbilityFlags, AbilityTable, DeckType, EngineConfig, Rarity } from './types';
+import type { BoardPiece, AbilityFlags, AbilityTable, DeckType, EngineConfig, PieceInstance, Rarity } from './types';
 import * as movegen from './movegen';
 import * as position from './position';
 
@@ -21,6 +21,7 @@ const emptyFlags = (): AbilityFlags => ({
   multiCapture: 0,
   bonusSelfMove: false,
   lifeline: false,
+  lifelineDurability: 0,
 });
 
 const cloneFlags = (f: AbilityFlags): AbilityFlags => ({
@@ -43,6 +44,13 @@ function images(df: number, dr: number): [number, number][] {
   return [...out.values()];
 }
 
+/** Throws unless `params[name]` is `expected`: the only value the engine implements. */
+function only(ability: string, params: Record<string, unknown>, name: string, expected: number): void {
+  if (params[name] !== expected) {
+    throw new Error(`rarity ability ${ability}: ${name} ${String(params[name])} is not implemented (only ${expected})`);
+  }
+}
+
 function applyAbility(flags: AbilityFlags, ability: string, params: Record<string, unknown>): void {
   switch (ability) {
     case 'leap_allies':
@@ -63,14 +71,23 @@ function applyAbility(flags: AbilityFlags, ability: string, params: Record<strin
       break;
     }
     case 'bonus_self_move':
+      only(ability, params, 'amount', 1);
       flags.bonusSelfMove = true;
       break;
     case 'multi_capture':
+      only(ability, params, 'maxTargets', 2);
       flags.multiCapture = params.afterLeap === true ? 2 : (Math.max(flags.multiCapture, 1) as 1 | 2);
       break;
-    case 'lifeline':
+    case 'lifeline': {
+      only(ability, params, 'usesPerRun', 1);
+      const back = params.returnDurability;
+      if (typeof back !== 'number' || !Number.isInteger(back) || back < 1) {
+        throw new Error(`rarity ability lifeline: returnDurability ${String(back)} must be a whole number of at least 1`);
+      }
       flags.lifeline = true;
+      flags.lifelineDurability = back;
       break;
+    }
     default:
       throw new Error(`unknown rarity ability: ${ability}`);
   }
@@ -87,6 +104,7 @@ export function compileAbilities(rarityAbilities: RarityAbilities): AbilityTable
       for (const { ability, params } of rarityAbilities[type]?.[tier] ?? []) {
         applyAbility(cur, ability, params ?? {});
       }
+      assertSingleMoveNeverOnY(type, tier, cur);
       flags.push(cur);
     }
     table[type] = flags as AbilityTable[DeckType];
@@ -379,6 +397,22 @@ export function markAbilityAttacks(
   const leaps = m.leaps[from]!;
   for (let i = 0; i < leaps.length; i++) out[leaps[i]!] = 1;
   return true;
+}
+
+/** The abilities of a deck instance's tier; null for the King. An unknown rarity counts as Normal. */
+function instanceFlags(inst: PieceInstance, config: EngineConfig): AbilityFlags | null {
+  if (inst.pieceType === 'king') return null;
+  return config.abilities[inst.pieceType][position.tierOf(inst.rarity) as 0 | 1 | 2 | 3];
+}
+
+/** Whether an enemy capture of `inst` is undone by its lifeline (docs/06): its tier has one and it is unused. */
+export function lifelineSaves(inst: PieceInstance, config: EngineConfig): boolean {
+  return instanceFlags(inst, config)?.lifeline === true && !inst.usedOnce?.includes('lifeline');
+}
+
+/** The durability a lifeline-saved `inst` returns with at stage end (`returnDurability` in pieces.yaml). */
+export function lifelineDurability(inst: PieceInstance, config: EngineConfig): number {
+  return instanceFlags(inst, config)?.lifelineDurability ?? 0;
 }
 
 /** Whether `piece` has a bonus move (the Legendary knight): a Hero Piece of a tier whose flags say so. */

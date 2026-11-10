@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { commitQueue } from '../src/rules';
-import { config, deepFreeze, runOf, stageOf } from './helpers';
+import { config, deckFor, deepFreeze, runOf, stageOf } from './helpers';
 import type { Action, GameEvent } from '../src/types';
 
 const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
@@ -46,7 +46,7 @@ describe('commitQueue', () => {
     expect(v.events).toContainEqual({ type: 'enemy_promoted', square: 'b1' });
     const capStage = stageOf(
       { g3: 'K', a1: 'R', e8: 'k', c8: 'r', c1: 'B' }, { enemyPolicy: scripted(['c8c1']) });
-    const cap = ok(commitQueue(runOf({ coins: 7 }), capStage, mv('a1', 'a2'), config));
+    const cap = ok(commitQueue(deckFor(runOf({ coins: 7 }), capStage), capStage, mv('a1', 'a2'), config));
     expect(cap.run.coins).toBe(7);
     expect(cap.stage.board.c1).toEqual({ pieceType: 'rook', color: 'black', stageId: capStage.board.c8!.stageId });
     expect(cap.events).toContainEqual({
@@ -56,7 +56,7 @@ describe('commitQueue', () => {
 
   it('reports a White capture by the enemy with salvage 0', () => {
     const stage = stageOf({ g1: 'K', a1: 'R', e8: 'k', a8: 'r' }, { enemyPolicy: scripted(['a8a2']) });
-    const v = ok(commitQueue(runOf(), stage, mv('a1', 'a2'), config));
+    const v = ok(commitQueue(deckFor(runOf(), stage), stage, mv('a1', 'a2'), config));
     expect(v.events).toContainEqual({
       type: 'capture', square: 'a2', pieceType: 'rook', color: 'white', salvage: 0, instanceId: 'p_rook_a1',
     });

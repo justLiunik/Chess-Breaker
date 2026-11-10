@@ -1,5 +1,5 @@
 import type { Action, RunState, StageState } from '../../src/types';
-import { runOf, stageOf } from '../helpers';
+import { deckFor, runOf, stageOf } from '../helpers';
 
 export interface Scenario { name: string; run: RunState; stage: StageState; queue: Action[] }
 
@@ -13,6 +13,9 @@ const mateBoard = { e1: 'K', a1: 'R', h8: 'k', g7: 'p', h7: 'p' };
 // tpl-act1-first-steps: the fixed enemy.
 const firstSteps = { e8: 'k', a7: 'p', b7: 'p', c7: 'p', f7: 'p', g7: 'p', c6: 'n' };
 const firstStepsLine = ['c6e5', 'e5c4', 'c4b6'];
+
+const rookCaptured = stageOf({ e1: 'K', a1: 'R', a8: 'r', e8: 'k' }, { enemyPolicy: script(['a8a3']) });
+const withRook = deckFor(run, rookCaptured);
 
 export const scenarios: Scenario[] = [
   // --- errors (9) ---
@@ -60,8 +63,8 @@ export const scenarios: Scenario[] = [
     stage: stageOf({ h1: 'K', b2: 'r', a8: 'r', e8: 'k' }, { enemyPolicy: script(['a8a1']) }) },
   { name: 'player stalemated after R5', run, queue: [mv('h2', 'h1')],
     stage: stageOf({ h2: 'K', g8: 'q', e8: 'k' }, { enemyPolicy: script(['g8g3']) }) },
-  { name: 'enemy captures a White piece', run, queue: [mv('a1', 'a3')],
-    stage: stageOf({ e1: 'K', a1: 'R', a8: 'r', e8: 'k' }, { enemyPolicy: script(['a8a3']) }) },
+  // The captured rook's deck instance is added to the run (I15); R5 removes it, so the output deck is `run`'s.
+  { name: 'enemy captures a White piece', run: withRook, queue: [mv('a1', 'a3')], stage: rookCaptured },
   { name: 'enemy pawn promotion', run, queue: [mv('g3', 'g4')],
     stage: stageOf({ g3: 'K', b2: 'p', e8: 'k' }, { enemyPolicy: script(['b2b1']) }) },
   { name: 'scripted move played', run, queue: [mv('a1', 'a2')],

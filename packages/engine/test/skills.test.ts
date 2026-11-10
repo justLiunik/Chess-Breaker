@@ -5,7 +5,7 @@ import { PRIMITIVES, pieceId } from '../src/skills/registry';
 import type { Action, CommitError, RunState, StageState } from '../src/types';
 import { startStage } from '../src/deployment';
 import { endStage } from '../src/stage-end';
-import { config, deepFreeze, deploymentStageOf, runOf, stageOf } from './helpers';
+import { config, deckFor, deepFreeze, deploymentStageOf, runOf, stageOf } from './helpers';
 
 const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
 const skill = (skillId: string, target?: string): Action => ({
@@ -142,7 +142,7 @@ describe('ACTIVATE_SKILL effects', () => {
     expect(r.value.stage.moveCredits).toBe(0);
     expect(r.value.events.map((e) => e.type)).toEqual(['skill_activated', 'move', 'move']);
     expect(r.value.events[0]).toEqual({ type: 'skill_activated', skillId: 'twin_step' });
-    expect(commitQueue(run, s, [skill('twin_step'), mv('a1', 'a2'), mv('a2', 'a3')], config).ok).toBe(true);
+    expect(commitQueue(deckFor(run, s), s, [skill('twin_step'), mv('a1', 'a2'), mv('a2', 'a3')], config).ok).toBe(true);
   });
   it('Twin Step after the move it would pay for is credits_exceeded', () => {
     expect(refused(runWith('twin_step'), stage(), [mv('a1', 'a2'), mv('a2', 'a3'), skill('twin_step')])).toEqual({

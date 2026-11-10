@@ -110,6 +110,24 @@ export function runOf(overrides: Partial<RunState> = {}): RunState {
   } as RunState);
 }
 
+/**
+ * `run` with a deck instance for every non-King Hero Piece on `stage`'s board that its deck lacks:
+ * the piece's id and rarity (Normal when it has none), `deployed`, as `startStage` leaves a summon.
+ * The R5 capture of a Hero Piece needs its instance (I15).
+ */
+export function deckFor(run: RunState, stage: StageState): RunState {
+  const have = new Set(run.deck.map((p) => p.instanceId));
+  const extra = Object.values(stage.board).flatMap((p) => {
+    if (p.color !== 'white' || p.instanceId === undefined || p.pieceType === 'king' || p.pieceType === 'pawn') return [];
+    if (have.has(p.instanceId)) return [];
+    return [{
+      instanceId: p.instanceId, pieceType: p.pieceType, rarity: p.rarity ?? 'normal', durability: 1, durabilityMax: 2,
+      origin: 'starter' as const, acquiredAtStage: 0, status: 'deployed' as const,
+    }];
+  });
+  return deepFreeze({ ...run, deck: [...run.deck, ...extra] });
+}
+
 export const MIDGAME_FENS: string[] = [
   'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1',
   'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b - - 0 1',

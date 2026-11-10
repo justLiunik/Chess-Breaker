@@ -1,10 +1,11 @@
 import type {
   CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, StageState,
 } from './types';
+import { lifelineDurability } from './abilities';
 
 /**
  * After a won stage: deployed pieces return with their durability, spent ones are removed, a
- * lifeline-saved piece returns at durability 1 (spec §7.4). `overCapacity` counts non-King
+ * lifeline-saved piece returns at its lifeline's `returnDurability` (spec §7.4; 1 in pieces.yaml). `overCapacity` counts non-King
  * pieces above the deck capacity; resolving it is the run layer's job.
  */
 export function endStage(
@@ -22,7 +23,7 @@ export function endStage(
       continue;
     }
     if (p.status === 'deployed' || p.status === 'captured') {
-      const durability = p.status === 'captured' ? 1 : p.durability;
+      const durability = p.status === 'captured' ? lifelineDurability(p, config) : p.durability;
       events.push({ type: 'piece_returned', instanceId: p.instanceId, durability });
       deck.push({ ...p, durability, status: 'in_deck' });
       continue;

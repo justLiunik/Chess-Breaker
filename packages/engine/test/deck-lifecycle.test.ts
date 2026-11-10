@@ -73,6 +73,20 @@ describe('enemy captures (R5)', () => {
     expect(v.run.deck.find((i) => i.instanceId === 'p_queen_d3')?.status).toBe('captured');
   });
 
+  it('counts an instance of an unknown rarity as Normal: removed, no lifeline, no throw', () => {
+    const run = withDeck(runOf(), [inst({ instanceId: 'p_queen_d3', pieceType: 'queen', rarity: 'mythic' as Rarity })]);
+    const v = ok(commitQueue(run, capturedStage('Q'), kingStep, config));
+    expect(v.run.deck.some((i) => i.instanceId === 'p_queen_d3')).toBe(false);
+    expect(v.events.some((e) => e.type === 'lifeline_saved')).toBe(false);
+  });
+
+  it('refuses with invariant_violation I15 when the captured Hero Piece has no deck instance', () => {
+    expect(commitQueue(runOf(), capturedStage('N'), kingStep, config)).toEqual({
+      ok: false,
+      error: { kind: 'invariant_violation', invariant: 'I15', detail: 'captured Hero Piece p_knight_d3 has no deck instance' },
+    });
+  });
+
   it('leaves the deck alone when the enemy captures nothing, and simulate agrees', () => {
     const stage = stageOf({ e1: 'K', h8: 'k', a7: 'P' });
     const run = runOf();
@@ -93,7 +107,8 @@ describe('capture event ids', () => {
   });
 
   it('an enemy capture of a Hero Piece carries instanceId and no stageId', () => {
-    const v = ok(commitQueue(runOf(), capturedStage('N'), kingStep, config));
+    const run = withDeck(runOf(), [inst({ instanceId: 'p_knight_d3', pieceType: 'knight' })]);
+    const v = ok(commitQueue(run, capturedStage('N'), kingStep, config));
     const cap = v.events.find((e) => e.type === 'capture');
     expect(cap).toHaveProperty('instanceId', 'p_knight_d3');
     expect(cap).not.toHaveProperty('stageId');

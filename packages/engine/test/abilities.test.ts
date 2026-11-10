@@ -51,6 +51,37 @@ describe('compileAbilities', () => {
   });
 });
 
+describe('compileAbilities refuses what the engine does not implement', () => {
+  const only = (type: 'knight' | 'rook' | 'queen', tier: 'unique' | 'legendary', list: { ability: string; params: Record<string, unknown> }[]) =>
+    ({ knight: {}, bishop: {}, rook: {}, queen: {}, [type]: { [tier]: list } });
+  it.each([
+    ['multi_capture maxTargets 3', only('rook', 'legendary', [{ ability: 'multi_capture', params: { maxTargets: 3, afterLeap: false } }]), /maxTargets/],
+    ['bonus_self_move amount 2', only('knight', 'legendary', [{ ability: 'bonus_self_move', params: { amount: 2 } }]), /amount/],
+    ['lifeline usesPerRun 2', only('queen', 'unique', [{ ability: 'lifeline', params: { usesPerRun: 2, returnDurability: 1 } }]), /usesPerRun/],
+    ['lifeline returnDurability 0', only('queen', 'unique', [{ ability: 'lifeline', params: { usesPerRun: 1, returnDurability: 0 } }]), /returnDurability/],
+  ])('throws on %s', (_, raw, message) => {
+    expect(() => compileAbilities(raw)).toThrow(message);
+  });
+  it('reads lifeline returnDurability from the data', () => {
+    const table = compileAbilities(only('queen', 'unique', [{ ability: 'lifeline', params: { usesPerRun: 1, returnDurability: 2 } }]));
+    expect(table.queen[2].lifeline).toBe(true);
+    expect(table.queen[2].lifelineDurability).toBe(2);
+    expect(table.queen[3].lifelineDurability).toBe(2);
+    expect(t.queen[2].lifelineDurability).toBe(1);
+  });
+  it('throws when a square could be both a single move and a multi-capture Y (a leaper along a capture line)', () => {
+    expect(() => compileAbilities(only('rook', 'legendary', [
+      { ability: 'add_leaper', params: { offsets: [[2, 0]] } },
+      { ability: 'multi_capture', params: { maxTargets: 2, afterLeap: false } },
+    ]))).toThrow(/single move/);
+    // A diagonal step beside an orthogonal multi-capture (the real Unique+Legendary rook) is fine.
+    expect(() => compileAbilities(only('rook', 'legendary', [
+      { ability: 'add_leaper', params: { offsets: [[1, 1]] } },
+      { ability: 'multi_capture', params: { maxTargets: 2, afterLeap: false } },
+    ]))).not.toThrow();
+  });
+});
+
 describe('lookups', () => {
   it('spawnCostOf', () => {
     expect(spawnCostOf('bishop', 'legendary', config)).toBe(5);

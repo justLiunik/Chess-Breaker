@@ -25,10 +25,15 @@ export function fromBoard(board: StageState['board']): Int8Array {
   return b;
 }
 
+/** The tier of a rarity: its index in TIERS; 0 (Normal) for none (the King) or an unknown rarity. */
+export function tierOf(rarity: Rarity | null | undefined): number {
+  return rarity == null ? 0 : Math.max(0, TIERS.indexOf(rarity));
+}
+
 /** The tier of a White Hero Piece on the board: 0 when transformed, not a Hero Piece, or of unknown rarity. */
 export function tierOfPiece(piece: StageState['board'][string]): number {
   if (piece.color !== 'white' || piece.instanceId === undefined || piece.transformed !== undefined) return 0;
-  return piece.rarity === undefined ? 0 : Math.max(0, TIERS.indexOf(piece.rarity));
+  return tierOf(piece.rarity);
 }
 
 /**

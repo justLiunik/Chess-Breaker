@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { endStage } from '../src/stage-end';
+import { compileAbilities } from '../src/abilities';
 import { startStage } from '../src/deployment';
 import { commitQueue } from '../src/rules';
 import { legalPlayerMoves } from '../src/legality';
@@ -60,6 +61,33 @@ describe('endStage', () => {
     const v = ok(endStage(run, won(), config));
     expect(find(v.run, 'p_queen_d3')).toMatchObject({ status: 'in_deck', durability: 1, usedOnce: ['lifeline'] });
     expect(v.events).toContainEqual({ type: 'piece_returned', instanceId: 'p_queen_d3', durability: 1 });
+  });
+
+  it('docs/06 "Lifeline on a spent queen": a Legendary queen spent at summoning, captured, returns at durability 1', () => {
+    const dep = deploymentStageOf({ e8: 'k', e4: 'p' }, { enemyPolicy: { type: 'scripted', line: ['e4d3'] } });
+    const base = runOf();
+    const run = deepFreeze({ ...base, deck: [...base.deck, queenOf({ rarity: 'legendary', durability: 1, durabilityMax: 1 })] });
+    const started = ok(startStage(run, dep, [
+      { instanceId: 'p_king_01', to: 'e1' }, { instanceId: 'p_queen_d3', to: 'd3' },
+    ], config));
+    expect(find(started.run, 'p_queen_d3')).toMatchObject({ status: 'spent', durability: 0 });
+    const captured = ok(commitQueue(started.run, started.stage, [{ type: 'MOVE', from: 'e1', to: 'f1' }], config));
+    expect(captured.events).toContainEqual({ type: 'lifeline_saved', instanceId: 'p_queen_d3' });
+    expect(find(captured.run, 'p_queen_d3')).toMatchObject({ status: 'captured', durability: 0, usedOnce: ['lifeline'] });
+    const v = ok(endStage(captured.run, won(), config));
+    expect(find(v.run, 'p_queen_d3')).toMatchObject({ status: 'in_deck', durability: 1, usedOnce: ['lifeline'] });
+    expect(v.events).toContainEqual({ type: 'piece_returned', instanceId: 'p_queen_d3', durability: 1 });
+  });
+
+  it('returns a lifeline queen with the returnDurability the data gives', () => {
+    const abilities = compileAbilities({
+      knight: {}, bishop: {}, rook: {},
+      queen: { unique: [{ ability: 'lifeline', params: { usesPerRun: 1, returnDurability: 2 } }] },
+    });
+    const base = runOf();
+    const run = deepFreeze({ ...base, deck: [...base.deck, queenOf({ status: 'captured', durability: 0, usedOnce: ['lifeline'] })] });
+    const v = ok(endStage(run, won(), { ...config, abilities }));
+    expect(v.events).toContainEqual({ type: 'piece_returned', instanceId: 'p_queen_d3', durability: 2 });
   });
 
   it('Review Focus 5: a lifeline queen captured again next stage is removed with no lifeline_saved', () => {

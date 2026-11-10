@@ -9,6 +9,7 @@ import { KING, fromBoard, tiersOf } from './position';
 import { toSquare } from './square';
 import { resolveQueue } from './queue';
 import { frozenMask } from './skills/registry';
+import { lifelineSaves } from './abilities';
 
 export function simulate(
   run: RunState,
@@ -58,27 +59,29 @@ export function simulate(
   return { ok: true, value: { run: nextRun, stage: next, events, award } };
 }
 
-const TIERS = ['normal', 'rare', 'unique', 'legendary'] as const;
-
-/** An enemy capture of a Hero Piece: the instance leaves the deck, unless a lifeline saves it (docs/06). */
+/**
+ * An enemy capture of a Hero Piece: the instance leaves the deck, unless a lifeline saves it (docs/06).
+ * A Hero Piece without a deck instance cannot have entered the board at Deployment (I15): refused.
+ */
 function loseInstance(
   run: RunState,
   instanceId: string,
   config: EngineConfig,
-): { run: RunState; saved: boolean } {
+): Result<{ run: RunState; saved: boolean }, CommitError> {
   const inst = run.deck.find((i) => i.instanceId === instanceId);
-  if (!inst) return { run, saved: false };
-  if (
-    inst.pieceType !== 'king' && inst.rarity !== null
-    && config.abilities[inst.pieceType][TIERS.indexOf(inst.rarity)]!.lifeline
-    && !inst.usedOnce?.includes('lifeline')
-  ) {
+  if (!inst) {
+    return {
+      ok: false,
+      error: { kind: 'invariant_violation', invariant: 'I15', detail: `captured Hero Piece ${instanceId} has no deck instance` },
+    };
+  }
+  if (lifelineSaves(inst, config)) {
     const deck = run.deck.map((i) => (i.instanceId === instanceId
       ? { ...i, status: 'captured' as const, usedOnce: [...(i.usedOnce ?? []), 'lifeline' as const] }
       : i));
-    return { run: { ...run, deck }, saved: true };
+    return { ok: true, value: { run: { ...run, deck }, saved: true } };
   }
-  return { run: { ...run, deck: run.deck.filter((i) => i.instanceId !== instanceId) }, saved: false };
+  return { ok: true, value: { run: { ...run, deck: run.deck.filter((i) => i.instanceId !== instanceId) }, saved: false } };
 }
 
 /**
@@ -118,8 +121,9 @@ export function commitQueue(
       });
       if (taken.instanceId !== undefined) {
         const lost = loseInstance(nextRun, taken.instanceId, config);
-        nextRun = lost.run;
-        if (lost.saved) events.push({ type: 'lifeline_saved', instanceId: taken.instanceId });
+        if (!lost.ok) return lost;
+        nextRun = lost.value.run;
+        if (lost.value.saved) events.push({ type: 'lifeline_saved', instanceId: taken.instanceId });
       }
     }
     if (mover.pieceType === 'pawn' && to.endsWith('1')) {

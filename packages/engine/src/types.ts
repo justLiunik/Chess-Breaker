@@ -132,7 +132,7 @@ export type CommitError =
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
   | { kind: 'invalid_target'; atStep: number; skillId: string; target?: string; reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
-  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
+  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3' | 'I15'; detail: string };
 
 export interface Award {
   coins: number;
@@ -176,6 +176,8 @@ export interface AbilityFlags {
   multiCapture: 0 | 1 | 2;
   bonusSelfMove: boolean;
   lifeline: boolean;
+  /** The durability a lifeline-saved piece returns with at stage end (0 when `lifeline` is false). */
+  lifelineDurability: number;
 }
 
 /** Cumulative abilities by tier index (normal, rare, unique, legendary). */

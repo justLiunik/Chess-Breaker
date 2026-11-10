@@ -7,7 +7,7 @@ import { fromBoard } from '../src/position';
 import { toIndex } from '../src/square';
 import { frozenMask } from '../src/skills/registry';
 import type { Action, EngineConfig, PieceType, RunState, SkillDef, StageState } from '../src/types';
-import { config, deepFreeze, runOf, stageOf } from './helpers';
+import { config, deckFor, deepFreeze, runOf, stageOf } from './helpers';
 
 const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
 const skill = (skillId: string, target?: string): Action => ({
@@ -135,10 +135,10 @@ describe('R5: the enemy reply with suppression at the root only', () => {
 
   it('the suppressed piece does not move in R5, but may move the enemy turn after', () => {
     const s = stageOf(pieces);
-    const free = ok(commitQueue(runOf(), s, [mv('g1', 'h1')], config));
+    const free = ok(commitQueue(deckFor(runOf(), s), s, [mv('g1', 'h1')], config));
     expect(free.events).toContainEqual({ type: 'enemy_move', from: 'e8', to: 'e4' });
 
-    const t1 = ok(commitQueue(runWith('lockdown'), s, [skill('lockdown', 'e8'), mv('g1', 'h1')], config));
+    const t1 = ok(commitQueue(deckFor(runWith('lockdown'), s), s, [skill('lockdown', 'e8'), mv('g1', 'h1')], config));
     const reply1 = t1.events.find((e) => e.type === 'enemy_move');
     expect(reply1).toMatchObject({ type: 'enemy_move' });
     expect(reply1 && 'from' in reply1 && reply1.from).not.toBe('e8');
