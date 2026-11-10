@@ -84,20 +84,22 @@ default is on.
 
 ### Piece prices (Act I base, Normal rarity)
 
-| Piece | Value | Price | Durability | Coins per durability |
-|---|---|---|---|---|
-| Pawn | 1 | not sold | — | — (spawned free by each stage) |
-| Knight | 3 | 8 | 2 | 4.0 |
-| Bishop | 3 | 8 | 2 | 4.0 |
-| Rook | 5 | 10 | 2 | 5.0 |
-| Queen | 9 | 16 | 1 | 16.0 |
+| Piece | Value | Spawn cost | Price | Durability | Coins per durability |
+|---|---|---|---|---|---|
+| Pawn | 1 | — | not sold | — | — (spawned free by each stage) |
+| Knight | 3 | 3 | 8 | 2 | 4.0 |
+| Bishop | 3 | 3 | 8 | 2 | 4.0 |
+| Rook | 5 | 5 | 10 | 2 | 5.0 |
+| Queen | 9 | 9 | 16 | 2 | 8.0 |
 
 **Price inflation:** `price(act) = round(basePrice × (1 + 0.20 × (act − 1)))` — Act II ×1.2,
 Act III ×1.44.
 
-That last column is the design statement: a knight or bishop is the cheapest way to buy
-**actions**, a queen is the most expensive way to buy **one** action. Durability is priced, not
-hidden. The cheapest action of all is a spawned pawn, which costs no coins — only the turns spent
+Durability is flat ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)), so the last
+column now tracks price alone: a knight or bishop is still the cheapest way to buy **summons**, a
+queen the most expensive. What keeps the queen from being the obvious buy is the spawn-cost column —
+it spends a whole Act I budget — not its durability. Whether 16 coins is still the right price for a
+queen that can be summoned twice is an M6 balance question ([10](10-roadmap-and-milestones.md)). The cheapest action of all is a spawned pawn, which costs no coins — only the turns spent
 moving it.
 
 ### Rarity and prices
@@ -115,7 +117,7 @@ rarityMultiplier:  Normal ×1 · Rare ×1.5 · Unique ×2 · Legendary ×3
 ```
 
 A tier that adds power adds cost, which keeps the coins-per-durability column honest. A Legendary
-bishop (24 base) costs more than a Normal queen (16) and, like the queen, deploys only once. The full
+bishop (24 base) costs more than a Normal queen (16) and 5 spawn points to summon instead of 3. The full
 price grid is in [07 §2.2](07-shop-phase.md#22-prices-by-rarity).
 
 Promotion is the other source of tiers: a spawned pawn that reaches rank 8 becomes a deck piece,
@@ -128,6 +130,14 @@ it costs the turns spent pushing the pawn, which the coin preview prices at one 
 |---|---|---|
 | Repair | 4 | +1 durability to one piece (never above its max) |
 | Reroll | 2 | Reroll the shop (first reroll each visit is free) |
+| **Sell** | pays **½** of the piece's current price, rounded down | The piece leaves the run; never the King or a `spent` piece ([07 §4](07-shop-phase.md#4-purchases)) |
+
+**Selling is a release valve, not a profit.** Buying and selling loses half. Using a piece once and
+selling it nets 4 coins per summon for a Normal knight — exactly the repair rate, so selling never
+beats keeping a piece alive. A promoted piece has no purchase price; selling it converts the turns
+spent promoting into coins at roughly the coin-bonus rate those turns cost. The sell factor may
+never exceed the recovery discount (both 0.5), or buying the discounted recovery piece and selling
+it back would print coins — the validator enforces this.
 
 ### Income vs. expenditure sanity check
 
@@ -136,7 +146,8 @@ An Act I stage cleared on turn 4 pays 12 coins. A Normal knight costs 8 and a Ra
 pay 4–8 coins, which buys a repair, a Normal piece, or a banked surplus.
 
 There is no capacity to buy: the deck is fixed at 8 pieces ([06 §2](06-deck-durability-and-permadeath.md#2-deck-capacity)),
-so coins go into pieces, skills, repairs and rerolls only. Merging three identical pieces into one
+so coins go into pieces, skills, repairs and rerolls only; selling a piece is the only way back from
+pieces to coins, at half price. Merging three identical pieces into one
 of the next tier is free ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)) — it costs pieces,
 not coins. If a player is clearing most stages on their last turn, they are on an
 economic treadmill and will visibly fall behind in Act II. That is the intended failure mode: the
@@ -217,6 +228,7 @@ lose. They are only forced to play well.
 | `promotion.tierUpChance` | 0.75 | Makes promotion a stronger reward |
 | `promotion.resultTypeWeights` | N35 B35 R20 Q10 | Shifts promotion toward bigger pieces |
 | `deck.merge.inputs` | 3 | Makes merging rarer and costlier in pieces (2 = cheaper merges) |
+| `services.sell.priceFactor` | 0.5 | Makes selling pay more; must stay ≤ `shop.recoveryDiscount` |
 | `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |
 
 **Tuning order:** `baseReward` and `coinRate` first (together they set income; `coinRate` alone sets

@@ -4,7 +4,7 @@
   "title": "PieceDefinition",
   "description": "A chess piece TYPE. Instance state (remaining durability, rarity) lives in run.schema.json, never here: rarity belongs to an instance, not a type. What each tier adds is declared here in rarityAbilities. See docs/06-deck-durability-and-permadeath.md and docs/02 §2.3.",
   "type": "object",
-  "required": ["id", "pieceType", "value", "durabilityMax", "purchasable"],
+  "required": ["id", "pieceType", "value", "spawnCost", "durabilityMax", "purchasable"],
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -20,6 +20,21 @@
       "minimum": 0,
       "description": "Chess material value (P1 N3 B3 R5 Q9), the same at every rarity tier. King is 0 and is never counted."
     },
+    "spawnCost": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Spawn points one summon of this piece costs in the Deployment phase, at Normal rarity (docs/02 §5). Mirrors chess value. King 0 (always free); pawn nominal (never in the deck)."
+    },
+    "spawnCostByRarity": {
+      "type": "object",
+      "description": "Per-tier overrides of spawnCost; may only raise it. Tiers not listed use spawnCost.",
+      "additionalProperties": false,
+      "properties": {
+        "rare": { "type": "integer", "minimum": 0 },
+        "unique": { "type": "integer", "minimum": 0 },
+        "legendary": { "type": "integer", "minimum": 0 }
+      }
+    },
     "cost": {
       "type": ["integer", "null"],
       "minimum": 0,
@@ -28,7 +43,7 @@
     "durabilityMax": {
       "type": ["integer", "null"],
       "minimum": 1,
-      "description": "Deployments per purchase at Normal rarity. null = not a deck piece with durability (king: immortal; pawn: stage-only)."
+      "description": "Summons per purchase at Normal rarity; the same for every deck piece (docs/06 §1). null = not a deck piece with durability (king: immortal; pawn: stage-only)."
     },
     "durabilityMaxByRarity": {
       "type": "object",
@@ -89,11 +104,12 @@
       "then": {
         "properties": {
           "durabilityMax": { "const": null },
+          "spawnCost": { "const": 0 },
           "cost": { "const": null },
           "purchasable": { "const": false }
         },
         "not": {
-          "anyOf": [{ "required": ["rarityAbilities"] }, { "required": ["durabilityMaxByRarity"] }]
+          "anyOf": [{ "required": ["rarityAbilities"] }, { "required": ["durabilityMaxByRarity"] }, { "required": ["spawnCostByRarity"] }]
         }
       }
     },
@@ -107,7 +123,7 @@
           "purchasable": { "const": false }
         },
         "not": {
-          "anyOf": [{ "required": ["rarityAbilities"] }, { "required": ["durabilityMaxByRarity"] }]
+          "anyOf": [{ "required": ["rarityAbilities"] }, { "required": ["durabilityMaxByRarity"] }, { "required": ["spawnCostByRarity"] }]
         }
       }
     },

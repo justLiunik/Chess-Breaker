@@ -1,12 +1,15 @@
 import type {
   Action, Award, CommitError, EngineConfig, GameEvent, Result, RunState, StageState,
 } from './types';
-import { hasLegalQueue, inCheck, legalMoves } from './legality';
+import { inCheck, legalMoves } from './legality';
+import { hasLegalQueue } from './legal-queue';
 import { enemyMove } from './enemy/policy';
 import { hash } from './rng';
-import { KING, fromBoard } from './position';
+import { KING, fromBoard, tiersOf } from './position';
 import { toSquare } from './square';
 import { resolveQueue } from './queue';
+import { frozenMask } from './skills/registry';
+import { lifelineSaves } from './abilities';
 
 export function simulate(
   run: RunState,
@@ -20,11 +23,12 @@ export function simulate(
   let nextRun = resolved.value.run;
   let next: StageState = resolved.value.stage;
 
-  // R3: evaluate Black's position.
+  // R3: evaluate Black's position, with suppressed pieces unable to move, against White's abilities.
   const b = fromBoard(next.board);
-  const checked = inCheck(b, 'black');
+  const tiers = { t: tiersOf(next.board), table: config.abilities };
+  const checked = inCheck(b, 'black', tiers);
   let award: Award | null = null;
-  if (legalMoves(b, 'black').length === 0) {
+  if (legalMoves(b, 'black', frozenMask(next), tiers).length === 0) {
     if (checked) {
       next = { ...next, status: 'won', endReason: 'checkmate' };
     } else {
@@ -56,8 +60,33 @@ export function simulate(
 }
 
 /**
- * `simulate` followed by the enemy's reply (R5) and the start of the next turn. A stage that
- * `simulate` already ended gets no reply.
+ * An enemy capture of a Hero Piece: the instance leaves the deck, unless a lifeline saves it (docs/06).
+ * A Hero Piece without a deck instance cannot have entered the board at Deployment (I15): refused.
+ */
+function loseInstance(
+  run: RunState,
+  instanceId: string,
+  config: EngineConfig,
+): Result<{ run: RunState; saved: boolean }, CommitError> {
+  const inst = run.deck.find((i) => i.instanceId === instanceId);
+  if (!inst) {
+    return {
+      ok: false,
+      error: { kind: 'invariant_violation', invariant: 'I15', detail: `captured Hero Piece ${instanceId} has no deck instance` },
+    };
+  }
+  if (lifelineSaves(inst, config)) {
+    const deck = run.deck.map((i) => (i.instanceId === instanceId
+      ? { ...i, status: 'captured' as const, usedOnce: [...(i.usedOnce ?? []), 'lifeline' as const] }
+      : i));
+    return { ok: true, value: { run: { ...run, deck }, saved: true } };
+  }
+  return { ok: true, value: { run: { ...run, deck: run.deck.filter((i) => i.instanceId !== instanceId) }, saved: false } };
+}
+
+/**
+ * `simulate` (Resolve to R4) followed by the enemy's reply (R5), the expiry of next_enemy_turn
+ * modifiers, and the start of the next turn. A stage that `simulate` already ended gets no reply.
  */
 export function commitQueue(
   run: RunState,
@@ -70,9 +99,13 @@ export function commitQueue(
 
   const events = [...sim.value.events];
   let next: StageState = sim.value.stage;
+  let nextRun = sim.value.run;
 
-  // R5: the enemy replies.
+  // R5: the enemy replies; suppressed pieces do not move.
   const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
+  if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
+    events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
+  }
   const mover = picked.move ? next.board[picked.move.from] : undefined;
   if (picked.move && mover) {
     const { from, to } = picked.move;
@@ -83,7 +116,15 @@ export function commitQueue(
     if (taken) {
       events.push({
         type: 'capture', square: to, pieceType: taken.pieceType, color: taken.color, salvage: 0,
+        ...(taken.instanceId !== undefined && { instanceId: taken.instanceId }),
+        ...(taken.stageId !== undefined && { stageId: taken.stageId }),
       });
+      if (taken.instanceId !== undefined) {
+        const lost = loseInstance(nextRun, taken.instanceId, config);
+        if (!lost.ok) return lost;
+        nextRun = lost.value.run;
+        if (lost.value.saved) events.push({ type: 'lifeline_saved', instanceId: taken.instanceId });
+      }
     }
     if (mover.pieceType === 'pawn' && to.endsWith('1')) {
       board[to] = { ...mover, pieceType: 'queen' };
@@ -93,11 +134,12 @@ export function commitQueue(
     }
     next = { ...next, board };
   }
-  if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
-    events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
-  }
+  // After R5: next_enemy_turn modifiers expire.
+  const expired = next.modifiers.filter((m) => m.duration === 'next_enemy_turn');
+  for (const m of expired) events.push({ type: 'modifier_expired', modifierId: m.modifierId });
   next = {
     ...next,
+    modifiers: expired.length === 0 ? next.modifiers : next.modifiers.filter((m) => m.duration !== 'next_enemy_turn'),
     enemyPolicy: picked.policy,
     moveCredits: config.rules.freeMovesPerTurn,
     focus: next.focusPool,
@@ -107,10 +149,10 @@ export function commitQueue(
   const b = fromBoard(next.board);
   const checked = inCheck(b, 'white');
   if (checked) events.push({ type: 'check', king: 'white', square: toSquare(b.indexOf(KING)) });
-  if (!hasLegalQueue(next, config)) {
+  if (!hasLegalQueue(nextRun, next, config)) {
     const endReason = checked ? 'player_mated' : 'player_stalemated';
     next = { ...next, status: 'lost', endReason };
     events.push({ type: 'stage_lost', endReason });
   }
-  return { ok: true, value: { run: sim.value.run, stage: next, events, award: null } };
+  return { ok: true, value: { run: nextRun, stage: next, events, award: null } };
 }

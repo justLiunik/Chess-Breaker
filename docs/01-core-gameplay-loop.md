@@ -54,7 +54,7 @@ pawn with turns. The chain has a leak — pieces get captured — and managing t
 ## Loop 1 — Action
 
 0. **Deploy (once per stage).** Before the first move, read the generated board, place the King and
-   summon up to the act's limit from the deck. Start locks the deck for the stage
+   summon deck pieces within the stage's spawn points, on ranks 1–4. Start locks the deck for the stage
    ([02 §5](02-rules-framework.md#5-deployment)).
 1. **Read.** Position, enemy threats, turns remaining, Focus, remaining charges.
 2. **Plan.** Assemble an ordered action queue: the Free Move, any extra moves, skill activations. A

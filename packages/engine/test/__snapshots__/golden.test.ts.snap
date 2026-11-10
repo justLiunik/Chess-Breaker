@@ -18,6 +18,7 @@ exports[`golden commitQueue scenarios > capture with salvage 1`] = `
         "pieceType": "knight",
         "salvage": 1,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -104,6 +105,7 @@ exports[`golden commitQueue scenarios > capture with salvage 1`] = `
         "d8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
         "e1": {
           "color": "white",
@@ -111,10 +113,6 @@ exports[`golden commitQueue scenarios > capture with salvage 1`] = `
           "pieceType": "king",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -125,9 +123,10 @@ exports[`golden commitQueue scenarios > capture with salvage 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -243,12 +242,9 @@ exports[`golden commitQueue scenarios > check event on Black 1`] = `
         "e7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -259,9 +255,10 @@ exports[`golden commitQueue scenarios > check event on Black 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -372,10 +369,12 @@ exports[`golden commitQueue scenarios > check event on White after R5 1`] = `
         "f8": {
           "color": "black",
           "pieceType": "rook",
+          "stageId": "s01",
         },
         "g8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
         "h2": {
           "color": "white",
@@ -383,10 +382,6 @@ exports[`golden commitQueue scenarios > check event on White after R5 1`] = `
           "pieceType": "rook",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 1,
         "fallbackDepth": 1,
@@ -401,9 +396,10 @@ exports[`golden commitQueue scenarios > check event on White after R5 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -517,20 +513,19 @@ exports[`golden commitQueue scenarios > checkmate win Act I 1`] = `
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s01",
         },
         "h7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "h8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "checkmate",
       "enemyPolicy": {
         "depth": 2,
@@ -542,9 +537,10 @@ exports[`golden commitQueue scenarios > checkmate win Act I 1`] = `
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "won",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 2,
@@ -658,20 +654,19 @@ exports[`golden commitQueue scenarios > checkmate win Act I boss 1`] = `
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s01",
         },
         "h7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "h8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "checkmate",
       "enemyPolicy": {
         "depth": 2,
@@ -683,9 +678,10 @@ exports[`golden commitQueue scenarios > checkmate win Act I boss 1`] = `
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "won",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 7,
       "turnsUsed": 7,
@@ -799,20 +795,19 @@ exports[`golden commitQueue scenarios > checkmate win Act II 1`] = `
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s01",
         },
         "h7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "h8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "checkmate",
       "enemyPolicy": {
         "depth": 2,
@@ -824,9 +819,10 @@ exports[`golden commitQueue scenarios > checkmate win Act II 1`] = `
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "won",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 6,
       "turnsUsed": 1,
@@ -934,6 +930,7 @@ exports[`golden commitQueue scenarios > deferred check through an attacked squar
         "b7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
         "g1": {
           "color": "white",
@@ -943,12 +940,9 @@ exports[`golden commitQueue scenarios > deferred check through an attacked squar
         "h8": {
           "color": "black",
           "pieceType": "rook",
+          "stageId": "s02",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -959,9 +953,10 @@ exports[`golden commitQueue scenarios > deferred check through an attacked squar
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -990,6 +985,7 @@ exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
       },
       {
         "color": "white",
+        "instanceId": "p_rook_a1",
         "pieceType": "rook",
         "salvage": 0,
         "square": "a3",
@@ -1069,6 +1065,7 @@ exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
         "a3": {
           "color": "black",
           "pieceType": "rook",
+          "stageId": "s01",
         },
         "e1": {
           "color": "white",
@@ -1078,12 +1075,9 @@ exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
         "e8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 1,
         "fallbackDepth": 1,
@@ -1098,9 +1092,10 @@ exports[`golden commitQueue scenarios > enemy captures a White piece 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -1205,10 +1200,12 @@ exports[`golden commitQueue scenarios > enemy pawn promotion 1`] = `
         "b1": {
           "color": "black",
           "pieceType": "queen",
+          "stageId": "s01",
         },
         "e8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
         "g4": {
           "color": "white",
@@ -1216,10 +1213,6 @@ exports[`golden commitQueue scenarios > enemy pawn promotion 1`] = `
           "pieceType": "king",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 1,
         "fallbackDepth": 1,
@@ -1234,9 +1227,10 @@ exports[`golden commitQueue scenarios > enemy pawn promotion 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -1263,6 +1257,7 @@ exports[`golden commitQueue scenarios > enemy stalemated 1`] = `
         "pieceType": "pawn",
         "salvage": 0,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -1354,12 +1349,9 @@ exports[`golden commitQueue scenarios > enemy stalemated 1`] = `
         "h8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "enemy_stalemated",
       "enemyPolicy": {
         "depth": 2,
@@ -1371,9 +1363,10 @@ exports[`golden commitQueue scenarios > enemy stalemated 1`] = `
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "lost",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -1441,6 +1434,7 @@ exports[`golden commitQueue scenarios > err invariant_violation without a White 
 exports[`golden commitQueue scenarios > err king_in_check_at_end 1`] = `
 {
   "error": {
+    "afterRevert": false,
     "checkers": [
       "h8",
     ],
@@ -1451,21 +1445,22 @@ exports[`golden commitQueue scenarios > err king_in_check_at_end 1`] = `
 }
 `;
 
-exports[`golden commitQueue scenarios > err stage_not_active 1`] = `
+exports[`golden commitQueue scenarios > err skill_unavailable not_in_loadout 1`] = `
 {
   "error": {
-    "kind": "stage_not_active",
+    "atStep": 1,
+    "kind": "skill_unavailable",
+    "reason": "not_in_loadout",
+    "skillId": "sk_x",
   },
   "ok": false,
 }
 `;
 
-exports[`golden commitQueue scenarios > err unsupported_action 1`] = `
+exports[`golden commitQueue scenarios > err stage_not_active 1`] = `
 {
   "error": {
-    "actionType": "ACTIVATE_SKILL",
-    "atStep": 1,
-    "kind": "unsupported_action",
+    "kind": "stage_not_active",
   },
   "ok": false,
 }
@@ -1586,20 +1581,19 @@ exports[`golden commitQueue scenarios > mate on the final turn (base only) 1`] =
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s01",
         },
         "h7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "h8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "checkmate",
       "enemyPolicy": {
         "depth": 2,
@@ -1611,9 +1605,10 @@ exports[`golden commitQueue scenarios > mate on the final turn (base only) 1`] =
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "won",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 8,
@@ -1709,6 +1704,7 @@ exports[`golden commitQueue scenarios > out of turns 1`] = `
         "a8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
         "e1": {
           "color": "white",
@@ -1721,10 +1717,6 @@ exports[`golden commitQueue scenarios > out of turns 1`] = `
           "pieceType": "rook",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "out_of_turns",
       "enemyPolicy": {
         "depth": 2,
@@ -1736,9 +1728,10 @@ exports[`golden commitQueue scenarios > out of turns 1`] = `
       "moveCredits": 0,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "lost",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 8,
@@ -1761,6 +1754,7 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
         "type": "move",
       },
       {
+        "instanceId": "p_61865fae",
         "promotesTo": {
           "pieceType": "knight",
           "rarity": "normal",
@@ -1832,6 +1826,16 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
           "rarity": "normal",
           "status": "in_deck",
         },
+        {
+          "acquiredAtStage": 0,
+          "durability": 2,
+          "durabilityMax": 2,
+          "instanceId": "p_61865fae",
+          "origin": "promotion",
+          "pieceType": "knight",
+          "rarity": "normal",
+          "status": "in_deck",
+        },
       ],
       "deckCapacity": 8,
       "history": [],
@@ -1852,12 +1856,9 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
         "e7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s02",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -1868,9 +1869,10 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -1980,14 +1982,17 @@ exports[`golden commitQueue scenarios > player mated after R5 1`] = `
         "a1": {
           "color": "black",
           "pieceType": "rook",
+          "stageId": "s02",
         },
         "b2": {
           "color": "black",
           "pieceType": "rook",
+          "stageId": "s01",
         },
         "e8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
         "g1": {
           "color": "white",
@@ -1995,10 +2000,6 @@ exports[`golden commitQueue scenarios > player mated after R5 1`] = `
           "pieceType": "king",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "player_mated",
       "enemyPolicy": {
         "cursor": 1,
@@ -2014,9 +2015,10 @@ exports[`golden commitQueue scenarios > player mated after R5 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "lost",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2121,10 +2123,12 @@ exports[`golden commitQueue scenarios > player stalemated after R5 1`] = `
         "e8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
         "g3": {
           "color": "black",
           "pieceType": "queen",
+          "stageId": "s02",
         },
         "h1": {
           "color": "white",
@@ -2132,10 +2136,6 @@ exports[`golden commitQueue scenarios > player stalemated after R5 1`] = `
           "pieceType": "king",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "endReason": "player_stalemated",
       "enemyPolicy": {
         "cursor": 1,
@@ -2151,9 +2151,10 @@ exports[`golden commitQueue scenarios > player stalemated after R5 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "lost",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2264,12 +2265,9 @@ exports[`golden commitQueue scenarios > quiet turn 1`] = `
         "e7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -2280,9 +2278,10 @@ exports[`golden commitQueue scenarios > quiet turn 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2305,13 +2304,13 @@ exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
         "type": "move",
       },
       {
+        "cursor": 3,
+        "type": "enemy_fell_back",
+      },
+      {
         "from": "e8",
         "to": "e7",
         "type": "enemy_move",
-      },
-      {
-        "cursor": 3,
-        "type": "enemy_fell_back",
       },
       {
         "turn": 2,
@@ -2392,18 +2391,22 @@ exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
         "a7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "b7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s03",
         },
         "c6": {
           "color": "black",
           "pieceType": "knight",
+          "stageId": "s01",
         },
         "c7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s04",
         },
         "e1": {
           "color": "white",
@@ -2413,20 +2416,19 @@ exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
         "e7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s07",
         },
         "f7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s05",
         },
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s06",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 3,
         "fallbackDepth": 1,
@@ -2444,9 +2446,10 @@ exports[`golden commitQueue scenarios > scripted fallback (exhausted) 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2469,13 +2472,13 @@ exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
         "type": "move",
       },
       {
+        "cursor": 0,
+        "type": "enemy_fell_back",
+      },
+      {
         "from": "e8",
         "to": "e7",
         "type": "enemy_move",
-      },
-      {
-        "cursor": 0,
-        "type": "enemy_fell_back",
       },
       {
         "turn": 2,
@@ -2556,18 +2559,22 @@ exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
         "a7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "b7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s03",
         },
         "c6": {
           "color": "black",
           "pieceType": "knight",
+          "stageId": "s01",
         },
         "c7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s04",
         },
         "e1": {
           "color": "white",
@@ -2577,20 +2584,19 @@ exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
         "e7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s07",
         },
         "f7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s05",
         },
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s06",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 0,
         "fallbackDepth": 1,
@@ -2607,9 +2613,10 @@ exports[`golden commitQueue scenarios > scripted fallback (illegal) 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2715,14 +2722,17 @@ exports[`golden commitQueue scenarios > scripted move played 1`] = `
         "a7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s02",
         },
         "b7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s03",
         },
         "c7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s04",
         },
         "e1": {
           "color": "white",
@@ -2732,24 +2742,24 @@ exports[`golden commitQueue scenarios > scripted move played 1`] = `
         "e5": {
           "color": "black",
           "pieceType": "knight",
+          "stageId": "s01",
         },
         "e8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s07",
         },
         "f7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s05",
         },
         "g7": {
           "color": "black",
           "pieceType": "pawn",
+          "stageId": "s06",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "cursor": 1,
         "fallbackDepth": 1,
@@ -2766,9 +2776,10 @@ exports[`golden commitQueue scenarios > scripted move played 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -2795,6 +2806,7 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
         "pieceType": "knight",
         "salvage": 1,
         "square": "a7",
+        "stageId": "s01",
         "type": "capture",
       },
       {
@@ -2809,6 +2821,7 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
         "pieceType": "rook",
         "salvage": 1,
         "square": "b7",
+        "stageId": "s02",
         "type": "capture",
       },
       {
@@ -2895,6 +2908,7 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
         "d8": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s03",
         },
         "e1": {
           "color": "white",
@@ -2902,10 +2916,6 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
           "pieceType": "king",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -2916,9 +2926,10 @@ exports[`golden commitQueue scenarios > two captures (credits 2) 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,
@@ -3036,12 +3047,9 @@ exports[`golden commitQueue scenarios > vanishing check 1`] = `
         "g7": {
           "color": "black",
           "pieceType": "king",
+          "stageId": "s01",
         },
       },
-      "deploymentRanks": [
-        1,
-        2,
-      ],
       "enemyPolicy": {
         "depth": 1,
         "type": "best_move",
@@ -3052,9 +3060,10 @@ exports[`golden commitQueue scenarios > vanishing check 1`] = `
       "moveCredits": 1,
       "phase": "action",
       "playerColor": "white",
+      "skillLog": [],
+      "spawnPoints": 9,
       "stageSeed": "9C41-0B77",
       "status": "active",
-      "summonLimit": 3,
       "templateId": "tpl-act1-open-field",
       "turnLimit": 8,
       "turnsUsed": 1,

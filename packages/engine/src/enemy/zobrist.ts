@@ -21,12 +21,19 @@ for (let i = 0; i < 12 * 64; i++) PIECE_KEYS.push(drawKey());
 const SIDE_KEY = drawKey();
 const TURN_KEYS: { hi: number; lo: number }[] = [];
 for (let i = 0; i < TURNS; i++) TURN_KEYS.push(drawKey());
+// Drawn after every key above, so the M1 keys are unchanged: (tier - 1) * 64 + square, tiers 1..3.
+const TIER_KEYS: { hi: number; lo: number }[] = [];
+for (let i = 0; i < 3 * 64; i++) TIER_KEYS.push(drawKey());
 
 function pieceIndex(code: number): number {
   return code < 0 ? code + 6 : code + 5; // -6..-1 -> 0..5, 1..6 -> 6..11
 }
 
-export function zobristKey(b: Int8Array, blackToMove: boolean, playerTurnsLeft: number): number {
+/**
+ * The position's key. With the tier array `t`, each White piece with a tier also XORs its
+ * (tier, square) key, so a tier-free `t` gives the M1 key.
+ */
+export function zobristKey(b: Int8Array, blackToMove: boolean, playerTurnsLeft: number, t?: Int8Array): number {
   if (!Number.isInteger(playerTurnsLeft) || playerTurnsLeft < 0 || playerTurnsLeft >= TURNS) {
     throw new RangeError(`playerTurnsLeft ${playerTurnsLeft} outside 0..${TURNS - 1}`);
   }
@@ -38,13 +45,21 @@ export function zobristKey(b: Int8Array, blackToMove: boolean, playerTurnsLeft: 
     const k = PIECE_KEYS[pieceIndex(code) * 64 + sq]!;
     hi ^= k.hi;
     lo ^= k.lo;
+    if (t !== undefined && code > 0) {
+      const tier = t[sq]!;
+      if (tier > 0) {
+        const tk = TIER_KEYS[(tier - 1) * 64 + sq]!;
+        hi ^= tk.hi;
+        lo ^= tk.lo;
+      }
+    }
   }
   if (blackToMove) {
     hi ^= SIDE_KEY.hi;
     lo ^= SIDE_KEY.lo;
   }
-  const t = TURN_KEYS[playerTurnsLeft]!;
-  hi ^= t.hi;
-  lo ^= t.lo;
+  const turn = TURN_KEYS[playerTurnsLeft]!;
+  hi ^= turn.hi;
+  lo ^= turn.lo;
   return (hi & 0x1fffff) * 2 ** 32 + (lo >>> 0);
 }

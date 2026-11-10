@@ -1,9 +1,13 @@
-# Launch skills — one per supported framework axis.
+# Skill catalogue — the three launch skills (status: mvp, built in M2) and the
+# next four (status: future, built in M6).
 #
 # Each skill breaks exactly ONE named rule of chess (pillar 3) and composes
 # entirely from the effect primitives in docs/03. Charges are per STAGE and
 # refresh at every stage start, so a skill is a strategic identity rather than
-# ammunition. See docs/03-skill-framework.md §5.
+# ammunition. See docs/03-skill-framework.md §5 and §6.
+#
+# cost is Focus per activation; price is the Act I shop price in coins (later
+# acts add data/economy.yaml priceInflationPerAct, as pieces do).
 
 skills:
   - id: twin_step
@@ -14,6 +18,7 @@ skills:
     trigger: activate
     cost: 1
     charges: 3
+    price: 12
     target:
       kind: none
     effects:
@@ -33,10 +38,13 @@ skills:
     trigger: activate
     cost: 2
     charges: 2
+    price: 12
     target:
       kind: own_piece
       pieceType: bishop
       must_be_on_board: true
+      excludesRarity:
+        - legendary     # already moves like a queen: Ascension would only take its leaps away
     effects:
       - primitive: set_piece_type
         params:
@@ -54,6 +62,7 @@ skills:
     trigger: activate
     cost: 1
     charges: 3
+    price: 10
     target:
       kind: enemy_piece
       must_be_on_board: true
@@ -67,3 +76,98 @@ skills:
       - once_per_turn
       - distinct_targets
     status: mvp
+
+  # ---- future (M6): data and rules are fixed now; the engine builds them in M6 ----
+
+  - id: gallop
+    name: Gallop
+    category: movement_override
+    ruleBroken: "A piece moves only the way its type moves."
+    text: "One of your pieces moves like a knight until the end of this turn."
+    trigger: activate
+    cost: 1
+    charges: 2
+    price: 10
+    target:
+      kind: own_piece
+      must_be_on_board: true
+      excludes:
+        - king
+        - pawn            # keeps the template's promotion-reach math honest
+    effects:
+      - primitive: override_moveset
+        params:
+          pieceType: knight
+        duration: this_turn
+    restrictions:
+      - once_per_turn
+    status: future
+
+  - id: phase_step
+    name: Phase Step
+    category: movement_override
+    ruleBroken: "Pieces are blocked by other pieces."
+    text: "One of your rooks, bishops or queens moves through every piece until the end of this turn."
+    trigger: activate
+    cost: 2
+    charges: 2
+    price: 14
+    target:
+      kind: own_piece
+      must_be_on_board: true
+      excludes:
+        - king
+        - pawn
+        - knight          # already leaps
+    effects:
+      - primitive: ignore_blockers
+        params: {}
+        duration: this_turn
+    restrictions:
+      - once_per_turn
+    status: future
+
+  - id: recall
+    name: Recall
+    category: board_manipulation
+    ruleBroken: "A piece on the board can only leave it by being captured."
+    text: "Return one of your pieces to your deck. It cannot come back this stage."
+    trigger: activate
+    cost: 1
+    charges: 1
+    price: 12
+    target:
+      kind: own_piece
+      must_be_on_board: true
+      excludes:
+        - king
+        - pawn            # spawned pawns are Stage Pieces, not deck pieces
+    effects:
+      - primitive: return_to_deck
+        params: {}
+        duration: instant
+    restrictions:
+      - once_per_turn
+    status: future
+
+  - id: bulwark
+    name: Bulwark
+    category: status
+    ruleBroken: "Any piece can be captured."
+    text: "Choose one of your pieces. It cannot be captured on the enemy's next turn."
+    trigger: activate
+    cost: 1
+    charges: 2
+    price: 10
+    target:
+      kind: own_piece
+      must_be_on_board: true
+      excludes:
+        - king
+    effects:
+      - primitive: shield_piece
+        params: {}
+        duration: next_enemy_turn
+    restrictions:
+      - once_per_turn
+    status: future

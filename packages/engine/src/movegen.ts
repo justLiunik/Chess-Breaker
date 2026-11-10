@@ -11,6 +11,10 @@ export type Move = {
   to: number;
   captured: number;
   promotion: 'queen' | 'removed' | null;
+  /** A multi-capture's first captured square (the mover ends on `to`, directly beyond it), else -1. */
+  via: number;
+  /** The code captured on `via`, else 0. */
+  viaCaptured: number;
 };
 
 const KNIGHT_D = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]] as const;
@@ -216,7 +220,9 @@ export function pseudoMoves(b: Int8Array, color: Color): Move[] {
     const n = targetsInto(b, from, TARGETS);
     for (let i = 0; i < n; i++) {
       const to = TARGETS[i]!;
-      moves.push({ from, to, captured: b[to]!, promotion: isPawn ? promotionOf(s, to) : null });
+      moves.push({
+        from, to, captured: b[to]!, promotion: isPawn ? promotionOf(s, to) : null, via: -1, viaCaptured: 0,
+      });
     }
   }
   return moves;
@@ -262,6 +268,7 @@ export function isAttacked(b: Int8Array, sq: number, by: Color): boolean {
 
 export function makeMove(b: Int8Array, m: Move): void {
   const code = b[m.from]!;
+  if (m.via >= 0) b[m.via] = 0;
   b[m.to] = m.promotion === 'queen' ? -QUEEN : m.promotion === 'removed' ? 0 : code;
   b[m.from] = 0;
 }
@@ -270,4 +277,27 @@ export function unmakeMove(b: Int8Array, m: Move): void {
   const moved = m.promotion === 'queen' ? -PAWN : m.promotion === 'removed' ? PAWN : b[m.to]!;
   b[m.from] = moved;
   b[m.to] = m.captured;
+  if (m.via >= 0) b[m.via] = m.viaCaptured;
+}
+
+/**
+ * `makeMove` on `b` and the tier array `t` beside it: the tier moves with the piece (and is dropped
+ * when the piece vanishes), captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
+ * needs to restore `t` exactly: from, to and via, two bits each.
+ */
+export function makeMoveTiered(b: Int8Array, t: Int8Array, m: Move): number {
+  const via = m.via;
+  const saved = t[m.from]! | (t[m.to]! << 2) | (via >= 0 ? t[via]! << 4 : 0);
+  makeMove(b, m);
+  t[m.to] = b[m.to]! > 0 ? t[m.from]! : 0;
+  t[m.from] = 0;
+  if (via >= 0) t[via] = 0;
+  return saved;
+}
+
+export function unmakeMoveTiered(b: Int8Array, t: Int8Array, m: Move, saved: number): void {
+  unmakeMove(b, m);
+  t[m.from] = saved & 3;
+  t[m.to] = (saved >> 2) & 3;
+  if (m.via >= 0) t[m.via] = (saved >> 4) & 3;
 }

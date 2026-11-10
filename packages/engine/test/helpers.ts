@@ -1,6 +1,8 @@
 import { loadEngineConfig } from '@checkbreaker/content';
+import { rng } from '../src/rng';
+import { isAttacked } from '../src/movegen';
 import type {
-  BoardPiece, EngineConfig, PieceType, RunState, Square, StageState,
+  BoardPiece, Color, EngineConfig, PieceType, Rarity, RunState, Square, StageState,
 } from '../src/types';
 
 export const config: EngineConfig = loadEngineConfig();
@@ -16,6 +18,16 @@ export function deepFreeze<T>(x: T): T {
 const LETTERS: Record<string, PieceType> = {
   k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
 };
+
+/** Gives each Stage Piece (no instanceId) a stageId s01, s02, ... in square-index order (a1 first). */
+export function assignStageIds(board: Record<Square, BoardPiece>): void {
+  const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
+  let n = 0;
+  for (const sq of Object.keys(board).sort((a, b) => index(a) - index(b))) {
+    const piece = board[sq]!;
+    if (piece.instanceId === undefined) piece.stageId = `s${String(++n).padStart(2, '0')}`;
+  }
+}
 
 export function stageOf(
   pieces: Record<Square, string>,
@@ -36,6 +48,7 @@ export function stageOf(
       board[sq] = { pieceType, color: 'white', instanceId: `p_${pieceType}_${sq}` };
     }
   }
+  assignStageIds(board);
   return deepFreeze({
     stageSeed: '9C41-0B77',
     templateId: 'tpl-act1-open-field',
@@ -47,13 +60,26 @@ export function stageOf(
     focus: 3,
     focusPool: 3,
     moveCredits: 1,
-    summonLimit: 3,
-    deploymentRanks: [1, 2],
+    spawnPoints: 9,
     modifiers: [],
+    skillLog: [],
     enemyPolicy: { type: 'best_move', depth: 2 },
     status: 'active',
     ...overrides,
   } as StageState);
+}
+
+/** A stage in the Deployment phase: `stageOf` without White Hero Pieces, with 9 spawn points. */
+export function deploymentStageOf(
+  pieces: Record<Square, string>,
+  overrides: Partial<StageState> = {},
+): StageState {
+  const base = stageOf(pieces);
+  const board: Record<Square, BoardPiece> = {};
+  for (const [sq, piece] of Object.entries(base.board)) {
+    if (!(piece.color === 'white' && piece.instanceId !== undefined)) board[sq] = { ...piece };
+  }
+  return deepFreeze({ ...base, board, phase: 'deployment', spawnPoints: 9, ...overrides } as StageState);
 }
 
 export function runOf(overrides: Partial<RunState> = {}): RunState {
@@ -84,6 +110,24 @@ export function runOf(overrides: Partial<RunState> = {}): RunState {
   } as RunState);
 }
 
+/**
+ * `run` with a deck instance for every non-King Hero Piece on `stage`'s board that its deck lacks:
+ * the piece's id and rarity (Normal when it has none), `deployed`, as `startStage` leaves a summon.
+ * The R5 capture of a Hero Piece needs its instance (I15).
+ */
+export function deckFor(run: RunState, stage: StageState): RunState {
+  const have = new Set(run.deck.map((p) => p.instanceId));
+  const extra = Object.values(stage.board).flatMap((p) => {
+    if (p.color !== 'white' || p.instanceId === undefined || p.pieceType === 'king' || p.pieceType === 'pawn') return [];
+    if (have.has(p.instanceId)) return [];
+    return [{
+      instanceId: p.instanceId, pieceType: p.pieceType, rarity: p.rarity ?? 'normal', durability: 1, durabilityMax: 2,
+      origin: 'starter' as const, acquiredAtStage: 0, status: 'deployed' as const,
+    }];
+  });
+  return deepFreeze({ ...run, deck: [...run.deck, ...extra] });
+}
+
 export const MIDGAME_FENS: string[] = [
   'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b - - 0 1',
   'r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b - - 0 1',
@@ -101,6 +145,25 @@ export const GAME_FENS: string[] = [
   '2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3 b - - 0 1',
 ];
 
+/**
+ * The rarity benchmark positions: each GAME_FEN with every White knight, bishop, rook and queen
+ * (all Hero Pieces) at Rare, at Unique and at Legendary. Build one with `rarityStage`.
+ */
+export const RARITY_FENS: { fen: string; rarity: Exclude<Rarity, 'normal'> }[] = GAME_FENS.flatMap(
+  (fen) => (['rare', 'unique', 'legendary'] as const).map((rarity) => ({ fen, rarity })),
+);
+
+/** `fenToStage(fen)` with the White knights, bishops, rooks and queens at `rarity`. */
+export function rarityStage(fen: string, rarity: Rarity): StageState {
+  const stage = fenToStage(fen);
+  const board: Record<Square, BoardPiece> = {};
+  for (const [sq, piece] of Object.entries(stage.board)) {
+    const tiered = piece.color === 'white' && piece.instanceId !== undefined && piece.pieceType !== 'king';
+    board[sq] = tiered ? { ...piece, rarity } : piece;
+  }
+  return deepFreeze({ ...stage, board });
+}
+
 export function fenToStage(fen: string, overrides: Partial<StageState> = {}): StageState {
   const placement = fen.split(' ')[0]!;
   const pieces: Record<Square, string> = {};
@@ -113,4 +176,57 @@ export function fenToStage(fen: string, overrides: Partial<StageState> = {}): St
     }
   });
   return stageOf(pieces, overrides);
+}
+
+/**
+ * A deterministic random board: one king per side, 2-14 other pieces, no pawn on rank 1 or 8,
+ * neither king in check, or with `sideInCheck` set, exactly that side in check (as M1 sees check).
+ * The same (seed, i, option) always gives the same board. With `tiers`, that array is filled with a
+ * random tier 0-3 for each White knight, bishop, rook and queen (0 elsewhere); the board is the same
+ * as without it.
+ */
+export function randomBoard(
+  seed: string, i: number, opts: { sideInCheck?: Color; tiers?: Int8Array } = {},
+): Int8Array {
+  let cursor = 0;
+  const next = (n: number): number => {
+    // The FNV hash's top bits barely move between consecutive cursors, so finish it with a
+    // murmur-style mix before scaling.
+    let h = rng(`${seed}|${i}`, cursor).value * 2 ** 32 >>> 0;
+    cursor++;
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return Math.floor(((h >>> 0) / 2 ** 32) * n);
+  };
+  for (;;) {
+    const b = new Int8Array(64);
+    const place = (code: number, pawn: boolean): void => {
+      for (;;) {
+        const sq = next(64);
+        const rank = sq >> 3;
+        if (b[sq] !== 0 || (pawn && (rank === 0 || rank === 7))) continue;
+        b[sq] = code;
+        return;
+      }
+    };
+    place(6, false);
+    place(-6, false);
+    const others = 2 + next(13);
+    for (let n = 0; n < others; n++) {
+      const type = 1 + next(5);
+      place(next(2) === 0 ? type : -type, type === 1);
+    }
+    const whiteChecked = isAttacked(b, b.indexOf(6), 'black');
+    const blackChecked = isAttacked(b, b.indexOf(-6), 'white');
+    const want = opts.sideInCheck;
+    if (want === undefined ? !whiteChecked && !blackChecked
+      : want === 'white' ? whiteChecked && !blackChecked : blackChecked && !whiteChecked) {
+      const t = opts.tiers;
+      if (t !== undefined) {
+        for (let sq = 0; sq < 64; sq++) t[sq] = b[sq]! >= 2 && b[sq]! <= 5 ? next(4) : 0;
+      }
+      return b;
+    }
+  }
 }

@@ -7,6 +7,8 @@ export interface BoardPiece {
   pieceType: PieceType;
   color: Color;
   instanceId?: string;
+  /** Stable id of a Stage Piece (no instanceId): s01, s02, ... Hero Pieces are identified by instanceId instead. */
+  stageId?: string;
   spawned?: true;
   rarity?: Rarity;
   promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
@@ -28,8 +30,10 @@ export interface ActiveModifier {
   primitive:
     | 'grant_move_credit' | 'grant_focus' | 'set_piece_type' | 'override_moveset'
     | 'ignore_blockers' | 'suppress_piece' | 'shield_king' | 'remove_piece'
-    | 'place_piece' | 'displace_piece' | 'reveal_intent' | 'add_plan_undo';
+    | 'place_piece' | 'displace_piece' | 'return_to_deck' | 'shield_piece'
+    | 'reveal_intent' | 'add_plan_undo';
   source?: string;
+  /** Id of the targeted piece: its `instanceId ?? stageId`, not a square (squares change as pieces move). */
   target?: string;
   duration: 'instant' | 'this_turn' | 'next_enemy_turn' | 'permanent';
   appliedOnTurn?: number;
@@ -49,9 +53,11 @@ export interface StageState {
   focus: number;
   focusPool: number;
   moveCredits: number;
-  summonLimit: number;
-  deploymentRanks: number[];
+  /** Summon budget: the summons' total spawnCost must fit (docs/02 §5). Deployment ranks are global (rules.deploymentRanks). */
+  spawnPoints: number;
   modifiers: ActiveModifier[];
+  /** Skills used this stage, in order; restrictions such as distinct_targets read it. */
+  skillLog: { skillId: string; turn: number; targetId?: string }[];
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';
   endReason?: EndReason;
@@ -103,18 +109,30 @@ export type Action =
 export type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
 
 export type CommitError =
-  | { kind: 'king_in_check_at_end'; square: Square; checkers: Square[] }
+  | {
+      kind: 'king_in_check_at_end';
+      square: Square;
+      checkers: Square[];
+      /** True when the King is attacked only on the board R1 reverted, not before the revert. */
+      afterRevert: boolean;
+    }
   | { kind: 'focus_exceeded'; atStep: number; needed: number; available: number }
   | { kind: 'credits_exceeded'; atStep: number }
   | { kind: 'empty_queue' }
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
   | { kind: 'stage_not_active' }
+  | { kind: 'stage_not_won'; status: StageState['status'] }
   | { kind: 'wrong_phase'; expected: 'deployment' | 'action' }
   | { kind: 'durability_unavailable'; instanceId: string }
-  | { kind: 'invalid_deployment'; to: Square; reason: string }
-  | { kind: 'summon_limit_exceeded'; limit: number; placed: number }
-  | { kind: 'unsupported_action'; atStep: number; actionType: 'ACTIVATE_SKILL' }
-  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
+  | {
+      kind: 'invalid_deployment';
+      to: Square;
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate';
+    }
+  | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
+  | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
+  | { kind: 'invalid_target'; atStep: number; skillId: string; target?: string; reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
+  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3' | 'I15'; detail: string };
 
 export interface Award {
   coins: number;
@@ -124,21 +142,90 @@ export interface Award {
 
 export type GameEvent =
   | { type: 'move'; from: Square; to: Square; pieceType: PieceType; color: Color }
-  | { type: 'capture'; square: Square; pieceType: PieceType; color: Color; salvage: number }
-  | { type: 'pawn_promoted'; square: Square; promotesTo: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity } }
+  | { type: 'capture'; square: Square; pieceType: PieceType; color: Color; salvage: number; instanceId?: string; stageId?: string }
+  | { type: 'pawn_promoted'; square: Square; promotesTo: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity }; instanceId: string }
   | { type: 'enemy_promoted'; square: Square }
   | { type: 'check'; king: Color; square: Square }
   | { type: 'stage_won'; award: Award }
   | { type: 'stage_lost'; endReason: EndReason }
   | { type: 'enemy_move'; from: Square; to: Square }
   | { type: 'enemy_fell_back'; cursor: number }
-  | { type: 'turn_started'; turn: number };
+  | { type: 'turn_started'; turn: number }
+  | { type: 'piece_summoned'; instanceId: string; square: Square }
+  | { type: 'lifeline_saved'; instanceId: string }
+  | { type: 'piece_returned'; instanceId: string; durability: number | null }
+  | { type: 'piece_removed'; instanceId: string; reason: 'spent' }
+  | { type: 'stage_started' }
+  | { type: 'skill_activated'; skillId: string; target?: Square }
+  | { type: 'piece_transformed'; target: string; pieceType: PieceType }
+  | { type: 'piece_suppressed'; target: string }
+  | { type: 'transform_reverted'; target: string }
+  | { type: 'modifier_expired'; modifierId: string };
 
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
+export type DeckType = 'knight' | 'bishop' | 'rook' | 'queen';
+
+export interface AbilityFlags {
+  /** 0 none · 1 may pass allies, no capture after · 2 may capture after */
+  leapAllies: 0 | 1 | 2;
+  /** Extra (df, dr) offsets, every symmetric image listed. */
+  leapers: [number, number][];
+  extraRays: ('orthogonal' | 'diagonal')[];
+  /** 0 none · 1 only on a move that passed no ally · 2 any move */
+  multiCapture: 0 | 1 | 2;
+  bonusSelfMove: boolean;
+  lifeline: boolean;
+  /** The durability a lifeline-saved piece returns with at stage end (0 when `lifeline` is false). */
+  lifelineDurability: number;
+}
+
+/** Cumulative abilities by tier index (normal, rare, unique, legendary). */
+export type AbilityTable = Record<DeckType, [AbilityFlags, AbilityFlags, AbilityFlags, AbilityFlags]>;
+
+export interface SkillDef {
+  id: string;
+  status: 'mvp' | 'future';
+  cost: number;
+  charges: number;
+  price: number;
+  target: {
+    kind: 'none' | 'own_piece' | 'enemy_piece' | 'board_square';
+    pieceType?: PieceType;
+    excludes?: PieceType[];
+    excludesRarity?: Rarity[];
+    must_be_on_board?: boolean;
+  };
+  effects: {
+    primitive: ActiveModifier['primitive'];
+    params?: Record<string, unknown>;
+    duration: ActiveModifier['duration'];
+  }[];
+  restrictions: ('once_per_turn' | 'distinct_targets' | 'requires_bishop_on_board')[];
+}
+
 export interface EngineConfig {
   /** `focusPool` is the default pool for stage generation (M3); the engine reads `stage.focusPool`. */
-  rules: { freeMovesPerTurn: number; focusPool: number; minMovesPerQueue: number };
+  rules: {
+    freeMovesPerTurn: number;
+    focusPool: number;
+    minMovesPerQueue: number;
+    deploymentRanks: number[];
+    summonCostsDurability: number;
+    spawnPoints: Record<'act1' | 'act2' | 'act3', { normal: number; boss: number }>;
+  };
+  pieces: Record<
+    'king' | DeckType,
+    {
+      spawnCost: number;
+      spawnCostByRarity: Partial<Record<Rarity, number>>;
+      durabilityMax: number | null;
+      durabilityMaxByRarity: Partial<Record<Rarity, number>>;
+    }
+  >;
+  abilities: AbilityTable;
+  skills: Record<string, SkillDef>;
+  deck: { capacity: number };
   pieceValues: Record<PieceType, number>;
   economy: {
     baseReward: { act1: number; act2: number; act3: number; bossMultiplier: number };
@@ -146,7 +233,11 @@ export interface EngineConfig {
     salvage: { enabled: boolean; divisor: number };
   };
   enemyAI: {
-    search: { transpositionTable: boolean; quiescenceMaxDepth: number; defaultFallbackDepth: number };
+    search: {
+      transpositionTable: boolean; quiescenceMaxDepth: number; defaultFallbackDepth: number;
+      /** Depth cap while any player piece has a rarity tier (docs/02 §8.1). */
+      maxDepthWithRarity: number;
+    };
     terminal: { playerMated: number; playerOutOfTurns: number; enemyMated: number };
     weights: {
       kingEscapeSquare: number;

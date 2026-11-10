@@ -1,11 +1,12 @@
-// Terminal playground for the M1 engine: one Act I stage, one move per turn. `npm run play`.
+// Terminal playground: one Act I stage. Deployment phase (startStage), then one move per turn;
+// endStage on a win. `npm run play`.
 import { createInterface } from 'node:readline';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { loadEngineConfig } from '@checkbreaker/content';
-import { commitQueue, simulate } from '@checkbreaker/engine';
+import { commitQueue, endStage, simulate, startStage } from '@checkbreaker/engine';
 import type {
-  Action, BoardPiece, CommitError, GameEvent, PieceType, RunState, Square, StageState,
+  Action, BoardPiece, CommitError, GameEvent, PieceInstance, PieceType, RunState, Square, StageState,
 } from '@checkbreaker/engine';
 
 const config = loadEngineConfig();
@@ -20,8 +21,8 @@ const PIECE_NAMES: Record<string, PieceType> = {
 function buildStage(): StageState {
   const doc = parse(readFileSync(new URL('../content/examples/templates.yaml', import.meta.url), 'utf8')) as {
     templates: {
-      id: string; turnLimit: number; focusPool: number; summonLimit: number;
-      deploymentRanks: number[]; fixedEnemy: Record<string, string>;
+      id: string; turnLimit: number; focusPool: number; spawnPoints: number;
+      fixedEnemy: Record<string, string>;
       enemyPolicy: { type: 'scripted'; line: string[]; fallbackDepth: number };
     }[];
   };
@@ -31,38 +32,67 @@ function buildStage(): StageState {
   for (const [sq, name] of Object.entries(tpl.fixedEnemy)) {
     board[sq] = { pieceType: PIECE_NAMES[name]!, color: 'black' };
   }
-  board.e1 = { pieceType: 'king', color: 'white', instanceId: 'p_king_01' };
-  board.a1 = { pieceType: 'rook', color: 'white', instanceId: 'p_rook_02' };
-  board.f1 = { pieceType: 'bishop', color: 'white', instanceId: 'p_bishop_03' };
+  // No White Hero Pieces yet: the player places them in the Deployment phase.
   for (const sq of ['c3', 'f3']) {
     board[sq] = {
       pieceType: 'pawn', color: 'white', spawned: true, rarity: 'normal',
       promotesTo: { pieceType: 'knight', rarity: 'normal' },
     };
   }
+  // Stage Pieces get stageIds s01, s02, ... in square-index order (a1 first).
+  const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
+  let stageCount = 0;
+  for (const sq of Object.keys(board).sort((a, b) => index(a) - index(b))) {
+    const piece = board[sq]!;
+    if (piece.instanceId === undefined) piece.stageId = `s${String(++stageCount).padStart(2, '0')}`;
+  }
   return {
     stageSeed: '9C41-0B77',
     templateId: tpl.id,
     playerColor: 'white',
-    phase: 'action',
+    phase: 'deployment',
     board,
     turnsUsed: 0,
     turnLimit: tpl.turnLimit,
     focus: tpl.focusPool,
     focusPool: tpl.focusPool,
     moveCredits: 1,
-    summonLimit: tpl.summonLimit,
-    deploymentRanks: tpl.deploymentRanks,
+    spawnPoints: tpl.spawnPoints,
     modifiers: [],
+    skillLog: [],
     enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth },
     status: 'active',
   };
 }
 
+// The King and two starter minors (3 + 3 spawn points = the template's budget of 6).
+const DECK: PieceInstance[] = [
+  { instanceId: 'p_king_01', pieceType: 'king', rarity: null, durability: null, durabilityMax: null, origin: 'starter', acquiredAtStage: 0, status: 'in_deck' },
+  { instanceId: 'p_knight_02', pieceType: 'knight', rarity: 'normal', durability: 2, durabilityMax: 2, origin: 'starter', acquiredAtStage: 0, status: 'in_deck' },
+  { instanceId: 'p_bishop_03', pieceType: 'bishop', rarity: 'normal', durability: 2, durabilityMax: 2, origin: 'starter', acquiredAtStage: 0, status: 'in_deck' },
+];
+const DEFAULT_PLACEMENTS = 'e1 king, b1 knight, f1 bishop';
+
+/** Parses 'e1 king, b1 knight' into placements (the next unused deck instance of each type), or returns a message. */
+function parsePlacements(text: string, run: RunState): { instanceId: string; to: Square }[] | string {
+  const out: { instanceId: string; to: Square }[] = [];
+  for (const part of text.split(',')) {
+    const m = /^\s*([a-h][1-8])\s+([a-z]+)\s*$/.exec(part.toLowerCase());
+    if (!m) return `not a placement: '${part.trim()}' (use e.g. e1 king)`;
+    const type = PIECE_NAMES[m[2]!];
+    if (!type) return `unknown piece '${m[2]}'`;
+    const used = out.map((p) => p.instanceId);
+    const inst = run.deck.find((d) => d.pieceType === type && !used.includes(d.instanceId));
+    if (!inst) return `no ${type} left in the deck`;
+    out.push({ instanceId: inst.instanceId, to: m[1]! });
+  }
+  return out;
+}
+
 function buildRun(): RunState {
   return {
     version: 1, seed: '7F3A-2210', actIndex: 0, stageIndex: 0, coins: 0, deckCapacity: 8,
-    deck: [], loadout: [], history: [], rngCursor: 0, status: 'in_progress',
+    deck: DECK, loadout: [], history: [], rngCursor: 0, status: 'in_progress',
   };
 }
 
@@ -93,6 +123,16 @@ function eventText(e: GameEvent): string {
     case 'enemy_move': return `enemy moves ${e.from}-${e.to}`;
     case 'enemy_fell_back': return `enemy script ended or was blocked (cursor ${e.cursor}); it now searches`;
     case 'turn_started': return `turn ${e.turn} begins`;
+    case 'piece_summoned': return `${e.instanceId} is summoned to ${e.square}`;
+    case 'lifeline_saved': return `${e.instanceId} is saved by its lifeline`;
+    case 'piece_returned': return `${e.instanceId} returns to the deck`;
+    case 'piece_removed': return `${e.instanceId} is spent and removed from the deck`;
+    case 'stage_started': return 'the stage begins';
+    case 'skill_activated': return `skill ${e.skillId} activated` + (e.target ? ` on ${e.target}` : '');
+    case 'piece_transformed': return `${e.target} becomes a ${e.pieceType}`;
+    case 'piece_suppressed': return `${e.target} is suppressed`;
+    case 'transform_reverted': return `${e.target} reverts to its own type`;
+    case 'modifier_expired': return `modifier ${e.modifierId} expires`;
   }
 }
 
@@ -103,7 +143,7 @@ function errorText(err: CommitError): string {
 }
 
 const HELP = [
-  'Type a move as from+to, e.g. a1a7, then answer y or n to the commit prompt.',
+  'Type a move as from+to, e.g. f1d3, then answer y or n to the commit prompt.',
   'Commands: help | undo-plan (discard the pending move) | quit',
 ].join('\n');
 
@@ -111,26 +151,49 @@ function main(): void {
   let run = buildRun();
   let stage = buildStage();
   let pending: Action[] | null = null;
+  let deploying = true;
   const rl = createInterface({ input: process.stdin });
 
   const show = (): void => {
     console.log(`\n${boardText(stage)}`);
     console.log(`turn ${stage.turnsUsed + 1}/${stage.turnLimit}   coins ${run.coins}   you are White (upper case)`);
   };
-  const prompt = (): void => console.log(pending ? 'commit? (y/n)' : 'move (e.g. a1a7), help, quit:');
+  const prompt = (): void => console.log(deploying
+    ? `place your pieces (Enter = ${DEFAULT_PLACEMENTS}), or quit:`
+    : pending ? 'commit? (y/n)' : 'move (e.g. f1d3), help, quit:');
   const finish = (): void => {
     console.log(`\nstage ${stage.status}: ${stage.endReason}`);
+    if (stage.status === 'won') {
+      const end = endStage(run, stage, config);
+      if (end.ok) for (const e of end.value.events) console.log(`  ${eventText(e)}`);
+      else console.log(errorText(end.error));
+    }
     rl.close();
     process.exit(stage.status === 'won' ? 0 : 1);
   };
 
   console.log('Checkbreaker playground: tpl-act1-first-steps');
   console.log(HELP);
+  console.log(`Deployment: ranks 1-4; the King is free, summons cost spawn points (knight 3, bishop 3; budget ${stage.spawnPoints}).`);
   show();
   prompt();
 
   rl.on('line', (raw) => {
     const line = raw.trim().toLowerCase();
+    if (deploying) {
+      if (line === 'quit') { console.log('bye'); rl.close(); process.exit(0); }
+      const parsed = parsePlacements(line === '' ? DEFAULT_PLACEMENTS : line, run);
+      if (typeof parsed === 'string') { console.log(parsed); prompt(); return; }
+      const res = startStage(run, stage, parsed, config);
+      if (!res.ok) { console.log(errorText(res.error)); prompt(); return; }
+      for (const e of res.value.events) console.log(`  ${eventText(e)}`);
+      run = res.value.run;
+      stage = res.value.stage;
+      deploying = false;
+      show();
+      prompt();
+      return;
+    }
     if (line === '') { prompt(); return; }
     if (line === 'quit') { console.log('bye'); rl.close(); process.exit(0); }
     if (line === 'help') { console.log(HELP); prompt(); return; }
@@ -162,7 +225,7 @@ function main(): void {
     }
 
     const m = /^([a-h][1-8])([a-h][1-8])$/.exec(line);
-    if (!m) { console.log(`not a move: '${line}' (try a1a7, or help)`); prompt(); return; }
+    if (!m) { console.log(`not a move: '${line}' (try f1d3, or help)`); prompt(); return; }
     const queue: Action[] = [{ type: 'MOVE', from: m[1]!, to: m[2]! }];
     const sim = simulate(run, stage, queue, config);
     if (!sim.ok) { console.log(errorText(sim.error)); prompt(); return; }

@@ -3,9 +3,12 @@
 # These are piece TYPES. Per-piece instance state (remaining durability, rarity)
 # lives in the run, not here — see docs/06-deck-durability-and-permadeath.md.
 #
-# durabilityMax is the design statement of the game: durability is inversely
-# correlated with power, so a reliable deck and a spiky deck are genuinely
-# different choices. The queen may be deployed exactly once per purchase.
+# Durability is flat: every deck piece can be summoned twice (durabilityMax 2)
+# at every tier, with one exception, the Legendary queen (1). Power is gated
+# per stage instead: each summon costs spawnCost from the stage's spawnPoints
+# (data/economy.yaml → rules.spawnPoints), so a queen spends a whole Act I
+# budget. A few strong pieces save durability; many minors spread the risk of
+# capture (docs/06 §1).
 #
 # rarityAbilities lists what each tier ADDS on top of the tiers below it
 # (abilities are cumulative). The rules for every ability are in
@@ -16,17 +19,19 @@ pieces:
   - id: king
     pieceType: king
     value: 0
+    spawnCost: 0
     cost: null
     durabilityMax: null
     purchasable: false
     notes: >-
       Run identity. Never capturable, never destroyed, occupies no deck slot.
-      Always placed by the player in the Deployment phase, free and outside
-      summonLimit. Checkmate of the player king ends the run. Has no rarity.
+      Always placed by the player in the Deployment phase, free: it costs no
+      spawn points. Checkmate of the player king ends the run. Has no rarity.
 
   - id: pawn
     pieceType: pawn
     value: 1
+    spawnCost: 1
     cost: null
     durabilityMax: null
     purchasable: false
@@ -34,10 +39,12 @@ pieces:
       Never sold and never in the deck. Each stage spawns a few pawns for the
       player with a rolled rarity; the rarity only decides what the pawn
       promotes into. Promotion turns stage tempo into a permanent deck piece.
+      Its spawnCost is nominal: a pawn is never in the deck, so never summoned.
 
   - id: knight
     pieceType: knight
     value: 3
+    spawnCost: 3
     cost: 8
     durabilityMax: 2
     purchasable: true
@@ -61,10 +68,11 @@ pieces:
   - id: bishop
     pieceType: bishop
     value: 3
+    spawnCost: 3
+    spawnCostByRarity:
+      legendary: 5
     cost: 8
     durabilityMax: 2
-    durabilityMaxByRarity:
-      legendary: 1
     purchasable: true
     rarityAbilities:
       rare:
@@ -82,11 +90,12 @@ pieces:
     notes: >-
       Standard value; also the only legal target for the Ascension skill, which
       makes it the deck's most skill-dependent piece. A Legendary bishop moves
-      like a queen and is therefore limited to one deployment, like a queen.
+      like a queen, so it costs 5 spawn points instead of 3 — a rook's price.
 
   - id: rook
     pieceType: rook
     value: 5
+    spawnCost: 5
     cost: 10
     durabilityMax: 2
     purchasable: true
@@ -114,8 +123,11 @@ pieces:
   - id: queen
     pieceType: queen
     value: 9
+    spawnCost: 9
     cost: 16
-    durabilityMax: 1
+    durabilityMax: 2
+    durabilityMaxByRarity:
+      legendary: 1
     purchasable: true
     rarityAbilities:
       rare:
@@ -134,8 +146,9 @@ pieces:
           params: { maxTargets: 2, afterLeap: true }
           text: "Can capture two adjacent enemies in one line, even after a leap."
     notes: >-
-      One deployment, ever. The queen is a burst that wins a specific stage and
-      then evaporates. If durability were flat this piece would dominate every
-      slot — it must not. Its higher tiers touch permanence (lifeline) before
+      Nine spawn points: a whole Act I budget, so bringing it means bringing
+      little else. Durability does not limit it — spawnCost does. Its higher tiers touch permanence (lifeline) before
       power, and the Legendary queen is deliberately the rarest piece in the
-      game (data/economy.yaml → rarity.retention).
+      game (data/economy.yaml → rarity.retention) and the only piece with
+      durability 1: a glass cannon for the last stages, with lifeline as its
+      second life.

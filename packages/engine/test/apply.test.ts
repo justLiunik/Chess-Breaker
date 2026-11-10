@@ -15,7 +15,7 @@ describe('applyPlayerMove', () => {
       expect(r.board['a1']).toBeUndefined();
       expect(r.events).toEqual([
         { type: 'move', from: 'a1', to: 'a5', pieceType: 'rook', color: 'white' },
-        { type: 'capture', square: 'a5', pieceType: type, color: 'black', salvage },
+        { type: 'capture', square: 'a5', pieceType: type, color: 'black', salvage, stageId: s.board['a5']!.stageId },
       ]);
     });
   }
@@ -35,22 +35,23 @@ describe('applyPlayerMove', () => {
     expect(r.events.map((e) => e.type)).toEqual(['move']);
   });
 
-  it('white pawn c7 to c8 vanishes and emits pawn_promoted', () => {
+  it('white pawn c7 to c8 vanishes and reports the promotion (resolveQueue emits pawn_promoted)', () => {
     const s = stageOf({ e1: 'K', c7: 'P', h8: 'k' });
     const r = applyPlayerMove(s.board, 'c7', 'c8', config);
     expect(r.board['c8']).toBeUndefined();
     expect(r.board['c7']).toBeUndefined();
     expect(r.events).toEqual([
       { type: 'move', from: 'c7', to: 'c8', pieceType: 'pawn', color: 'white' },
-      { type: 'pawn_promoted', square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' } },
     ]);
+    expect(r.promoted).toEqual({ square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' } });
   });
 
-  it('pawn capturing onto rank 8 emits move, capture, pawn_promoted', () => {
+  it('pawn capturing onto rank 8 emits move, capture and reports the promotion', () => {
     const s = stageOf({ e1: 'K', c7: 'P', d8: 'r', h8: 'k' });
     const r = applyPlayerMove(s.board, 'c7', 'd8', config);
     expect(r.board['d8']).toBeUndefined();
-    expect(r.events.map((e) => e.type)).toEqual(['move', 'capture', 'pawn_promoted']);
+    expect(r.events.map((e) => e.type)).toEqual(['move', 'capture']);
+    expect(r.promoted?.square).toBe('d8');
     expect(r.salvage).toBe(1);
   });
 

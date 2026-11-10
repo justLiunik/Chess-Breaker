@@ -9,9 +9,14 @@ M1–M5.
 ## A. Skill catalogue (deferred by request)
 
 **Question:** what is the full set of skills?
-**Status:** deferred until M6. The framework in [03](03-skill-framework.md) exists precisely so this
-can be answered later without engine changes.
-**Default:** the 3 launch skills only.
+**Partly decided (M2 design):** seven skills are catalogued with their numbers — the launch three
+(Twin Step, Ascension, Lockdown; built in M2) and Gallop, Phase Step, Recall and Bulwark (`future`,
+built in M6) — with Act I prices of 10–14 coins ([03 §5](03-skill-framework.md),
+[07 §2.3](07-shop-phase.md#23-skill-prices)).
+**Candidates, not catalogued:** *Shove* (push an adjacent enemy one square; `displace_piece`),
+*Foresight* (preview the enemy's reply; needs the planning primitive class), *Surge* (+2 Focus,
+0 cost, 1 charge; the first use of `grant_focus`). Rejected: any post-commit undo, any king freeze.
+**Still open:** whether the catalogue grows past seven, and which candidate fills categories 6–7.
 **Trigger:** M6 start. **Blocker for:** nothing.
 **Constraint when it happens:** every skill passes the [03 §7](03-skill-framework.md#7-guardrail-checklist-for-any-new-skill)
 guardrail checklist; category coverage must not regress.
@@ -55,14 +60,18 @@ cannot fix it.
 ## E. Player-selected opening line
 
 **Decided:** the player chooses everything. The random opening line is gone; in the Deployment
-phase the player places the King and summons up to `summonLimit` pieces onto squares of their choice,
-before the first move, and the deck locks at Start
+phase the player places the King and summons pieces within the stage's spawn points onto squares of
+their choice on ranks 1–4, before the first move, and the deck locks at Start
 ([02 §5](02-rules-framework.md#5-deployment)).
 **Why:** choosing the army against a fully visible board makes the analysis itself the first move
 of the puzzle, and removes the mid-stage "add pieces as needed" plan that made deployment reactive.
-**Still open:** the summon limits (Act I 3 · Act II 4 · Act III 5) and the faster durability drain
-are provisional, to be tuned with the headless bot (M4, M6); `no_first_turn_mate` checks single
-pieces only ([04 §4](04-stage-generation-and-authoring.md#4-preconditions)).
+**Later decided:** the summon limit is replaced by a **spawn-point budget** (Act I 9 · Act II 12 ·
+Act III 15, bosses +3; knight/bishop 3, Legendary bishop 5, rook 5, queen 9), the deployment ranks
+are always ranks 1–4, and durability is flat at 2 (Legendary queen 1)
+([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)).
+**Still open:** the budgets and the flat durability are provisional, to be tuned with the headless
+bot (M4, M6); `no_first_turn_mate` checks single pieces and pairs only
+([04 §4](04-stage-generation-and-authoring.md#4-preconditions)).
 
 ---
 

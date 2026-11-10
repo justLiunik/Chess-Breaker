@@ -6,8 +6,8 @@
   "type": "object",
   "required": [
     "stageSeed", "templateId", "playerColor", "phase", "board", "turnsUsed", "turnLimit",
-    "focus", "focusPool", "moveCredits", "summonLimit",
-    "deploymentRanks", "modifiers", "enemyPolicy", "status"
+    "focus", "focusPool", "moveCredits", "spawnPoints",
+    "modifiers", "skillLog", "enemyPolicy", "status"
   ],
   "additionalProperties": false,
   "properties": {
@@ -16,7 +16,7 @@
     "playerColor": { "enum": ["white", "black"] },
     "phase": {
       "enum": ["deployment", "action"],
-      "description": "deployment: the player places the King and up to summonLimit deck pieces; nothing is paid until Start. action: begins with the first move; the deck is locked for the rest of the stage (docs/02 §3)."
+      "description": "deployment: the player places the King (free) and summons deck pieces whose total spawnCost fits spawnPoints, all on ranks 1-4; durability is paid only at Start. action: begins with the first move; the deck is locked for the rest of the stage (docs/02 §3)."
     },
     "board": {
       "type": "object",
@@ -31,21 +31,29 @@
     "focus": { "type": "integer", "minimum": 0 },
     "focusPool": { "type": "integer", "minimum": 1 },
     "moveCredits": { "type": "integer", "minimum": 0 },
-    "summonLimit": {
+    "spawnPoints": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 8,
-      "description": "Deck pieces (King excluded) the player may summon in the Deployment phase of this stage."
-    },
-    "deploymentRanks": {
-      "type": "array",
-      "items": { "type": "integer", "minimum": 1, "maximum": 8 },
-      "minItems": 1
+      "description": "Summon budget for this stage's Deployment phase: the total spawnCost of the summoned deck pieces (King free) must not exceed it. From data/economy.yaml rules.spawnPoints by act and tier, lowered by the template if it says so. The deployment ranks are the global rules.deploymentRanks."
     },
     "modifiers": {
       "type": "array",
       "description": "Active skill effects. Expiry is ordered by duration in docs/02 §6.",
       "items": { "$ref": "#/$defs/activeModifier" }
+    },
+    "skillLog": {
+      "type": "array",
+      "description": "Skills used this stage, in order. Restrictions such as distinct_targets read it; every live modifier has a matching entry.",
+      "items": {
+        "type": "object",
+        "required": ["skillId", "turn"],
+        "additionalProperties": false,
+        "properties": {
+          "skillId": { "type": "string" },
+          "turn": { "type": "integer", "minimum": 1 },
+          "targetId": { "type": "string", "description": "The targeted piece: its instanceId or stageId." }
+        }
+      }
     },
     "enemyPolicy": {
       "type": "object",
@@ -95,6 +103,11 @@
         "instanceId": {
           "type": "string",
           "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces have no instance."
+        },
+        "stageId": {
+          "type": "string",
+          "pattern": "^s[0-9]{2,}$",
+          "description": "Stable id of a Stage Piece (enemy pieces and spawned pawns); unique on the board. Hero Pieces have an instanceId instead."
         },
         "spawned": {
           "const": true,
@@ -158,12 +171,14 @@
             "remove_piece",
             "place_piece",
             "displace_piece",
+            "return_to_deck",
+            "shield_piece",
             "reveal_intent",
             "add_plan_undo"
           ]
         },
         "source": { "type": "string", "description": "Skill id that created it." },
-        "target": { "type": "string", "description": "Square or piece the modifier applies to." },
+        "target": { "type": "string", "description": "Id of the piece the modifier applies to: its instanceId or stageId." },
         "duration": { "enum": ["instant", "this_turn", "next_enemy_turn", "permanent"] },
         "appliedOnTurn": { "type": "integer", "minimum": 1 }
       }
