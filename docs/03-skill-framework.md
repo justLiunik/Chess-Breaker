@@ -97,7 +97,10 @@ skills (distinct, within Focus and charges, each with every legal target), follo
 resulting credits in moves, each legal when made, with I2 holding after R1. It is complete for the
 launch three because a credit must be granted before the move it pays for, a transform must precede
 the moves of its piece, and Lockdown never changes I2; a test brute-forces every interleaving on
-small boards to confirm. A future skill that breaks one of these needs the search revisited.
+small boards to confirm. A future skill that breaks one of these needs the search revisited. Because no
+launch primitive moves a piece, grants Focus or changes a piece's own type or rarity, each set of
+skills is tried once, in loadout order; a skill made only of queue-neutral primitives (today
+`suppress_piece`, which never changes Resolve or R2) is not tried at all.
 
 ### Duration semantics
 

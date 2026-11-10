@@ -201,14 +201,24 @@ enemyMove(stage, seed: number, config): {
   move: { from: Square; to: Square } | null,   // null when Black has no legal move
   policy: EnemyPolicy,                         // scripted cursor / fellBack advanced
 }
-legalPlayerMoves(stage, from): Square[]
-hasLegalQueue(run, stage, config): boolean   // credits are read from stage.moveCredits
+legalPlayerMoves(stage, from, config): Square[]
+hasLegalQueue(run, stage, config): boolean   // credits are read from stage.moveCredits (module legal-queue.ts)
 endStage(run, stage, config): Result<{ run; events; overCapacity: number }, CommitError>
+compileAbilities(rarityAbilities): AbilityTable   // pieces.yaml rarityAbilities → per-tier flags; the loader calls it
+TIERS: readonly Rarity[]                          // rarities in tier order: a tier is an index into it
+spawnCostOf(type, rarity, config): number
+durabilityMaxOf(type, rarity, config): number | null
 ```
 
 `hasLegalQueue` searches skills first, then moves (see [03 §3](03-skill-framework.md#3-effect-primitives)).
+It tries each set of skills once, in loadout order, and never tries a skill whose primitives cannot
+change Resolve or R2 (`QUEUE_NEUTRAL` in the primitive registry: today `suppress_piece`).
+`compileAbilities` throws on a parameter the engine does not implement (`multi_capture.maxTargets`
+≠ 2, `bonus_self_move.amount` ≠ 1, `lifeline.usesPerRun` ≠ 1) and on a leaper that would make a
+square both a single move and a multi-capture's second square.
 `endStage` runs on a `won` stage: it returns deployed pieces to the deck with their durability, removes
-`spent` pieces, and returns a lifeline-saved queen with durability 1.
+`spent` pieces, and returns a lifeline-saved queen with its lifeline's `returnDurability` (1 in
+`pieces.yaml`).
 
 `simulate` runs R1–R4 (the player's queue and stage-end evaluation); `commitQueue` is `simulate`
 plus R5, the enemy's reply and the start of the next turn.
@@ -246,8 +256,8 @@ type CommitError =
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   // endStage only:
   | { kind: 'stage_not_won'; status: StageState['status'] }
-  // R2 safety net; a bug if it ever fires:
-  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3'; detail: string };
+  // R2 safety net, and R5's capture of a Hero Piece that has no deck instance (I15); a bug if it ever fires:
+  | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3' | 'I15'; detail: string };
 
 type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
 ```
@@ -273,7 +283,7 @@ is produced for a skill whose cost exceeds the Focus left at its step.
 | `transform_reverted { target }` | R1, when a transformed piece reverts |
 | `modifier_expired { modifierId }` | R1 and the end of R5, for every modifier removed, including one dropped because its target was captured |
 | `lifeline_saved { instanceId }` | a Unique+ queen captured for the first time |
-| `piece_returned { instanceId, durability }` | `endStage`, per piece back in the deck |
+| `piece_returned { instanceId, durability: number \| null }` | `endStage`, per piece back in the deck (`null` for the King) |
 | `piece_removed { instanceId, reason: 'spent' }` | `endStage`, per spent piece |
 
 `capture` and `pawn_promoted` carry the ids of the pieces involved (`instanceId` / `stageId`).
@@ -310,13 +320,14 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | Module | Owns | Must not |
 |---|---|---|
 | `engine/board` | Square math, move generation per piece type and rarity ability (data-driven from `pieces.yaml`) | Know about durability or skills |
-| `engine/legality` | Per-action legality, check detection and `hasLegalQueue` (not the end-state invariants, which `engine/queue` checks) | Know about transitions/durations |
-| `engine/queue` | `resolveQueue` (Resolve, R1, R2, I2) and `applyPlayerMove`: sequential cost accounting and per-step legality | Decide win conditions |
+| `engine/legality` | Per-action legality and check detection (not the end-state invariants, which `engine/queue` checks) | Know about transitions/durations, or import `engine/queue` |
+| `engine/queue` | `resolveQueue` (Resolve, R1, R2, I2), built from one step at a time (`beginQueue`, `resolveStep`) and a lean end judge (`queueAccepted`, no I2 detail), and `applyPlayerMove`: sequential cost accounting and per-step legality | Decide win conditions |
+| `engine/legal-queue` (`legal-queue.ts`) | `hasLegalQueue`: candidate queues (skill targets, `legalPlayerMoves`) resolved by `engine/queue`'s own steps and judge, a shared prefix once | Judge a queue any other way than `engine/queue` does |
 | `engine/deployment` (`deployment.ts`) | The Deployment phase: placement validation, `startStage`, durability spend at Start | Run after Start |
 | stage end (`stage-end.ts`) | `endStage`: deck write-back after a won stage (return, remove spent, lifeline) | Run on a stage that is not won |
 | `engine/rules` | `simulate` and `commitQueue` (R3–R5): stage end evaluation (checkmate, stalemate, turns, no legal queue) and the enemy reply | Render or animate |
-| `engine/skills` (`skills/check.ts`, `skills/registry.ts`) | `check.ts`: the ordered `ACTIVATE_SKILL` checks; `registry.ts`: primitive interpretation, modifier stack, expiry | Add per-skill special cases |
-| `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups | Be consulted by name in `engine/rules` |
+| `engine/skills` (`skills/check.ts`, `skills/registry.ts`) | `check.ts`: the ordered `ACTIVATE_SKILL` checks; `registry.ts`: primitive interpretation, modifier stack (an `instant` effect is never stored), expiry, which primitives are queue-neutral | Add per-skill special cases |
+| `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups; the lifeline (whether a capture is saved, the durability it returns with) | Be consulted by name in `engine/rules` |
 | `engine/enemy` | `enemyMove(stage, seed, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `gen` | Templates, generation pipeline, solver | Be imported by the web app |
@@ -352,17 +363,17 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz): 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants) and Focus spent never exceeds the pool |
+| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz): 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants and Legendary-knight bonus moves) and Focus spent never exceeds the pool. White's Hero Pieces carry random rarities and the deck matches the board (same ids), so multi-captures, bonus moves, R5 Hero captures and lifeline saves occur, each with a coverage count; a board/deck desync refuses with `invariant_violation` I15. `parity.test.ts` checks `commitQueue` = `simulate` + R5 including the deck changes of R5 captures |
 | Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
 | Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
 | Deck lifecycle | `deck-lifecycle.test.ts`, `stage-end.test.ts`: a captured instance leaves `run.deck` at once; `endStage` returns deployed pieces with their durability, removes `spent` ones only then; promotion adds exactly `promotesTo` at full durability; I15 over 500 chained random queues |
 | Skills | `skills.test.ts`, `modifiers.test.ts`: every `ACTIVATE_SKILL` check in spec 8.1 order (earlier wins), effects of Twin Step, Ascension and Lockdown, R1 revert, R3 suppression, R5 root mask, a temporary queen never mates |
-| `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, no charges or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards |
+| `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, no charges or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards. `npm run bench` bounds the worst case found so far (a mated board with all three launch skills) at 400 ms |
 | Rarity abilities | `abilities*.test.ts`, `enemy-abilities.test.ts`: per-tier tables from `pieces.yaml`, ability-aware attack squares, the Legendary knight bonus move in the queue, abilities suspended while Ascension holds, the enemy search models abilities |
 | Reference differential | `reference.test.ts`: the optimised move generator is checked against a slow, independent reference implementation on the same positions |
-| Lifeline | First capture of a Unique+ queen returns it at stage end with 1 durability and `usedOnce: [lifeline]`; second capture destroys it |
+| Lifeline | First capture of a Unique+ queen returns it at stage end with its `returnDurability` (1) and `usedOnce: [lifeline]`, also when it was spent (a Legendary queen); second capture destroys it |
 | Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
 | Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |

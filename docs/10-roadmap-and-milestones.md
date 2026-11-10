@@ -100,7 +100,7 @@ must be resisted — that would silently delete the game's core mechanic.
 - [x] A Lockdown that leaves the enemy without a legal move is scored at R3: checkmate if in check,
       stalemate (a loss) otherwise (test).
 - [x] Captured instance is permanently absent from `RunState.deck` (test).
-- [ ] No skill is implemented with a special case in `engine/rules` (code review criterion).
+- [x] No skill is implemented with a special case in `engine/rules` (code review criterion; verified by the final M2 review).
 - [x] Ascension never changes a piece's rarity; the King's rarity is always `null` (I12; `skills.test.ts`).
 - [x] Every ability row of `docs/02 §2.3` has a test: Rare bishop cannot capture on a leap and does
       not give check through an ally; Unique can; Legendary bishop moves like a queen and costs 5
