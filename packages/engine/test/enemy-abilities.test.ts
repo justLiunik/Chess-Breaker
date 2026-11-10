@@ -195,3 +195,40 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
     }
   }, 120_000);
 });
+
+describe('the search depth is capped on rarity boards (docs/02 §8.1)', () => {
+  /** enemyMove's pick for a given search depth: the best score, ties broken by the seed. */
+  function pickAt(stage: StageState, depth: number, seed: number) {
+    const b = fromBoard(stage.board);
+    const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config, undefined, tiersOf(stage.board));
+    const best = Math.max(...scored.map((r) => r.score));
+    const tied = scored.filter((r) => r.score === best);
+    const m = tied[(seed >>> 0) % tied.length]!.move;
+    return { from: toSquare(m.from), to: toSquare(m.to) };
+  }
+
+  it('a depth-4 policy searches at maxDepthWithRarity when a player piece has a tier', () => {
+    expect(config.enemyAI.search.maxDepthWithRarity).toBe(3);
+    const stage = rarityStage(GAME_FENS[1]!, 'legendary');
+    const deep = deepFreeze({ ...stage, enemyPolicy: { type: 'best_move' as const, depth: 4 } });
+    for (const seed of [1, 7, 42]) {
+      expect(enemyMove(deep, seed, config).move).toEqual(pickAt(deep, 3, seed));
+    }
+  }, 60_000);
+
+  it('the cap comes from config: raising it lets the policy depth through', () => {
+    const stage = rarityStage(GAME_FENS[3]!, 'legendary');
+    const deep = deepFreeze({ ...stage, enemyPolicy: { type: 'best_move' as const, depth: 4 } });
+    const raised = deepFreeze({
+      ...config,
+      enemyAI: { ...config.enemyAI, search: { ...config.enemyAI.search, maxDepthWithRarity: 4 } },
+    });
+    expect(enemyMove(deep, 5, raised).move).toEqual(pickAt(deep, 4, 5));
+  }, 60_000);
+
+  it('tier-free boards keep the policy depth', () => {
+    const stage = fenToStage(GAME_FENS[3]!);
+    const deep = deepFreeze({ ...stage, enemyPolicy: { type: 'best_move' as const, depth: 4 } });
+    expect(enemyMove(deep, 5, config).move).toEqual(pickAt(deep, 4, 5));
+  }, 60_000);
+});

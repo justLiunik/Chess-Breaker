@@ -233,7 +233,11 @@ export interface EngineConfig {
     salvage: { enabled: boolean; divisor: number };
   };
   enemyAI: {
-    search: { transpositionTable: boolean; quiescenceMaxDepth: number; defaultFallbackDepth: number };
+    search: {
+      transpositionTable: boolean; quiescenceMaxDepth: number; defaultFallbackDepth: number;
+      /** Depth cap while any player piece has a rarity tier (docs/02 §8.1). */
+      maxDepthWithRarity: number;
+    };
     terminal: { playerMated: number; playerOutOfTurns: number; enemyMated: number };
     weights: {
       kingEscapeSquare: number;

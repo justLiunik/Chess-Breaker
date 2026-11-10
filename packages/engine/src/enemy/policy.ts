@@ -1,5 +1,6 @@
 import type { EngineConfig, EnemyPolicy, Square, StageState } from '../types';
 import { fromBoard, tiersOf } from '../position';
+import { hasTiers } from '../abilities';
 import { legalMoves } from '../legality';
 import { frozenMask } from '../skills/registry';
 import { isSquare, toIndex, toSquare } from '../square';
@@ -11,7 +12,9 @@ function searchMove(
   stage: StageState, b: Int8Array, t: Int8Array, frozen: Uint8Array, seed: number, depth: number,
   policy: EnemyPolicy, config: EngineConfig,
 ): Pick {
-  const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config, frozen, t);
+  // Rarity abilities enlarge the tree: while any player piece has a tier, the depth is capped.
+  const capped = hasTiers(t) ? Math.min(depth, config.enemyAI.search.maxDepthWithRarity) : depth;
+  const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, capped, config, frozen, t);
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
   const tied = scored.filter((r) => r.score === best);

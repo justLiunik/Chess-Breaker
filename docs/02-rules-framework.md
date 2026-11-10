@@ -429,7 +429,7 @@ not launch risky attacks.
 | Element | Rule |
 |---|---|
 | Algorithm | Alpha-beta minimax with **iterative deepening** (depth 1, 2, … up to the policy depth) and a deterministic **transposition table** |
-| Depth | The template's `enemyPolicy.depth`: Act I 2, Act II–III 3, bosses 4 ([04 §6](04-stage-generation-and-authoring.md#6-difficulty-curve)) |
+| Depth | The template's `enemyPolicy.depth`: Act I 2, Act II–III 3, bosses 4 ([04 §6](04-stage-generation-and-authoring.md#6-difficulty-curve)). **Capped at 3 while any player piece is Rare or higher** (`enemyAI.search.maxDepthWithRarity`): rarity abilities enlarge the player's replies, and a depth-4 search on a Legendary board took up to ~160 ms against the 50 ms budget, while depth 3 stays under 40 ms. The cap applies to scripted fallbacks too, and is part of `enemyMove`, so the solver sees the same enemy |
 | One ply | One enemy move, or one player reply |
 | The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine skills or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
 | Quiescence | At the horizon, keep searching **captures only**, at most 2 more plies, so the enemy never hangs a piece just past its depth |

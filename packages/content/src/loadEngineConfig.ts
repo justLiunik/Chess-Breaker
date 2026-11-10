@@ -157,6 +157,7 @@ export function loadEngineConfig(
         transpositionTable: bool(y, 'enemyAI.search.transpositionTable'),
         quiescenceMaxDepth: num(y, 'enemyAI.search.quiescence.maxDepth'),
         defaultFallbackDepth: num(y, 'enemyAI.search.defaultFallbackDepth'),
+        maxDepthWithRarity: num(y, 'enemyAI.search.maxDepthWithRarity'),
       },
       terminal: {
         playerMated: num(y, 'enemyAI.terminal.playerMated'),

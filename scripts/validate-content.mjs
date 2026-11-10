@@ -511,6 +511,12 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     fail('economy.yaml: enemyAI.search.quiescence.maxDepth must be a non-negative integer');
     problems += 1;
   }
+  // docs/02 §8.1: rarity abilities enlarge the tree, so the depth is capped while any player piece
+  // has a tier. The cap must be a real search depth (the schema's policy depths are 1..6).
+  if (!(Number.isInteger(ai.search?.maxDepthWithRarity) && ai.search.maxDepthWithRarity >= 1 && ai.search.maxDepthWithRarity <= 6)) {
+    fail('economy.yaml: enemyAI.search.maxDepthWithRarity must be an integer in 1..6');
+    problems += 1;
+  }
   if (problems === 0) ok(`economy.yaml: enemy AI terminal scores outrank positional bound ${bound}`);
 }
 

@@ -16,17 +16,17 @@ const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'bench
 const baseline: Record<string, number> = JSON.parse(readFileSync(fixture, 'utf8'));
 
 /**
- * Median wall time in ms of a depth-4 root search, playerTurnsLeft 6, after a warm-up. The tiers
- * are passed as enemyMove passes them.
+ * Median wall time in ms of a root search (depth 4 unless given), playerTurnsLeft 6, after a
+ * warm-up. The tiers are passed as enemyMove passes them.
  */
-function medianMs(stage: StageState): number {
+function medianMs(stage: StageState, depth = 4): number {
   const b = fromBoard(stage.board);
   const t = tiersOf(stage.board);
-  for (let i = 0; i < WARMUP; i++) scoreRootMoves(b, 6, 4, config, undefined, t);
+  for (let i = 0; i < WARMUP; i++) scoreRootMoves(b, 6, depth, config, undefined, t);
   const times: number[] = [];
   for (let i = 0; i < RUNS; i++) {
     const t0 = performance.now();
-    scoreRootMoves(b, 6, 4, config, undefined, t);
+    scoreRootMoves(b, 6, depth, config, undefined, t);
     times.push(performance.now() - t0);
   }
   times.sort((x, y) => x - y);
@@ -44,8 +44,19 @@ describe('depth-4 enemy search speed', () => {
     });
   }
 
-  // Report-only (Ruling R14): rarity pieces genuinely enlarge the tree, so the 2x ratio is logged,
-  // not asserted; docs/10's risk register carries the open decision.
+  // Rarity boards: enemyMove caps the depth at enemyAI.search.maxDepthWithRarity (docs/02 §8.1),
+  // decided because depth 4 took up to ~160 ms there. The capped search is what ships: assert it.
+  for (const { fen, rarity } of RARITY_FENS) {
+    it(`capped depth under 50 ms (median): ${fen} ${rarity}`, { timeout: 120_000 }, () => {
+      const depth = config.enemyAI.search.maxDepthWithRarity;
+      const ms = medianMs(rarityStage(fen, rarity), depth);
+      console.log(`depth ${depth} median ${ms.toFixed(1)} ms  ${fen} ${rarity}`);
+      expect(ms).toBeLessThan(50);
+    });
+  }
+
+  // Report-only (Ruling R14): depth 4 on rarity boards is no longer played, but its cost is logged
+  // so a future optimisation can show when the cap may be lifted.
   it('reports rarity medians and their ratio to the GAME_FEN baseline (not asserted)', { timeout: 600_000 }, () => {
     for (const { fen, rarity } of RARITY_FENS) {
       const ms = medianMs(rarityStage(fen, rarity));
