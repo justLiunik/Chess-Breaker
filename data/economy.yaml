@@ -242,7 +242,15 @@ generation:
     nodeBudget: 40000              # enemy replies needed (computed or memoized), per board
     minSolveTurns: 2               # a mate on turn 1 is never a proof
     memoizeEnemyReplies: true      # the enemy is a pure function: cache its reply per position
-    deployment: { maxSubsets: 6, kingSquares: 4, squaresPerPiece: 6, maxCandidates: 200 }
+    deployment:
+      maxSubsets: 6
+      kingSquares: 4
+      squaresPerPiece: 6
+      maxCandidates: 200
+      # A summon square's score = kingZone x (squares around the enemy king it attacks)
+      # + advance x (its moves into advanceRanks) - attacked x (1 if the enemy attacks the square)
+      score: { kingZone: 3, advance: 1, attacked: 5 }
+      advanceRanks: [5, 6, 7, 8]
     screen: { width: 4, turns: 3 }
     deep: { candidates: 8, width: 32 }
     expansion: 3

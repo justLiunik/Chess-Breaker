@@ -20,7 +20,7 @@ type Subset = { counts: number[]; value: number; text: string };
  * §9.2: a bounded, ranked set of deployments for the solver to try, best first. Every candidate
  * places the King, and every one passes `startStage`. The summons are the maximal type-and-tier
  * subsets that fit the spawn points (the highest total piece value first); the King goes on one of
- * the safest squares; each summon goes on one of its top-scored squares.
+ * the safe squares (none safe gives `[]`); each summon goes on one of its top-scored squares.
  */
 export function deploymentCandidates(run: RunState, stage: StageState, config: GenConfig): Placement[][] {
   const opts = config.gen.solver.deployment;
@@ -48,7 +48,7 @@ export function deploymentCandidates(run: RunState, stage: StageState, config: G
   // Interleaved round-robin over the pairs; a candidate counts only if `startStage` accepts it.
   const out: Placement[][] = [];
   const seen = new Set<string>();
-  const kind = new Map(run.deck.map((p) => [p.instanceId, `${p.pieceType}${p.rarity ?? ''}`]));
+  const kind = new Map(run.deck.map((p) => [p.instanceId, `${p.pieceType}${p.rarity ?? 'normal'}`]));
   for (let round = 0; out.length < opts.maxCandidates; round++) {
     let any = false;
     for (const list of lists) {
@@ -114,22 +114,20 @@ function maximalSubsets(groups: Group[], budget: number): Subset[] {
 }
 
 /**
- * Empty deployment squares that Black does not attack (an open line to a Black rook, bishop or
- * queen is an attack on the square), spread over the files in `KING_FILES` order: the lowest rank
- * of each file first, then the next one up on each, and so on.
+ * Up to `kingSquares` safe squares, one per file in `KING_FILES` order, skipping files with none.
+ * The k-th chosen square prefers rank `deploymentRanks[k % 2]` (ranks 1 and 2 alternately) and falls
+ * back to the file's lowest safe rank. Safe means empty and not attacked by Black (an open line to a
+ * Black rook, bishop or queen is an attack on the square).
  */
 function safeKingSquares(b: Int8Array, config: GenConfig): number[] {
-  const perFile = KING_FILES.map((f) => {
-    const col: number[] = [];
-    for (let r = 0; r < 8; r++) {
-      const s = f + 8 * r;
-      if (b[s] === 0 && config.rules.deploymentRanks.includes(r + 1) && !isAttacked(b, s, 'black')) col.push(s);
-    }
-    return col;
-  });
+  const ranks = config.rules.deploymentRanks;
   const out: number[] = [];
-  for (let depth = 0; perFile.some((c) => c.length > depth); depth++) {
-    for (const col of perFile) if (col[depth] !== undefined) out.push(col[depth]!);
+  for (const f of KING_FILES) {
+    if (out.length >= config.gen.solver.deployment.kingSquares) break;
+    const safe = ranks.filter((r) => b[f + 8 * (r - 1)] === 0 && !isAttacked(b, f + 8 * (r - 1), 'black'));
+    if (safe.length === 0) continue;
+    const want = ranks[out.length % 2]!;
+    out.push(f + 8 * ((safe.includes(want) ? want : Math.min(...safe)) - 1));
   }
   return out;
 }
@@ -138,8 +136,8 @@ const TO = new Int8Array(80);
 const VIA = new Int8Array(80);
 
 /**
- * The empty deployment squares for a piece of the group, best first. Score = 3 × (squares around the
- * Black king it attacks) + (moves into ranks 5-8) − 5 × (attacked by Black), the piece alone on the
+ * The empty deployment squares for a piece of the group, best first. Score = kingZone × (squares around the
+ * Black king it attacks) + advance × (moves into advanceRanks) − attacked × (attacked by Black), the piece alone on the
  * generated board; ties by square name.
  */
 function rankedSquares(b: Int8Array, t: Int8Array, g: Group, config: GenConfig): number[] {
@@ -154,6 +152,8 @@ function rankedSquares(b: Int8Array, t: Int8Array, g: Group, config: GenConfig):
       }
     }
   }
+  const advance = new Set(config.gen.solver.deployment.advanceRanks);
+  const w = config.gen.solver.deployment.score;
   const scored: { s: number; name: string; score: number }[] = [];
   for (let s = 0; s < 64; s++) {
     if (b[s] !== 0 || !config.rules.deploymentRanks.includes(rankOf(s) + 1)) continue;
@@ -164,9 +164,9 @@ function rankedSquares(b: Int8Array, t: Int8Array, g: Group, config: GenConfig):
     let forward = 0;
     for (let i = 0; i < n; i++) {
       if (near.has(TO[i]!)) attacks++;
-      if (rankOf(TO[i]!) >= 4) forward++;
+      if (advance.has(rankOf(TO[i]!) + 1)) forward++;
     }
-    const score = 3 * attacks + forward - (isAttacked(b, s, 'black') ? 5 : 0);
+    const score = w.kingZone * attacks + w.advance * forward - (isAttacked(b, s, 'black') ? w.attacked : 0);
     b[s] = 0;
     t[s] = 0;
     scored.push({ s, name: toSquare(s), score });

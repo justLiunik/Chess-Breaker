@@ -215,7 +215,7 @@ enumerates a bounded, deterministic set. Each candidate is validated by `startSt
 | Part | Rule | Bound |
 |---|---|---|
 | Subsets | Every type-and-rarity multiset of the deck that fits `spawnPoints`, identical instances counted once; maximal subsets first, largest value first | `deployment.maxSubsets` (6) |
-| King squares | Safe squares on ranks 1–4, spread across files and ranks, avoiding an open line to an enemy rook, bishop or queen | `deployment.kingSquares` (4) |
+| King squares | Safe squares on ranks 1–4, spread across files (e, d, f, c, g, b, h, a) and alternating ranks 1 and 2, avoiding an open line to an enemy rook, bishop or queen | `deployment.kingSquares` (4) |
 | Piece squares | Each piece's best squares, scored by attacks on the squares next to the enemy king, legal moves into ranks 5–8, and safety from enemy attack | `deployment.squaresPerPiece` (6) |
 | Combining | Greedy assignment plus single-piece variants, interleaved across subsets and King squares | `deployment.maxCandidates` (200) |
 
@@ -260,7 +260,7 @@ the line and is counted as a solver bug in `gen:report`.
 | `generation.solver.nodeBudget` | 40,000 | Hard stop per board, in enemy replies; the spike's hardest solved board needed about 37,000 |
 | `generation.solver.minSolveTurns` | 2 | A mate on turn 1 is a free win and is rejected |
 | `generation.solver.memoizeEnemyReplies` | true | Saved 30–60 % of enemy searches in the spike |
-| `generation.solver.deployment` | `maxSubsets` 6, `kingSquares` 4, `squaresPerPiece` 6, `maxCandidates` 200 | Ply 0 |
+| `generation.solver.deployment` | `maxSubsets` 6, `kingSquares` 4, `squaresPerPiece` 6, `maxCandidates` 200, `score` (`kingZone` 3, `advance` 1, `attacked` 5), `advanceRanks` 5–8 | Ply 0 |
 | `generation.solver.screen` | `width` 4, `turns` 3 | Stage 1 |
 | `generation.solver.deep` | `candidates` 8, `width` 32 | Stage 2 |
 | `generation.solver.expansion` | 3 | Queues given an enemy reply per beam slot |

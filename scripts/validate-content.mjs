@@ -569,6 +569,14 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   positive(g.formations, ['maxPerTemplate', 'minPerTemplate'], 'generation.formations');
   positive(g.solver, ['nodeBudget', 'minSolveTurns', 'expansion'], 'generation.solver');
   positive(g.solver?.deployment, ['maxSubsets', 'kingSquares', 'squaresPerPiece', 'maxCandidates'], 'generation.solver.deployment');
+  for (const k of ['kingZone', 'advance', 'attacked']) {
+    const w = g.solver?.deployment?.score?.[k];
+    if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) bad(`generation.solver.deployment.score.${k} must be a number >= 0`);
+  }
+  const ar = g.solver?.deployment?.advanceRanks;
+  if (!Array.isArray(ar) || !ar.every((r) => Number.isInteger(r) && r >= 1 && r <= 8) || new Set(ar).size !== ar.length) {
+    bad('generation.solver.deployment.advanceRanks must be distinct integers in 1..8');
+  }
   positive(g.solver?.screen, ['width', 'turns'], 'generation.solver.screen');
   positive(g.solver?.deep, ['candidates', 'width'], 'generation.solver.deep');
   positive(g.acceptance, ['minSolvableRate', 'medianMateTurnTolerance'], 'generation.acceptance');

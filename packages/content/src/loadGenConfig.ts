@@ -17,7 +17,14 @@ export interface GenSettings {
     nodeBudget: number;
     minSolveTurns: number;
     memoizeEnemyReplies: boolean;
-    deployment: { maxSubsets: number; kingSquares: number; squaresPerPiece: number; maxCandidates: number };
+    deployment: {
+      maxSubsets: number;
+      kingSquares: number;
+      squaresPerPiece: number;
+      maxCandidates: number;
+      score: { kingZone: number; advance: number; attacked: number };
+      advanceRanks: number[];
+    };
     screen: { width: number; turns: number };
     deep: { candidates: number; width: number };
     expansion: number;
@@ -69,6 +76,12 @@ export function loadGenConfig(path: string = DEFAULT_PATH): GenConfig {
         kingSquares: num(y, 'generation.solver.deployment.kingSquares'),
         squaresPerPiece: num(y, 'generation.solver.deployment.squaresPerPiece'),
         maxCandidates: num(y, 'generation.solver.deployment.maxCandidates'),
+        score: {
+          kingZone: num(y, 'generation.solver.deployment.score.kingZone'),
+          advance: num(y, 'generation.solver.deployment.score.advance'),
+          attacked: num(y, 'generation.solver.deployment.score.attacked'),
+        },
+        advanceRanks: [...(need(y, 'generation.solver.deployment.advanceRanks') as number[])],
       },
       screen: {
         width: num(y, 'generation.solver.screen.width'),

@@ -22,6 +22,26 @@ describe('deploymentCandidates', () => {
     }
   });
 
+  it('spreads King squares over at least two ranks when they are safe', () => {
+    const run = deckRun('starter', 0, 0);
+    for (const stage of act1) {
+      const b = internal.fromBoard(stage.board);
+      const ranks = new Set(deploymentCandidates(run, stage, config).map((c) => c[0]!.to[1]));
+      const safe = (r: number) => [0, 1, 2, 3, 4, 5, 6, 7].some((f) => b[f + 8 * (r - 1)] === 0 && !internal.isAttacked(b, f + 8 * (r - 1), 'black'));
+      if (safe(1) && safe(2)) expect(ranks.size).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('gives no candidates when every deployment square is attacked', () => {
+    const run = deckRun('starter', 0, 0);
+    const stage = act1[0]!;
+    const board = { ...stage.board };
+    for (const f of 'abcdefgh') for (const r of [1, 2, 3, 4]) delete board[`${f}${r}`];
+    for (const f of 'abcdefgh') board[`${f}5`] = { pieceType: 'rook', color: 'black', stageId: `x${f}` };
+    const walled = deepFreeze({ ...stage, board });
+    expect(deploymentCandidates(run, walled, config)).toEqual([]);
+  });
+
   it('every candidate includes the King', () => {
     const run = deckRun('starter', 0, 0);
     for (const c of deploymentCandidates(run, act1[0]!, config)) {
