@@ -1,0 +1,37 @@
+{
+  "templateId": "tpl-act1-open-field",
+  "source": {
+    "url": "https://database.lichess.org/#puzzles",
+    "licence": "CC0",
+    "date": "2026-11-01",
+    "sha256": "7b0d235fa40cfd7fdb7df1fec56a96b3b6ee1496b32ed2eb05be90d0ebf94253"
+  },
+  "filters": {
+    "enemyZone": [
+      7,
+      8
+    ],
+    "enemyArmy": {
+      "pawn": [
+        5,
+        6
+      ],
+      "knight": [
+        1,
+        1
+      ]
+    },
+    "valueBand": [
+      7,
+      9
+    ],
+    "noPawnOnRank8": true
+  },
+  "formations": [
+    {
+      "id": "vWhwL",
+      "rating": 2282,
+      "black": "4nk2/pp3ppp/8/8/8/8/8/8"
+    }
+  ]
+}

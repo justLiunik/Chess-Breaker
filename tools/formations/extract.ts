@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
+import { Readable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import zlib from 'node:zlib';
 import { Chess } from 'chess.js';
@@ -163,10 +164,45 @@ export function extractFormations(rows: Iterable<PuzzleRow | null>, templates: T
   return ex.finish();
 }
 
+// Lichess's .zst is several zstd frames separated by skippable frames (magic 0x184D2A5x, here a fixed
+// 12-byte one: 50 2A 4D 18 04 00 00 00 + 4 payload bytes). Node's decoder stops at the first one, so
+// find the data frames ourselves and decode them one after another.
+const SKIPPABLE = Buffer.from([0x50, 0x2a, 0x4d, 0x18, 0x04, 0x00, 0x00, 0x00]);
+const SKIPPABLE_LEN = 12;
+
+async function dataFrames(path: string): Promise<Array<[number, number]>> {
+  const cuts: number[] = [];
+  let carry: Buffer = Buffer.alloc(0);
+  let base = 0;
+  for await (const chunk of createReadStream(path)) {
+    const buf = Buffer.concat([carry, chunk as Buffer]);
+    for (let i = buf.indexOf(SKIPPABLE); i >= 0; i = buf.indexOf(SKIPPABLE, i + 1)) {
+      const at = base + i;
+      if (cuts.length === 0 || at >= (cuts[cuts.length - 1] as number) + SKIPPABLE_LEN) cuts.push(at);
+    }
+    const keep = Math.min(buf.length, SKIPPABLE.length - 1);
+    base += buf.length - keep;
+    carry = buf.subarray(buf.length - keep);
+  }
+  const size = statSync(path).size;
+  const frames: Array<[number, number]> = [];
+  let start = 0;
+  for (const c of cuts) {
+    if (c > start) frames.push([start, c]);
+    start = c + SKIPPABLE_LEN;
+  }
+  if (size > start) frames.push([start, size]);
+  return frames;
+}
+
+async function* zstdChunks(path: string): AsyncIterable<Buffer> {
+  for (const [start, end] of await dataFrames(path)) {
+    yield* createReadStream(path, { start, end: end - 1 }).pipe(zlib.createZstdDecompress()) as AsyncIterable<Buffer>;
+  }
+}
+
 async function* readLines(source: string): AsyncIterable<string> {
-  const input = source.endsWith('.csv')
-    ? createReadStream(source)
-    : createReadStream(source).pipe(zlib.createZstdDecompress());
+  const input = source.endsWith('.csv') ? createReadStream(source) : Readable.from(zstdChunks(source));
   yield* createInterface({ input, crlfDelay: Infinity });
 }
 

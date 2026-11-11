@@ -32,6 +32,7 @@ const SCHEMA_IDS = {
   template: 'https://checkbreaker.dev/schemas/template.schema.json',
   stage: 'https://checkbreaker.dev/schemas/stage.schema.json',
   run: 'https://checkbreaker.dev/schemas/run.schema.json',
+  formation: 'https://checkbreaker.dev/schemas/formation.schema.json',
 };
 
 const MANIFEST = [
@@ -44,12 +45,14 @@ const MANIFEST = [
 ];
 
 const errors = [];
+const warnings = [];
 const passes = [];
 const docs = {};
 const templates = [];
 
 const fail = (msg) => errors.push(msg);
 const ok = (msg) => passes.push(msg);
+const warn = (msg) => warnings.push(msg);
 
 // ---------------------------------------------------------------------------
 // Load schemas
@@ -1026,10 +1029,140 @@ if (stage) {
 }
 
 // ---------------------------------------------------------------------------
+// Formations (content/formations/<templateId>.json)
+//
+// Re-implements tools/formations/extract.ts `rejectReason` in plain JS (this file imports no TS):
+// zone, army, value band (unrounded, x bossMultiplier for bosses), no pawn on rank 8, Black pieces only.
+// ---------------------------------------------------------------------------
+
+{
+  const FORMATIONS_DIR = path.join(ROOT, 'content', 'formations');
+  const TYPE_OF = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+  const minPerTemplate = economy.generation?.formations?.minPerTemplate ?? 20;
+  const templateById = new Map(templates.map((t) => [t.id, t]));
+  let names = [];
+  try {
+    names = readdirSync(FORMATIONS_DIR).filter((n) => n.endsWith('.json')).sort();
+  } catch {
+    names = [];
+  }
+  const seenTemplates = new Set();
+
+  for (const name of names) {
+    const label = `content/formations/${name}`;
+    let doc;
+    try {
+      doc = JSON.parse(readFileSync(path.join(FORMATIONS_DIR, name), 'utf8'));
+    } catch (err) {
+      fail(`${label}: cannot parse JSON — ${err.message}`);
+      continue;
+    }
+    itemCount += 1;
+    if (!ajv.validate(SCHEMA_IDS.formation, doc)) {
+      fail(...formatAjvErrors(label, '', ajv.errors));
+      continue;
+    }
+    const t = templateById.get(doc.templateId);
+    if (!t) {
+      fail(`${label}: templateId ${doc.templateId} has no template`);
+      continue;
+    }
+    if (t.placement === 'fixed') {
+      fail(`${label}: templateId ${doc.templateId} is a fixed-placement template and takes no formations`);
+      continue;
+    }
+    if (name !== `${doc.templateId}.json`) {
+      fail(`${label}: file name must equal the templateId`);
+      continue;
+    }
+    seenTemplates.add(t.id);
+
+    // The stored filters must still describe the template.
+    const band = economy.stages?.enemyArmyValueBand?.[`act${t.act}`];
+    const factor = t.tier === 'boss' ? bossMultiplier : 1;
+    const [bandLo, bandHi] = Array.isArray(band) ? [band[0] * factor, band[1] * factor] : [NaN, NaN];
+    const stale = [];
+    if (JSON.stringify(doc.filters.enemyZone) !== JSON.stringify(t.enemyZone)) stale.push('enemyZone');
+    if (JSON.stringify(doc.filters.enemyArmy) !== JSON.stringify(t.enemyArmy)) stale.push('enemyArmy');
+    if (doc.filters.valueBand[0] !== bandLo || doc.filters.valueBand[1] !== bandHi) stale.push('valueBand');
+    if (stale.length > 0) fail(`${label}: filters.${stale.join(', filters.')} differ from template ${t.id}; re-run npm run formations:extract`);
+
+    const maxPer = economy.generation?.formations?.maxPerTemplate;
+    if (maxPer !== undefined && doc.formations.length > maxPer) {
+      fail(`${label}: ${doc.formations.length} formations exceeds maxPerTemplate ${maxPer}`);
+    }
+
+    const ids = new Set();
+    let bad = 0;
+    for (const f of doc.formations) {
+      const problems = [];
+      if (ids.has(f.id)) problems.push('has a duplicate id');
+      ids.add(f.id);
+      const ranks = f.black.split('/');
+      const counts = {};
+      let total = 0;
+      let zoneBad = false;
+      let pawnOn8 = false;
+      let widthBad = false;
+      let whitePiece = false;
+      ranks.forEach((r, i) => {
+        const rank = 8 - i;
+        let width = 0;
+        for (const c of r) {
+          if (/[1-8]/.test(c)) {
+            width += Number(c);
+            continue;
+          }
+          width += 1;
+          const type = TYPE_OF[c];
+          if (!type) {
+            whitePiece = true;
+            continue;
+          }
+          counts[type] = (counts[type] ?? 0) + 1;
+          total += valueOf(type) ?? 0;
+          if (t.enemyZone && !t.enemyZone.includes(rank)) zoneBad = true;
+          if (type === 'pawn' && rank === 8) pawnOn8 = true;
+        }
+        if (width !== 8) widthBad = true;
+      });
+      if (ranks.length !== 8 || widthBad) problems.push('is not an 8x8 placement');
+      if (whitePiece) problems.push('has a piece that is not a Black piece');
+      if (zoneBad) problems.push('has a Black piece outside enemyZone');
+      if ((counts.king ?? 0) !== 1) problems.push(`has ${counts.king ?? 0} kings, expected exactly 1`);
+      if (t.enemyArmy) {
+        for (const type of Object.keys(counts)) {
+          if (type !== 'king' && !(type in t.enemyArmy)) problems.push(`has a ${type}, which enemyArmy does not list`);
+        }
+        for (const [type, [lo, hi]] of Object.entries(t.enemyArmy)) {
+          const n = counts[type] ?? 0;
+          if (n < lo || n > hi) problems.push(`has ${n} ${type} outside enemyArmy ${lo}-${hi}`);
+        }
+      }
+      if (Number.isFinite(bandLo) && (total < bandLo || total > bandHi)) problems.push(`has enemy value ${total} outside band ${bandLo}-${bandHi}`);
+      if (pawnOn8) problems.push('has a Black pawn on rank 8');
+      for (const p of problems) fail(`${label}: formation ${f.id} ${p}`);
+      if (problems.length > 0) bad += 1;
+    }
+    if (bad === 0) ok(`${label}: ${doc.formations.length} formations satisfy ${t.id} filters`);
+    if (doc.formations.length < minPerTemplate) {
+      warn(`${t.id}: only ${doc.formations.length} formations (min ${minPerTemplate}); random placement covers the rest`);
+    }
+  }
+
+  for (const t of templates) {
+    if (t.placement !== 'fixed' && !seenTemplates.has(t.id) && !names.includes(`${t.id}.json`)) {
+      warn(`${t.id}: only 0 formations (min ${minPerTemplate}); random placement covers the rest`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
 
 for (const p of passes) console.log(`  ok  ${p}`);
+for (const w of warnings) console.warn(`  WARN ${w}`);
 
 if (errors.length > 0) {
   console.error(`\n${errors.length} problem(s) found:\n`);

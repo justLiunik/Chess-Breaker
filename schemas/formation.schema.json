@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://checkbreaker.dev/schemas/formation.schema.json",
+  "title": "FormationFile",
+  "description": "Enemy starting formations for one stage template: the defending side of Lichess puzzle positions (CC0), filtered per template and mirror-deduplicated. Produced by tools/formations/extract.ts; never hand-edited. See docs/04 and spec section 8.1.",
+  "type": "object",
+  "required": ["templateId", "source", "filters", "formations"],
+  "additionalProperties": false,
+  "properties": {
+    "templateId": { "type": "string", "pattern": "^tpl-[a-z0-9-]+$" },
+    "source": {
+      "type": "object",
+      "required": ["url", "licence", "date", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "licence": { "const": "CC0" },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "required": ["valueBand", "noPawnOnRank8"],
+      "additionalProperties": false,
+      "properties": {
+        "enemyZone": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 8 }, "minItems": 1 },
+        "enemyArmy": {
+          "type": "object",
+          "propertyNames": { "enum": ["pawn", "knight", "bishop", "rook", "queen"] },
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "valueBand": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 2, "maxItems": 2 },
+        "noPawnOnRank8": { "const": true }
+      }
+    },
+    "formations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rating", "black"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "rating": { "type": "integer" },
+          "black": { "type": "string", "pattern": "^([1-8kqrbnp]{1,8}/){7}[1-8kqrbnp]{1,8}$" }
+        }
+      }
+    }
+  }
+}

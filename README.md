@@ -54,6 +54,7 @@ docs/                          Design documents 00–11
 schemas/                       JSON Schemas (draft 2020-12): run, stage, template, piece, skill
 data/economy.yaml              EVERY tuning constant, in one place
 content/examples/              Validated example content used as schema fixtures
+content/formations/            Enemy formations per template, extracted from the Lichess puzzle database
 scripts/validate-content.mjs   Validates examples against schemas
 ```
 
@@ -91,3 +92,7 @@ each failure with its JSON pointer path.
 | **Spawned pawn** | A free pawn the stage gives you, with a rolled rarity. Lives for one stage only. |
 | **Promotion** | A spawned pawn reaching rank 8 becomes a new deck piece, usually one rarity tier higher. |
 | **Rarity** | A piece's tier: Normal, Rare, Unique, Legendary. The King has none. Higher tiers give knights, bishops, rooks and queens new abilities and cost more; the highest tier available rises with each act (Act I: Rare). |
+
+## Credits
+
+Enemy formations derived from the Lichess puzzle database (database.lichess.org), CC0.
