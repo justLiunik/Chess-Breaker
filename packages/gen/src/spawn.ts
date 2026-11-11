@@ -74,7 +74,7 @@ function freeSpawnSquares(board: Record<Square, BoardPiece>, tpl: Template): Squ
   return out;
 }
 
-function nextStageNumber(board: Record<Square, BoardPiece>): number {
+export function nextStageNumber(board: Record<Square, BoardPiece>): number {
   let max = 0;
   for (const p of Object.values(board)) {
     const m = /^s(\d+)$/.exec(p.stageId ?? '');
@@ -83,7 +83,7 @@ function nextStageNumber(board: Record<Square, BoardPiece>): number {
   return max + 1;
 }
 
-const stageId = (n: number) => `s${String(n).padStart(2, '0')}`;
+export const stageId = (n: number) => `s${String(n).padStart(2, '0')}`;
 
 function spawnedPawn(
   id: string | undefined,

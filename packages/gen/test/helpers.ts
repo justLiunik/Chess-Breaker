@@ -38,6 +38,13 @@ export function exampleRun(name: 'starter' | 'mid'): RunState {
   return deepFreeze(parse(readFileSync(url, 'utf8')) as RunState);
 }
 
+/** The example deck `name` at (actIndex, stageIndex), deep-frozen. The 'strong' deck arrives in Task 17; Act III uses 'mid' until then. */
+export function deckRun(name: 'starter' | 'mid' | 'strong', actIndex: number, stageIndex: number): RunState {
+  const file = name === 'strong' ? 'mid' : name; // TODO Task 17: load run-strong.yaml
+  const url = new URL(`../../../content/examples/run-${file}.yaml`, import.meta.url);
+  return deepFreeze({ ...(parse(readFileSync(url, 'utf8')) as RunState), actIndex, stageIndex });
+}
+
 /**
  * The first `n` boards that G2 and G4 build for a content template, one per seed `GEN-<i>` at
  * attempt 0, as deep-frozen Deployment-phase stages.
@@ -48,6 +55,7 @@ export function generatedStages(templateId: string, n: number): { tpl: Template;
   const formations = loadFormations()[t.id] ?? [];
   const out: { tpl: Template; stage: StageState }[] = [];
   for (let i = 0; out.length < n; i++) {
+    if (i >= 100 * n) throw new Error(`generatedStages: only ${out.length} of ${n} boards for ${templateId} in ${i} seeds`);
     const seed = `GEN-${i}`;
     const enemy = enemyBoard(t, formations, seed, 0, config);
     const board = enemy && placeSpawnedPawns(enemy.board, t, seed, 0, config);
