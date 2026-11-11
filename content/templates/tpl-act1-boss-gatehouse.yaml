@@ -1,0 +1,30 @@
+id: tpl-act1-boss-gatehouse
+title: The Gatehouse
+act: 1
+tier: boss
+turnLimit: 7
+enemyArmy:
+  pawn: [3, 4]
+  knight: [1, 1]
+  bishop: [1, 1]
+enemyZone: [6, 7, 8]
+spawnedPawns:
+  count: [1, 2]
+  ranks: [3, 4]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 4
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Act I boss. Enemy value 9-10 (the Act I band x1.25), seven turns,
+  depth-4 policy. Teaches mating under turn pressure: a thicker defence and
+  one turn less than the rest of Act I, so the player must find the mating
+  net early instead of trading down.

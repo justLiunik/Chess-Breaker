@@ -1,0 +1,28 @@
+id: tpl-act1-open-field
+title: Open Field
+act: 1
+tier: normal
+turnLimit: 8
+enemyArmy:
+  pawn: [5, 6]
+  knight: [1, 1]
+enemyZone: [7, 8]
+spawnedPawns:
+  count: [2, 2]
+  ranks: [3, 4]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 2
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Teaching template. Enemy army value 8-9 against an 8-turn limit: enough
+  slack to learn summoning and the turn counter without the stage being a
+  free win. Depth-2 policy punishes obvious hangs only.

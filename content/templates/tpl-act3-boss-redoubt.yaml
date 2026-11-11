@@ -1,0 +1,31 @@
+id: tpl-act3-boss-redoubt
+title: The Redoubt
+act: 3
+tier: boss
+turnLimit: 4
+enemyArmy:
+  pawn: [6, 7]
+  knight: [2, 2]
+  bishop: [1, 1]
+  rook: [1, 1]
+enemyZone: [6, 7, 8]
+spawnedPawns:
+  count: [1, 1]
+  ranks: [4, 5]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 4
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Boss. Enemy value 20-21, four turns, depth-4 policy. There is no line that
+  does not spend charges and durability. The player who banked coins into
+  Act III wins here; the player who emptied the deck in Act I does not.
+  Enemy skills are reserved for M6 (docs/11 §B).

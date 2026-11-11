@@ -15,7 +15,7 @@
  * Usage: npm run validate
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
@@ -37,7 +37,7 @@ const SCHEMA_IDS = {
 const MANIFEST = [
   { file: 'pieces.yaml', schema: 'piece', collection: 'pieces' },
   { file: 'skills.yaml', schema: 'skill', collection: 'skills' },
-  { file: 'templates.yaml', schema: 'template', collection: 'templates' },
+  { dir: 'content/templates', schema: 'template' },
   { file: 'run-starter.yaml', schema: 'run' },
   { file: 'run-mid.yaml', schema: 'run' },
   { file: 'stage-state.yaml', schema: 'stage' },
@@ -46,6 +46,7 @@ const MANIFEST = [
 const errors = [];
 const passes = [];
 const docs = {};
+const templates = [];
 
 const fail = (msg) => errors.push(msg);
 const ok = (msg) => passes.push(msg);
@@ -85,6 +86,32 @@ const formatAjvErrors = (file, where, errs) =>
 let itemCount = 0;
 
 for (const entry of MANIFEST) {
+  if (entry.dir) {
+    const dirPath = path.join(ROOT, entry.dir);
+    const names = readdirSync(dirPath).filter((n) => n.endsWith('.yaml')).sort();
+    for (const name of names) {
+      const label = `${entry.dir}/${name}`;
+      let doc;
+      try {
+        doc = parseYaml(readFileSync(path.join(dirPath, name), 'utf8'));
+      } catch (err) {
+        fail(`${label}: cannot parse YAML — ${err.message}`);
+        continue;
+      }
+      itemCount += 1;
+      if (!ajv.validate(SCHEMA_IDS[entry.schema], doc)) {
+        fail(...formatAjvErrors(label, '', ajv.errors));
+        continue;
+      }
+      if (name !== `${doc.id}.yaml`) {
+        fail(`${label}: file name must equal the template id`);
+        continue;
+      }
+      templates.push(doc);
+      ok(`${label}: valid`);
+    }
+    continue;
+  }
   const filePath = path.join(CONTENT_DIR, entry.file);
   let doc;
   try {
@@ -136,7 +163,7 @@ const valueOf = (pieceType) => economy.pieces?.[pieceType]?.value;
 const templateIds = new Set();
 const skillIds = new Set();
 
-for (const t of docs['templates.yaml']?.templates ?? []) templateIds.add(t.id);
+for (const t of templates) templateIds.add(t.id);
 for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
 
 // ---------------------------------------------------------------------------
@@ -189,7 +216,7 @@ for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
 // win, so there is no material threshold to check — docs/02 §7.)
 const bossMultiplier = economy.stages?.enemyArmyValueBand?.bossMultiplier ?? 1.25;
 
-for (const t of docs['templates.yaml']?.templates ?? []) {
+for (const t of templates) {
   let minValue = 0;
   let maxValue = 0;
   for (const [pieceType, range] of Object.entries(t.enemyArmy ?? {})) {
@@ -564,7 +591,7 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
 }
 
 // 2a''''. Templates: spawned pawns must be able to promote within the turn limit.
-for (const t of docs['templates.yaml']?.templates ?? []) {
+for (const t of templates) {
   const sp = t.spawnedPawns;
   if (!sp) continue;
   const [lo, hi] = sp.count;
@@ -694,7 +721,7 @@ for (const t of docs['templates.yaml']?.templates ?? []) {
   }
 
   const deployRanks = r.deploymentRanks ?? [];
-  for (const t of docs['templates.yaml']?.templates ?? []) {
+  for (const t of templates) {
     const actBudget = r.spawnPoints?.[`act${t.act}`]?.[t.tier];
     const budget = t.spawnPoints ?? actBudget;
     if (t.spawnPoints !== undefined && actBudget !== undefined && t.spawnPoints > actBudget) {
@@ -781,7 +808,7 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
   const bossIndex = (economy.stages?.bossStageIndex ?? 3) - 1;
   (run.history ?? []).forEach((h, i) => {
     const where = `${file}: history[${i}]`;
-    const tpl = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === h.templateId);
+    const tpl = templates.find((t) => t.id === h.templateId);
     if (!tpl) {
       fail(`${where} references unknown template "${h.templateId}"`);
       return;
@@ -807,7 +834,7 @@ if (stage) {
     fail(`stage-state.yaml: unknown template "${stage.templateId}"`);
   }
 
-  const stageTemplate = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
+  const stageTemplate = templates.find((t) => t.id === stage.templateId);
   const stageCeiling = stageTemplate ? ceilingOf(stageTemplate.act) : -1;
   let spawnedCount = 0;
 
@@ -887,7 +914,7 @@ if (stage) {
     }
   }
   {
-    const tpl = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
+    const tpl = templates.find((t) => t.id === stage.templateId);
     const expected = tpl ? (tpl.spawnPoints ?? economy.rules?.spawnPoints?.[`act${tpl.act}`]?.[tpl.tier]) : undefined;
     if (expected !== undefined && stage.spawnPoints !== expected) {
       fail(`stage-state.yaml: spawnPoints ${stage.spawnPoints} does not match template ${tpl.id}'s ${expected}`);
@@ -929,7 +956,7 @@ if (stage) {
     fail(`stage-state.yaml: focus ${stage.focus} exceeds focusPool ${stage.focusPool}`);
   }
 
-  const template = (docs['templates.yaml']?.templates ?? []).find((t) => t.id === stage.templateId);
+  const template = templates.find((t) => t.id === stage.templateId);
   if (template && template.turnLimit !== stage.turnLimit) {
     fail(`stage-state.yaml: turnLimit ${stage.turnLimit} does not match template ${template.id}'s ${template.turnLimit}`);
   }

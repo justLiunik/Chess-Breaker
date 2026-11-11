@@ -1,9 +1,7 @@
 // Terminal playground: one Act I stage. Deployment phase (startStage), then one move per turn;
 // endStage on a win. `npm run play`.
 import { createInterface } from 'node:readline';
-import { readFileSync } from 'node:fs';
-import { parse } from 'yaml';
-import { loadEngineConfig } from '@checkbreaker/content';
+import { loadEngineConfig, loadTemplates } from '@checkbreaker/content';
 import { commitQueue, endStage, simulate, startStage } from '@checkbreaker/engine';
 import type {
   Action, BoardPiece, CommitError, GameEvent, PieceInstance, PieceType, RunState, Square, StageState,
@@ -19,18 +17,11 @@ const PIECE_NAMES: Record<string, PieceType> = {
 };
 
 function buildStage(): StageState {
-  const doc = parse(readFileSync(new URL('../content/examples/templates.yaml', import.meta.url), 'utf8')) as {
-    templates: {
-      id: string; turnLimit: number; focusPool: number; spawnPoints: number;
-      fixedEnemy: Record<string, string>;
-      enemyPolicy: { type: 'scripted'; line: string[]; fallbackDepth: number };
-    }[];
-  };
-  const tpl = doc.templates.find((t) => t.id === 'tpl-act1-first-steps');
-  if (!tpl) throw new Error('tpl-act1-first-steps not found in templates.yaml');
+  const tpl = loadTemplates().find((t) => t.id === 'tpl-act1-first-steps');
+  if (!tpl?.fixedEnemy || tpl.enemyPolicy.line === undefined) throw new Error('tpl-act1-first-steps not found in content/templates');
   const board: Record<Square, BoardPiece> = {};
   for (const [sq, name] of Object.entries(tpl.fixedEnemy)) {
-    board[sq] = { pieceType: PIECE_NAMES[name]!, color: 'black' };
+    board[sq] = { pieceType: name, color: 'black' };
   }
   // No White Hero Pieces yet: the player places them in the Deployment phase.
   for (const sq of ['c3', 'f3']) {
@@ -57,10 +48,10 @@ function buildStage(): StageState {
     focus: tpl.focusPool,
     focusPool: tpl.focusPool,
     moveCredits: 1,
-    spawnPoints: tpl.spawnPoints,
+    spawnPoints: tpl.spawnPoints ?? 6,
     modifiers: [],
     skillLog: [],
-    enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth },
+    enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth ?? 2 },
     status: 'active',
   };
 }

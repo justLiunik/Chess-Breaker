@@ -1,0 +1,30 @@
+id: tpl-act2-fortress
+title: Fortress
+act: 2
+tier: normal
+turnLimit: 6
+enemyArmy:
+  pawn: [5, 6]
+  knight: [1, 1]
+  bishop: [1, 1]
+enemyZone: [6, 7, 8]
+spawnedPawns:
+  count: [1, 2]
+  ranks: [3, 4]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 3
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Enemy value 11-12, six turns. The slack from Act I is gone: there is no
+  slow win to fall back on, so the player must summon the right pieces in
+  the Deployment phase to reach a mate in time. Tests whether the deck was
+  built or only survived.
