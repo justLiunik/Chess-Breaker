@@ -1,0 +1,7 @@
+{
+  "name": "@checkbreaker/gen",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@checkbreaker/engine": "*", "@checkbreaker/content": "*" }
+}
