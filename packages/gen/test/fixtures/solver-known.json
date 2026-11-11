@@ -1,0 +1,629 @@
+[
+  {
+    "name": "mate2",
+    "run": {
+      "version": 1,
+      "seed": "87FB-0CCF",
+      "actIndex": 2,
+      "stageIndex": 2,
+      "coins": 0,
+      "deckCapacity": 8,
+      "deck": [
+        {
+          "instanceId": "p_king_01",
+          "pieceType": "king",
+          "rarity": null,
+          "durability": null,
+          "durabilityMax": null,
+          "origin": "starter",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_queen_06",
+          "pieceType": "queen",
+          "rarity": "normal",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_rook_07",
+          "pieceType": "rook",
+          "rarity": "normal",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        }
+      ],
+      "loadout": [],
+      "history": [],
+      "rngCursor": 0,
+      "status": "in_progress"
+    },
+    "stage": {
+      "stageSeed": "D13F-BA7F",
+      "templateId": "tpl-act3-boss-redoubt",
+      "playerColor": "white",
+      "phase": "deployment",
+      "board": {
+        "a6": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s01"
+        },
+        "b6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s02"
+        },
+        "e6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s03"
+        },
+        "g6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s04"
+        },
+        "h6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s05"
+        },
+        "a7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s06"
+        },
+        "d7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s07"
+        },
+        "f7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s08"
+        },
+        "g7": {
+          "pieceType": "bishop",
+          "color": "black",
+          "stageId": "s09"
+        },
+        "h7": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s10"
+        },
+        "e8": {
+          "pieceType": "king",
+          "color": "black",
+          "stageId": "s11"
+        },
+        "h8": {
+          "pieceType": "rook",
+          "color": "black",
+          "stageId": "s12"
+        },
+        "a5": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "stageId": "s13",
+          "rarity": "rare",
+          "promotesTo": {
+            "pieceType": "knight",
+            "rarity": "unique"
+          }
+        },
+        "b4": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "rarity": "normal",
+          "promotesTo": {
+            "pieceType": "bishop",
+            "rarity": "rare"
+          },
+          "stageId": "s14"
+        }
+      },
+      "turnsUsed": 0,
+      "mateIn": 2,
+      "overtimePaid": 0,
+      "focus": 3,
+      "focusPool": 3,
+      "moveCredits": 1,
+      "spawnPoints": 18,
+      "modifiers": [],
+      "skillLog": [],
+      "enemyPolicy": {
+        "type": "best_move",
+        "depth": 4
+      },
+      "status": "active",
+      "provenance": {
+        "templateId": "tpl-act3-boss-redoubt",
+        "seed": "D13F-BA7F",
+        "attempts": 11
+      }
+    },
+    "placements": [
+      {
+        "instanceId": "p_king_01",
+        "to": "e1"
+      },
+      {
+        "instanceId": "p_queen_06",
+        "to": "d2"
+      },
+      {
+        "instanceId": "p_rook_07",
+        "to": "d1"
+      }
+    ],
+    "mateTurn": 2,
+    "deploymentRanks": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "mate3",
+    "run": {
+      "version": 1,
+      "seed": "BDCB-4C34",
+      "actIndex": 2,
+      "stageIndex": 2,
+      "coins": 0,
+      "deckCapacity": 8,
+      "deck": [
+        {
+          "instanceId": "p_king_01",
+          "pieceType": "king",
+          "rarity": null,
+          "durability": null,
+          "durabilityMax": null,
+          "origin": "starter",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_queen_06",
+          "pieceType": "queen",
+          "rarity": "normal",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_rook_07",
+          "pieceType": "rook",
+          "rarity": "normal",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        }
+      ],
+      "loadout": [],
+      "history": [],
+      "rngCursor": 0,
+      "status": "in_progress"
+    },
+    "stage": {
+      "stageSeed": "CCD2-27F3",
+      "templateId": "tpl-act3-boss-redoubt",
+      "playerColor": "white",
+      "phase": "deployment",
+      "board": {
+        "a6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s01"
+        },
+        "b6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s02"
+        },
+        "d6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s03"
+        },
+        "g6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s04"
+        },
+        "h6": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s05"
+        },
+        "a7": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s06"
+        },
+        "b7": {
+          "pieceType": "bishop",
+          "color": "black",
+          "stageId": "s07"
+        },
+        "c7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s08"
+        },
+        "e7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s09"
+        },
+        "h7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s10"
+        },
+        "a8": {
+          "pieceType": "rook",
+          "color": "black",
+          "stageId": "s11"
+        },
+        "d8": {
+          "pieceType": "king",
+          "color": "black",
+          "stageId": "s12"
+        },
+        "g4": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "stageId": "s13",
+          "rarity": "normal",
+          "promotesTo": {
+            "pieceType": "bishop",
+            "rarity": "rare"
+          }
+        },
+        "e5": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "rarity": "rare",
+          "promotesTo": {
+            "pieceType": "knight",
+            "rarity": "unique"
+          },
+          "stageId": "s14"
+        }
+      },
+      "turnsUsed": 0,
+      "mateIn": 3,
+      "overtimePaid": 0,
+      "focus": 3,
+      "focusPool": 3,
+      "moveCredits": 1,
+      "spawnPoints": 18,
+      "modifiers": [],
+      "skillLog": [],
+      "enemyPolicy": {
+        "type": "best_move",
+        "depth": 4
+      },
+      "status": "active",
+      "provenance": {
+        "templateId": "tpl-act3-boss-redoubt",
+        "seed": "CCD2-27F3",
+        "attempts": 3
+      }
+    },
+    "placements": [
+      {
+        "instanceId": "p_king_01",
+        "to": "c2"
+      },
+      {
+        "instanceId": "p_queen_06",
+        "to": "a2"
+      },
+      {
+        "instanceId": "p_rook_07",
+        "to": "f1"
+      }
+    ],
+    "mateTurn": 3,
+    "deploymentRanks": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "bonus",
+    "run": {
+      "version": 1,
+      "seed": "0616-16A6",
+      "actIndex": 2,
+      "stageIndex": 2,
+      "coins": 0,
+      "deckCapacity": 8,
+      "deck": [
+        {
+          "instanceId": "p_king_01",
+          "pieceType": "king",
+          "rarity": null,
+          "durability": null,
+          "durabilityMax": null,
+          "origin": "starter",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_knight_02",
+          "pieceType": "knight",
+          "rarity": "legendary",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        }
+      ],
+      "loadout": [],
+      "history": [],
+      "rngCursor": 0,
+      "status": "in_progress"
+    },
+    "stage": {
+      "stageSeed": "D6DD-A34B",
+      "templateId": "tpl-act3-boss-redoubt",
+      "playerColor": "white",
+      "phase": "deployment",
+      "board": {
+        "b6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s01"
+        },
+        "e6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s02"
+        },
+        "g6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s03"
+        },
+        "c7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s04"
+        },
+        "e7": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s05"
+        },
+        "f7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s06"
+        },
+        "g7": {
+          "pieceType": "bishop",
+          "color": "black",
+          "stageId": "s07"
+        },
+        "h7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s08"
+        },
+        "b8": {
+          "pieceType": "knight",
+          "color": "black",
+          "stageId": "s09"
+        },
+        "f8": {
+          "pieceType": "king",
+          "color": "black",
+          "stageId": "s10"
+        },
+        "h8": {
+          "pieceType": "rook",
+          "color": "black",
+          "stageId": "s11"
+        },
+        "a4": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "stageId": "s12",
+          "rarity": "rare",
+          "promotesTo": {
+            "pieceType": "bishop",
+            "rarity": "unique"
+          }
+        },
+        "f5": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "rarity": "normal",
+          "promotesTo": {
+            "pieceType": "queen",
+            "rarity": "rare"
+          },
+          "stageId": "s13"
+        }
+      },
+      "turnsUsed": 0,
+      "mateIn": 2,
+      "overtimePaid": 0,
+      "focus": 3,
+      "focusPool": 3,
+      "moveCredits": 1,
+      "spawnPoints": 18,
+      "modifiers": [],
+      "skillLog": [],
+      "enemyPolicy": {
+        "type": "best_move",
+        "depth": 4
+      },
+      "status": "active",
+      "provenance": {
+        "templateId": "tpl-act3-boss-redoubt",
+        "seed": "D6DD-A34B",
+        "attempts": 3
+      }
+    },
+    "placements": [
+      {
+        "instanceId": "p_king_01",
+        "to": "e1"
+      },
+      {
+        "instanceId": "p_knight_02",
+        "to": "a2"
+      }
+    ],
+    "mateTurn": 2,
+    "deploymentRanks": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "promotion",
+    "run": {
+      "version": 1,
+      "seed": "7F3A-2210",
+      "actIndex": 1,
+      "stageIndex": 0,
+      "coins": 0,
+      "deckCapacity": 8,
+      "deck": [
+        {
+          "instanceId": "p_king_01",
+          "pieceType": "king",
+          "rarity": null,
+          "durability": null,
+          "durabilityMax": null,
+          "origin": "starter",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        },
+        {
+          "instanceId": "p_rook_07",
+          "pieceType": "rook",
+          "rarity": "normal",
+          "durability": 2,
+          "durabilityMax": 2,
+          "origin": "shop",
+          "acquiredAtStage": 0,
+          "status": "in_deck"
+        }
+      ],
+      "loadout": [],
+      "history": [],
+      "rngCursor": 0,
+      "status": "in_progress"
+    },
+    "stage": {
+      "stageSeed": "81C2-D9F1",
+      "templateId": "tpl-act2-fortress",
+      "playerColor": "white",
+      "phase": "deployment",
+      "board": {
+        "b6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s01"
+        },
+        "f6": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s02"
+        },
+        "b7": {
+          "pieceType": "pawn",
+          "color": "black",
+          "stageId": "s03"
+        },
+        "a8": {
+          "pieceType": "king",
+          "color": "black",
+          "stageId": "s04"
+        },
+        "b8": {
+          "pieceType": "bishop",
+          "color": "black",
+          "stageId": "s05"
+        },
+        "a7": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "stageId": "s06",
+          "rarity": "normal",
+          "promotesTo": {
+            "pieceType": "rook",
+            "rarity": "rare"
+          }
+        },
+        "c7": {
+          "pieceType": "pawn",
+          "color": "white",
+          "spawned": true,
+          "stageId": "s07",
+          "rarity": "normal",
+          "promotesTo": {
+            "pieceType": "knight",
+            "rarity": "rare"
+          }
+        }
+      },
+      "turnsUsed": 0,
+      "mateIn": 2,
+      "overtimePaid": 0,
+      "focus": 3,
+      "focusPool": 3,
+      "moveCredits": 1,
+      "spawnPoints": 12,
+      "modifiers": [],
+      "skillLog": [],
+      "enemyPolicy": {
+        "type": "best_move",
+        "depth": 3
+      },
+      "status": "active"
+    },
+    "placements": [
+      {
+        "instanceId": "p_king_01",
+        "to": "e1"
+      },
+      {
+        "instanceId": "p_rook_07",
+        "to": "d1"
+      }
+    ],
+    "mateTurn": 2,
+    "deploymentRanks": [
+      1,
+      2
+    ]
+  }
+]

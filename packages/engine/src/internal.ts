@@ -4,5 +4,6 @@ export { legalMoves, inCheck, newSafety, analyse, safeMove } from './legality';
 export { evaluate } from './enemy/evaluate';
 export { makeMoveTiered, unmakeMoveTiered, isAttacked, targetsInto } from './movegen';
 export type { Move } from './movegen';
-export { abilityAttacked, abilityTargetsInto } from './abilities';
+export { abilityAttacked, abilityTargetsInto, hasBonusMove } from './abilities';
 export { frozenMask } from './skills/registry';
+export { applyPlayerMove } from './queue';
