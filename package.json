@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate-content.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "test": "vitest run",
     "bench": "vitest run --config vitest.bench.config.ts",
     "typecheck": "tsc -p tsconfig.json",

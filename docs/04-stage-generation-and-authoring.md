@@ -93,31 +93,79 @@ a large family of stages.
 
 ## 3. Generation pipeline
 
-Generation runs once per stage, after the shop resolves. It is deterministic for
-`(runSeed, actIndex, stageIndex)`.
+Generation runs once per stage, **right after the previous stage is cleared**, from the deck as it
+stands after the stage-end chooser. It never runs during play: the solver works in the background
+over the results screen and the shop, which then shows the finished board as a preview without its
+par ([07 §1](07-shop-phase.md#1-entry-exit-and-flow)). Nothing is re-checked after the shop: selling
+or merging a piece the next stage needs is the player's informed choice. Generation is deterministic
+for `(runSeed, actIndex, stageIndex, deck)`; the solver's budgets count nodes, never time.
 
 | Step | Action | Failure → |
 |---|---|---|
-| **G0** | Derive seed: `hash(runSeed, actIndex, stageIndex)` | — |
-| **G1** | Select template: filter by act + tier, weighted; exclude templates used in the previous stage of the same act where possible | No template → engine bug (every act/tier must have ≥2 templates) |
-| **G2** | Roll enemy army from `enemyArmy` ranges (a fixed template takes `fixedEnemy` as-is). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
-| **G3** | Place enemy pieces in `enemyZone` under constraints (no illegal square, the enemy king not in check, and at least one deployment square left unattacked for the player's King); skipped for a fixed template | Retry placement (max 50 tries) → regenerate |
-| **G4** | Prepare the Deployment phase: set `spawnPoints` (the act and tier's budget, lowered by the template if it says so) and `phase: deployment`. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
-| **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
-| **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
-| **G6** | Assert preconditions (§4) | Regenerate |
-| **G7** | **Solver check** (§5): a checkmate exists within the par (X turns, the `mateIn` the generator picked), using the current board + remaining deck | Regenerate |
-| **G8** | Emit `StageState` with provenance `{templateId, seed, attempts}` | — |
+| **G0** | Derive seed: `stageSeed = hash(runSeed, actIndex, stageIndex)` | — |
+| **G1** | Select a template by act and tier (the boss when `stageIndex == 2`), weighted by `draw(stageSeed, 'template')`; avoid the previous stage's template where possible | No template → engine bug (every act and tier needs at least 1 template) |
+| **G2** | Board. A `fixed` template takes `fixedEnemy` as is. Any other template takes a formation (below) at index `⌊draw(stageSeed, 'formation', attempt) × n⌋`, mirrored left–right when `draw(stageSeed, 'mirror', attempt) < 0.5`. With an empty pool it falls back to random placement in `enemyZone` (streams `'army'` and `'place'`, at most `maxPlacementTries` squares tried per piece). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
+| **G3** | Prepare the Deployment phase: `mateIn` (the par X) drawn once per stage from the template range with `draw(stageSeed, 'par')`; `spawnPoints` (the act and tier's budget, lowered by the template if it says so); Focus; the enemy policy. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
+| **G4** | Spawn pawns: the count from `spawnedPawns.count`; per pawn a square in `spawnedPawns.ranks`, a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)), all from `draw(stageSeed, 'spawn', attempt, i, field)` | No square → next attempt |
+| **G5** | Verify the enemy army value is inside the act band (§6), then the seven preconditions (§4) | Next attempt, at most `maxRegenerations` (20) per template |
+| **G6** | `solveStage` (§5) with the deck: the pieces with durability ≥ 1, and the King. A mate within the par, on turn 2 or later, must exist | Next board, at most `maxBoards` (3) boards that passed G5 |
+| **G7** | Choose the board: the first proven one. If none is proven, the first board that passed G5 gets **one extra spawned pawn**, silently (below) | — |
+| **G8** | Emit `StageState` (`phase: deployment`, `mateIn`, `overtimePaid: 0`) with provenance `{templateId, seed, attempts}`. The generator also returns `{formationId, mirrored, proven, bonusPawn, solverNodes}` beside it, for `gen:report` only; the player never sees them | — |
 
-Regeneration cap: `maxRegenerations` (20). On exhaustion, fall through to the next-best template for
-that act/tier and reset the counter. If every template fails, the generator emits the last attempt
-with a `validationFailed` flag — the UI must surface this as a bug report prompt rather than showing
-an unverified stage. This is a **fail-loud** path, not a silent fallback.
+A *board* is one pass of G2–G5 that survives. If a template exhausts `maxRegenerations` attempts at
+G5, the next template of the same act and tier is tried and the counter resets. If every template
+fails, the last attempt is emitted with `validationFailed: true`: a content error that the UI must
+surface as a bug-report prompt rather than showing an unverified stage. This is a **fail-loud**
+path, not a silent fallback. A stage that merely was not proven never sets `validationFailed`.
+
+**Seed streams.** Every random choice reads its own stream, `draw(seed, ...parts) =
+mix32(hash(seed, ...parts)) / 2^32`, so a change to one step never shifts another:
+
+| Stream | Used by |
+|---|---|
+| `draw(stageSeed, 'template')` | G1 |
+| `draw(stageSeed, 'formation', attempt)` | G2, formation index |
+| `draw(stageSeed, 'mirror', attempt)` | G2, mirroring |
+| `draw(stageSeed, 'par')` | G3, once per stage |
+| `draw(stageSeed, 'spawn', attempt, i, field)` | G4, per pawn and field (square, rarity, `promotesTo`) |
+| `draw(stageSeed, 'bonus-pawn', field)` | G7, the extra pawn |
+| `draw(stageSeed, 'army', …)` and `draw(stageSeed, 'place', …)` | Random-placement fallback in G2 |
+
+**The bonus pawn.** The extra pawn is the one documented exception to
+[05](05-run-structure-and-economy.md)'s "no hidden assistance": the rule is public (the Codex), the
+pawn is visible on the board, and only *which* stage received it is never said. It is placed with
+the `bonus-pawn` stream on the template's spawn ranks, with the preconditions re-checked, on the
+first legal square in stream order; if none is legal, no pawn is added. The enemy side is not
+changed.
+
+### Formations
+
+Enemy boards of non-fixed templates are natural positions rather than random scatter. They come from
+the **Lichess puzzle database** (CC0), extracted offline by `tools/formations/extract.ts` and
+committed to `content/formations/<templateId>.json`, so a build never depends on the download.
+
+For each puzzle, the first UCI move of `Moves` is applied to the `FEN`, and the side to move solves
+the result; the *other* side is the defender, and if that is White the board is flipped vertically
+and the colours swapped. Only the defender's pieces are kept. The position is **filtered, not
+trimmed**: it is rejected if any of these holds:
+
+- a Black piece lies outside the template's `enemyZone`;
+- the composition is outside `enemyArmy`;
+- the value is outside the act band;
+- a pawn is on rank 8.
+
+A formation and its left–right mirror count once. Survivors are sorted by `mix32(hash(puzzleId))`
+and the first `generation.formations.maxPerTemplate` (50) are stored with each formation's id,
+rating and Black placement, plus the source, licence, file date and SHA-256 and the filters applied.
+Re-running on the same source file is byte-identical. The validator re-checks every stored formation
+against its template and warns when a template has fewer than `generation.formations.minPerTemplate`
+(20). Random placement in `enemyZone` stays as the fallback for an empty pool; there is no other
+fallback library.
 
 ## 4. Preconditions
 
-The player's army is not on the board when these run — the King and the summons are placed later, in
-the Deployment phase. So every precondition is about the generated board alone, or about what *any*
+The player's army is not on the board when these run (G5, after the spawned pawns are placed) — the
+King and the summons are placed later, in the Deployment phase. So every precondition is about the generated board alone, or about what *any*
 deployment could do on it.
 
 | Precondition | Rule | Reason |
@@ -140,79 +188,97 @@ show it happening, the check widens to triples (tracked in [10](10-roadmap-and-m
 
 ## 5. The solver
 
-The solver answers exactly one question: **"can this stage be won within the par (X turns), with
-this deck and this loadout?"** It does not need to find the *best* line, only a winning one — which keeps
-it tractable.
+The solver answers exactly one question: **"is there a deployment and a line of single-move queues
+that mates within the par (X = `mateIn` turns), on turn 2 or later, against the enemy's actual
+replies, with this deck?"** It does not look for the best line, only a winning one. It is a
+**single-agent search**: the enemy is a deterministic function (`enemyMove`,
+[02 §8.1](02-rules-framework.md#81-enemy-ai)), so after each candidate queue the solver computes the
+*one* reply the enemy will play, including scripted lines and their fallback. Its prediction always
+matches the real game, and it is far cheaper than a two-sided minimax.
 
-"This deck" includes each Hero Piece's rarity, because rarity changes movement: the solver generates
-moves with the abilities of [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities) (ally leaps,
-extra leaps and steps, multi-capture, the Legendary knight's free second move). Lifeline does not
-affect a stage — the queen still leaves the board — so the solver ignores it. It also models spawned
-pawns and promotion; a promoted piece joins the deck but cannot be summoned until the next stage, so
-within a stage promotion only removes the pawn. Because every promotion result is rolled at
-generation, the solver sees exactly what the player sees.
+"This deck" includes each Hero Piece's rarity, because rarity changes movement: `simulate` gives the
+solver the abilities of [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities) (ally leaps, extra
+leaps and steps, multi-capture, the Legendary knight's free second move), and it models spawned pawns
+and promotion. Lifeline does not affect a stage, so it is ignored.
 
-### Search shape
+**Queues are a single `MOVE`, or a `MOVE` plus the Legendary knight's bonus `MOVE`. No skills.**
+Skills only add options, so a line without them stays legal for any loadout. The solver is therefore
+**sound but incomplete**: a stage it accepts has a real winning deployment and line, so no unwinnable
+stage ships; a win that needs a skill, or a deployment it does not try, only costs a regeneration or,
+at worst, a bonus pawn.
 
-- **Ply 0 is the deployment.** The solver first chooses a King square and a set of summons whose
-  spawn costs fit `spawnPoints`, with their squares. Trying every placement is hopeless (up to 32
-  squares on ranks 1–4, up to six pieces), so it enumerates a bounded candidate set:
-  - pieces: subsets of the deck by **type + tier** (identical instances are interchangeable) that fit
-    the budget, largest and most valuable first;
-  - squares: for each piece, only squares from which it reaches the enemy zone, an open file or
-    diagonal, or a spawned pawn's path within two moves; the King on safe squares only.
+### Deployment candidates (ply 0)
 
-  This search is **incomplete but sound**: a stage it accepts has a real winning deployment and
-  line, so no unwinnable stage ever ships; a winning deployment it fails to try only costs a
-  regeneration.
-- **Every later ply is a turn, not an action.** Each ply expands the current position into candidate
-  *queues*, not individual actions.
-- **Queue candidates** per turn are generated from a bounded combinatorial set, each holding at
-  least one `MOVE` (there is no pass):
-  - single `MOVE`
-  - `MOVE` + one skill
-  - skill + `MOVE` + `MOVE` (Twin Step lines)
-  - `MOVE` + bonus `MOVE` (Legendary knight; also combined with each line above)
-- **Move enumeration** is chess-legal generation plus rarity abilities; skills add a small
-  multiplicative factor (bounded by charges remaining). Rare+ knights and bishops widen per-piece
-  branching, and a Legendary knight roughly squares its own; these are the first places to look if
-  solver budgets are exceeded.
-- **Losing leaves are pruned at once.** A queue that stalemates the enemy, a reply that leaves the
-  player with no legal queue, and a position past the par are all failures
-  ([02 §7](02-rules-framework.md#7-stage-end-evaluation)); the solver never expands them.
-- **Enemy replies are not branched.** The enemy is a deterministic function
-  (`enemyMove`, [02 §8.1](02-rules-framework.md#81-enemy-ai)), so after each candidate queue the solver
-  computes the *one* reply the enemy will actually play — including scripted lines and their fallback.
-  The solver is therefore a **single-agent search** over the player's deployment and queues, far
-  cheaper than a two-sided minimax, and its prediction always matches the real game.
-- **Enemy replies are memoized** per position (`generation.memoizeEnemyReplies`): the same position
-  never runs the enemy's search twice. Without this, an enemy search at every solver node would be
-  the dominant cost.
+Trying every placement is hopeless (up to 32 squares on ranks 1–4, up to six pieces), so ply 0
+enumerates a bounded, deterministic set. Each candidate is validated by `startStage`.
 
-### Budgets and acceptance
-
-| Parameter | Value | Notes |
+| Part | Rule | Bound |
 |---|---|---|
-| `solverNodeBudget` | 200,000 queue-nodes | Hard stop |
-| `solverTimeMs` | 2,000 | Wall-clock guard |
-| Acceptance | any deployment + queue sequence terminating in `WIN` **using at least 2 turns** | First found wins; the 2-turn floor rejects free wins |
-| Ordering heuristic | mate-in-1 first → checks/captures → everything else | Finds wins fast; keeps cost flat |
-| Rejection | budget exhausted with no win | Stage regenerated |
+| Subsets | Every type-and-rarity multiset of the deck that fits `spawnPoints`, identical instances counted once; maximal subsets first, largest value first | `deployment.maxSubsets` (6) |
+| King squares | Safe squares on ranks 1–4, spread across files and ranks, avoiding an open line to an enemy rook, bishop or queen | `deployment.kingSquares` (4) |
+| Piece squares | Each piece's best squares, scored by attacks on the squares next to the enemy king, legal moves into ranks 5–8, and safety from enemy attack | `deployment.squaresPerPiece` (6) |
+| Combining | Greedy assignment plus single-piece variants, interleaved across subsets and King squares | `deployment.maxCandidates` (200) |
+
+### Two-stage beam
+
+1. **Screening.** Every candidate runs a beam of width `screen.width` (4) for `min(screen.turns, mateIn)`
+   turns (3). Candidates rank by the best score they reach. A mate found here ends the solve.
+2. **Deep search.** The top `deep.candidates` (8) run a beam of width `deep.width` (32) up to `mateIn` turns.
+
+Each beam step, for every state and every candidate queue:
+
+1. `simulate` the queue.
+2. A win on turn `minSolveTurns` (2) or later ends the search; a loss is dropped.
+3. On the last turn of the par only wins are kept, so no enemy reply is computed.
+4. The others are scored by `−evaluate`, with tiers, and deduplicated by position.
+5. The top `width × expansion` (3) get the enemy's reply, memoized per board by position
+   (`memoizeEnemyReplies`).
+6. A reply that leaves the player no legal queue is dropped
+   ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
+7. The top `width` states are kept.
+
+All sorts break ties by text (the queue, square names), so the search is deterministic.
+
+### Budgets, replay and acceptance
+
+A **node** is one enemy reply needed, whether computed or taken from the memo, so the count is the
+same on every device and generation depends only on the seed and the deck. A board stops when it
+reaches `nodeBudget`.
+
+A found line is **replayed** through `startStage` and `commitQueue` before it counts: no stage is
+proven unless its line replays to a win. Within the par the enemy's clock never reads the wallet, so
+the replay's coins do not matter and the proof survives whatever the player buys. A mismatch rejects
+the line and is counted as a solver bug in `gen:report`.
+
+| Parameter (`data/economy.yaml`) | Value | Notes |
+|---|---|---|
+| `generation.maxRegenerations` | 20 | Attempts per template at G5 |
+| `generation.maxPlacementTries` | 50 | Random-placement fallback, per piece |
+| `generation.maxBoards` | 3 | Boards the solver tries before the bonus pawn |
+| `generation.formations.maxPerTemplate` | 50 | Formations stored per template |
+| `generation.formations.minPerTemplate` | 20 | The validator warns below this |
+| `generation.solver.nodeBudget` | 40,000 | Hard stop per board, in enemy replies; the spike's hardest solved board needed about 37,000 |
+| `generation.solver.minSolveTurns` | 2 | A mate on turn 1 is a free win and is rejected |
+| `generation.solver.memoizeEnemyReplies` | true | Saved 30–60 % of enemy searches in the spike |
+| `generation.solver.deployment` | `maxSubsets` 6, `kingSquares` 4, `squaresPerPiece` 6, `maxCandidates` 200 | Ply 0 |
+| `generation.solver.screen` | `width` 4, `turns` 3 | Stage 1 |
+| `generation.solver.deep` | `candidates` 8, `width` 32 | Stage 2 |
+| `generation.solver.expansion` | 3 | Queues given an enemy reply per beam slot |
+| Acceptance | A deployment and line that mate within `mateIn`, on turn 2 or later, and replay | The first found wins |
+| Rejection | `nodeBudget` exhausted with no mate | Next board (G6); after `maxBoards`, the bonus pawn (G7) |
 
 ### Cost control
 
-The solver is affordable **only** because templates are narrow. With ~8–10 pieces on the board,
-~3 skills, and a par of at most 5 turns, the branching factor per ply stays in the low hundreds in practice;
-the mate-first ordering typically resolves Act I stages in well under 10k nodes. The deployment ply
-multiplies everything below it, so its candidate set is the first knob to turn: fewer candidate
-squares per piece, or only the strongest few subsets.
+The solver is affordable because templates are narrow and the search is a beam rather than a tree.
+The cost is dominated by `simulate` in Act I, and elsewhere by the enemy search (about 5–12 ms per
+call at depth 3–4); `hasLegalQueue` is 2–5 % of the total. The deployment ply multiplies everything
+below it, so its candidate set is the first knob to turn. Mitigations if real numbers exceed the
+budgets (tracked in [10](10-roadmap-and-milestones.md)):
 
-Mitigations if real numbers exceed budget (tracked in [10](10-roadmap-and-milestones.md)):
-1. Cache: memoize accepted template+seed combinations in a shipped table for the most common
-   starting decks.
-2. Precompute: validate a template family offline against a set of representative deck archetypes,
-   then verify only the deck-specific deployment online.
-3. Loosen: shorten the Act I par range, which shrinks the search depth.
+1. Tune the deployment scoring with `gen:report`.
+2. Lower `deep.candidates` or `nodeBudget` and accept more bonus pawns; node budgets keep the result
+   identical on every device.
+3. Shorten the Act I par range, which shrinks the search depth.
 
 ## 6. Difficulty curve
 
@@ -278,7 +344,7 @@ pays overtime); one that always mates in 2 against a par of 5 is too loose.
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
 | Deployment availability | 100% of stages have at least `floor(spawnPoints / 3) + 1` free squares on ranks 1–4, and no enemy piece on ranks 1–4 |
 | Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
-| Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks outside `enemyZone` |
+| Spawned pawns | 100% of stages spawn a count within the template range, or one above it on a bonus-pawn stage (§3), on spawn ranks outside `enemyZone` |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |
 | Difficulty banding | Median solver mating turn within one turn of the stage's par |
