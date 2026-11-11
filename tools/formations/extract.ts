@@ -1,10 +1,10 @@
 // Offline tool: extract enemy starting formations from the Lichess puzzle database (CC0).
 // The defender's pieces (the side that just moved in Moves[0]) become Black; see docs/04 and spec §8.1.
 import { createHash } from 'node:crypto';
-import { createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, createReadStream, mkdirSync, openSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import zlib from 'node:zlib';
 import { Chess } from 'chess.js';
@@ -164,45 +164,65 @@ export function extractFormations(rows: Iterable<PuzzleRow | null>, templates: T
   return ex.finish();
 }
 
-// Lichess's .zst is several zstd frames separated by skippable frames (magic 0x184D2A5x, here a fixed
-// 12-byte one: 50 2A 4D 18 04 00 00 00 + 4 payload bytes). Node's decoder stops at the first one, so
+// Lichess's .zst is several zstd data frames separated by skippable frames (magic 0x184D2A50-5F, then a
+// 4-byte little-endian payload size; frame length = 8 + size). Node's decoder stops at the first one, so
 // find the data frames ourselves and decode them one after another.
-const SKIPPABLE = Buffer.from([0x50, 0x2a, 0x4d, 0x18, 0x04, 0x00, 0x00, 0x00]);
-const SKIPPABLE_LEN = 12;
+const SKIP_TAIL = Buffer.from([0x2a, 0x4d, 0x18]);
 
-async function dataFrames(path: string): Promise<Array<[number, number]>> {
-  const cuts: number[] = [];
+/** True when `pos` is end of file or the first byte of a zstd data frame (28 B5 2F FD) or another skippable frame. */
+function startsFrame(fd: number, pos: number, size: number): boolean {
+  if (pos === size) return true;
+  const b = Buffer.alloc(4);
+  if (readSync(fd, b, 0, 4, pos) < 4) return false;
+  const magic = b.readUInt32LE(0);
+  return magic === 0xfd2fb528 || (magic & 0xfffffff0) >>> 0 === 0x184d2a50;
+}
+
+/** [start, end) byte ranges of the data frames between skippable frames. */
+export async function dataFrames(path: string, highWaterMark?: number): Promise<Array<[number, number]>> {
+  const cuts: Array<[number, number]> = [];
   let carry: Buffer = Buffer.alloc(0);
   let base = 0;
-  for await (const chunk of createReadStream(path)) {
+  for await (const chunk of createReadStream(path, { highWaterMark })) {
     const buf = Buffer.concat([carry, chunk as Buffer]);
-    for (let i = buf.indexOf(SKIPPABLE); i >= 0; i = buf.indexOf(SKIPPABLE, i + 1)) {
-      const at = base + i;
-      if (cuts.length === 0 || at >= (cuts[cuts.length - 1] as number) + SKIPPABLE_LEN) cuts.push(at);
+    // A candidate needs 8 bytes; one that is cut off stays in the 7-byte carry and is seen next round.
+    for (let j = buf.indexOf(SKIP_TAIL); j >= 1; j = buf.indexOf(SKIP_TAIL, j + 1)) {
+      const i = j - 1;
+      if (i + 8 > buf.length || ((buf[i] as number) & 0xf0) !== 0x50) continue;
+      cuts.push([base + i, base + i + 8 + buf.readUInt32LE(i + 4)]);
     }
-    const keep = Math.min(buf.length, SKIPPABLE.length - 1);
+    const keep = Math.min(buf.length, 7);
     base += buf.length - keep;
     carry = buf.subarray(buf.length - keep);
   }
   const size = statSync(path).size;
   const frames: Array<[number, number]> = [];
   let start = 0;
-  for (const c of cuts) {
-    if (c > start) frames.push([start, c]);
-    start = c + SKIPPABLE_LEN;
+  const fd = openSync(path, 'r');
+  try {
+    for (const [at, end] of cuts) {
+      if (at < start || end > size || !startsFrame(fd, end, size)) continue; // magic-looking bytes inside compressed data
+      if (at > start) frames.push([start, at]);
+      start = end;
+    }
+  } finally {
+    closeSync(fd);
   }
   if (size > start) frames.push([start, size]);
   return frames;
 }
 
-async function* zstdChunks(path: string): AsyncIterable<Buffer> {
-  for (const [start, end] of await dataFrames(path)) {
-    yield* createReadStream(path, { start, end: end - 1 }).pipe(zlib.createZstdDecompress()) as AsyncIterable<Buffer>;
+async function* zstdChunks(path: string, highWaterMark?: number): AsyncIterable<Buffer> {
+  for (const [start, end] of await dataFrames(path, highWaterMark)) {
+    const decoder = zlib.createZstdDecompress();
+    pipeline(createReadStream(path, { start, end: end - 1, highWaterMark }), decoder, () => {});
+    yield* decoder as AsyncIterable<Buffer>;
   }
 }
 
-async function* readLines(source: string): AsyncIterable<string> {
-  const input = source.endsWith('.csv') ? createReadStream(source) : Readable.from(zstdChunks(source));
+/** Lines of a .csv or a (multi-frame) .csv.zst. */
+export async function* readLines(source: string, highWaterMark?: number): AsyncIterable<string> {
+  const input = source.endsWith('.csv') ? createReadStream(source) : Readable.from(zstdChunks(source, highWaterMark));
   yield* createInterface({ input, crlfDelay: Infinity });
 }
 
