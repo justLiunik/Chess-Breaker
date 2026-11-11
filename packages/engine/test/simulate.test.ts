@@ -14,12 +14,12 @@ function ok<T, E>(r: { ok: true; value: T } | { ok: false; error: E }): T {
 
 describe('simulate', () => {
   it('awards a one-move mate in Act I', () => {
-    const v = ok(simulate(runOf({ coins: 10 }), stageOf(mateBoard, { turnsUsed: 1, turnLimit: 8 }), mv('a1', 'a8'), config));
+    const v = ok(simulate(runOf({ coins: 10 }), stageOf(mateBoard, { turnsUsed: 1 }), mv('a1', 'a8'), config));
     expect(v.stage.status).toBe('won');
     expect(v.stage.endReason).toBe('checkmate');
-    expect(v.award).toEqual({ coins: 16, base: 4, turnBonus: 12 });
-    expect(v.run.coins).toBe(26);
-    expect(v.events).toContainEqual({ type: 'stage_won', award: { coins: 16, base: 4, turnBonus: 12 } });
+    expect(v.award).toEqual({ coins: 10, base: 4, parBonus: 6 });
+    expect(v.run.coins).toBe(20);
+    expect(v.events).toContainEqual({ type: 'stage_won', award: { coins: 10, base: 4, parBonus: 6 } });
     expect(v.stage.turnsUsed).toBe(2);
   });
 
@@ -27,18 +27,18 @@ describe('simulate', () => {
     const board = { ...mateBoard, a8: 'p' };
     const v = ok(simulate(runOf({ coins: 0 }), stageOf(board, { turnsUsed: 1 }), mv('a1', 'a8'), config));
     const salvage = Math.floor(config.pieceValues.pawn / config.economy.salvage.divisor);
-    expect(v.award?.coins).toBe(16);
-    expect(v.run.coins).toBe(16 + salvage);
+    expect(v.award?.coins).toBe(10);
+    expect(v.run.coins).toBe(10 + salvage);
   });
 
   it('applies the boss multiplier', () => {
-    const v = ok(simulate(runOf({ stageIndex: 2 }), stageOf(mateBoard, { turnsUsed: 6, turnLimit: 7 }), mv('a1', 'a8'), config));
-    expect(v.award).toEqual({ coins: 6, base: 6, turnBonus: 0 });
+    const v = ok(simulate(runOf({ stageIndex: 2 }), stageOf(mateBoard, { turnsUsed: 1 }), mv('a1', 'a8'), config));
+    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9 });
   });
 
   it('uses Act II rates', () => {
-    const v = ok(simulate(runOf({ actIndex: 1 }), stageOf(mateBoard, { turnsUsed: 0, turnLimit: 6 }), mv('a1', 'a8'), config));
-    expect(v.award).toEqual({ coins: 21, base: 6, turnBonus: 15 });
+    const v = ok(simulate(runOf({ actIndex: 1 }), stageOf(mateBoard, { turnsUsed: 0, mateIn: 3 }), mv('a1', 'a8'), config));
+    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9 });
   });
 
   it('loses when White stalemates Black', () => {
@@ -51,21 +51,12 @@ describe('simulate', () => {
     expect(v.events).toContainEqual({ type: 'stage_lost', endReason: 'enemy_stalemated' });
   });
 
-  it('ends a malformed stage whose turnsUsed already exceeds the limit', () => {
-    const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 9, turnLimit: 8 });
+  it('never ends a stage on turn count alone', () => {
+    const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 7, mateIn: 4 });
     const v = ok(simulate(runOf(), stage, mv('h1', 'h2'), config));
-    expect(v.stage.status).toBe('lost');
-    expect(v.stage.endReason).toBe('out_of_turns');
-  });
-
-  it('loses on the last turn without mate', () => {
-    const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 7, turnLimit: 8 });
-    const v = ok(simulate(runOf(), stage, mv('h1', 'h2'), config));
-    expect(v.stage.status).toBe('lost');
-    expect(v.stage.endReason).toBe('out_of_turns');
+    expect(v.stage.status).toBe('active');
     expect(v.stage.turnsUsed).toBe(8);
     expect(v.award).toBeNull();
-    expect(v.events).toContainEqual({ type: 'stage_lost', endReason: 'out_of_turns' });
   });
 
   it('is non-terminal otherwise, and reports check', () => {

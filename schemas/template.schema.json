@@ -5,7 +5,7 @@
   "description": "A designed encounter skeleton. Templates fix difficulty shape and randomization ranges; they never specify the player's deck army (that comes from the deck) or any rarity. Enemy squares are generated, except in a placement: fixed template, which hand-places the enemy army for set-piece stages. See docs/04-stage-generation-and-authoring.md.",
   "type": "object",
   "required": [
-    "id", "title", "act", "tier", "turnLimit",
+    "id", "title", "act", "tier", "mateIn",
     "spawnedPawns",
     "focusPool", "enemyPolicy", "preconditions"
   ],
@@ -15,7 +15,13 @@
     "title": { "type": "string", "minLength": 1, "maxLength": 40 },
     "act": { "type": "integer", "minimum": 1, "maximum": 3 },
     "tier": { "enum": ["normal", "boss"] },
-    "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "mateIn": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 2, "maximum": 5 },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Inclusive [min,max] par: the target Mate in X, drawn per stage from the stage seed (docs/04 §2). min <= max."
+    },
     "spawnPoints": {
       "type": "integer",
       "minimum": 0,
@@ -70,7 +76,7 @@
           "items": { "type": "integer", "minimum": 2, "maximum": 7 },
           "minItems": 1,
           "uniqueItems": true,
-          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone, and rank 8 must be reachable within the turn limit. May overlap the deployment ranks (1-4): a spawned pawn simply occupies its square."
+          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone. May overlap the deployment ranks (1-4): a spawned pawn simply occupies its square."
         }
       }
     },

@@ -104,9 +104,10 @@ describe('commitQueue', () => {
   });
 
   it('gives a lost stage no enemy move', () => {
-    const stage = stageOf({ e1: 'K', h1: 'R', a8: 'k' }, { turnsUsed: 7, turnLimit: 8 });
-    const v = ok(commitQueue(runOf(), stage, mv('h1', 'h2'), config));
-    expect(v.stage.endReason).toBe('out_of_turns');
+    // Bb6xa7 stalemates Black: simulate ends the stage, so there is no reply.
+    const stage = stageOf({ e1: 'K', b6: 'B', f7: 'Q', h8: 'k', a7: 'p' });
+    const v = ok(commitQueue(runOf(), stage, mv('b6', 'a7'), config));
+    expect(v.stage.endReason).toBe('enemy_stalemated');
     expect(types(v.events)).not.toContain('enemy_move');
   });
 

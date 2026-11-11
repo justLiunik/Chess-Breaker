@@ -40,7 +40,7 @@ export interface ActiveModifier {
 }
 
 export type EndReason =
-  | 'checkmate' | 'enemy_stalemated' | 'out_of_turns' | 'player_mated' | 'player_stalemated';
+  | 'checkmate' | 'enemy_stalemated' | 'out_of_coins' | 'player_mated' | 'player_stalemated';
 
 export interface StageState {
   stageSeed: string;
@@ -49,7 +49,10 @@ export interface StageState {
   phase: 'deployment' | 'action';
   board: Record<Square, BoardPiece>;
   turnsUsed: number;
-  turnLimit: number;
+  /** The par: the target "Mate in X". There is no turn limit; turns past it cost overtime (docs/05 §2). */
+  mateIn: number;
+  /** Coins of overtime charged so far this stage, from the pending reward and the wallet together. */
+  overtimePaid: number;
   focus: number;
   focusPool: number;
   moveCredits: number;
@@ -137,7 +140,7 @@ export type CommitError =
 export interface Award {
   coins: number;
   base: number;
-  turnBonus: number;
+  parBonus: number;
 }
 
 export type GameEvent =
@@ -151,6 +154,7 @@ export type GameEvent =
   | { type: 'enemy_move'; from: Square; to: Square }
   | { type: 'enemy_fell_back'; cursor: number }
   | { type: 'turn_started'; turn: number }
+  | { type: 'overtime_paid'; turn: number; fromReward: number; fromWallet: number }
   | { type: 'piece_summoned'; instanceId: string; square: Square }
   | { type: 'lifeline_saved'; instanceId: string }
   | { type: 'piece_returned'; instanceId: string; durability: number | null }
@@ -229,7 +233,8 @@ export interface EngineConfig {
   pieceValues: Record<PieceType, number>;
   economy: {
     baseReward: { act1: number; act2: number; act3: number; bossMultiplier: number };
-    coinRate: { act1: number; act2: number; act3: number };
+    parBonus: { act1: number; act2: number; act3: number };
+    overtimeCost: { act1: number; act2: number; act3: number };
     salvage: { enabled: boolean; divisor: number };
   };
   enemyAI: {

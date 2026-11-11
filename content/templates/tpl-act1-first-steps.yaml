@@ -2,7 +2,7 @@ id: tpl-act1-first-steps
 title: First Steps
 act: 1
 tier: normal
-turnLimit: 8
+mateIn: [4, 5]
 placement: fixed
 spawnPoints: 6      # Act I's 9 minus a minor: two summons at most on the very first stage
 fixedEnemy:

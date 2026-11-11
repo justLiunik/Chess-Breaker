@@ -131,7 +131,7 @@ export function makeCase(label: string, i: number): Case {
     const credits = 1 + pick(2);
     const plain = stageOf(pieces, {
       moveCredits: credits, focus: sub(6) === 0 ? 0 : 1 + sub(3), focusPool: 3, enemyPolicy: { type: 'best_move', depth: 1 },
-      turnsUsed: sub(6), turnLimit: 8,
+      turnsUsed: sub(6), mateIn: 4, overtimePaid: 0,
     });
     const { stage, deck } = heroDeck(plain, sub);
     const b = fromBoard(stage.board);

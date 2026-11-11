@@ -10,6 +10,7 @@ import { toSquare } from './square';
 import { resolveQueue } from './queue';
 import { frozenMask } from './skills/registry';
 import { lifelineSaves } from './abilities';
+import { stageEconomy } from './economy';
 
 export function simulate(
   run: RunState,
@@ -40,16 +41,12 @@ export function simulate(
 
   // R4: the turn is spent.
   next = { ...next, turnsUsed: next.turnsUsed + 1 };
-  if (next.status === 'active' && next.turnsUsed >= next.turnLimit) {
-    next = { ...next, status: 'lost', endReason: 'out_of_turns' };
-  }
 
   if (next.status === 'won') {
-    const act = `act${run.actIndex + 1}` as 'act1' | 'act2' | 'act3';
-    const { baseReward, coinRate } = config.economy;
-    const base = Math.round(baseReward[act] * (run.stageIndex === 2 ? baseReward.bossMultiplier : 1));
-    const turnBonus = (next.turnLimit - next.turnsUsed) * coinRate[act];
-    award = { coins: base + turnBonus, base, turnBonus };
+    const { baseFull, parBonusFull } = stageEconomy(run, config);
+    const base = Math.max(0, baseFull - next.overtimePaid);
+    const parBonus = next.turnsUsed <= next.mateIn ? parBonusFull : 0;
+    award = { coins: base + parBonus, base, parBonus };
     nextRun = { ...nextRun, coins: nextRun.coins + award.coins };
     events.push({ type: 'stage_won', award });
   } else if (next.status === 'lost') {
@@ -153,6 +150,19 @@ export function commitQueue(
     const endReason = checked ? 'player_mated' : 'player_stalemated';
     next = { ...next, status: 'lost', endReason };
     events.push({ type: 'stage_lost', endReason });
+  } else if (next.turnsUsed + 1 > next.mateIn) {
+    // Past the par every turn costs overtime: from the pending reward first, then from the wallet.
+    const { baseFull, overtimeCost: cost } = stageEconomy(nextRun, config);
+    const fromReward = Math.min(cost, Math.max(0, baseFull - next.overtimePaid));
+    const fromWallet = cost - fromReward;
+    if (nextRun.coins < fromWallet) {
+      next = { ...next, status: 'lost', endReason: 'out_of_coins' };
+      events.push({ type: 'stage_lost', endReason: 'out_of_coins' });
+    } else {
+      nextRun = { ...nextRun, coins: nextRun.coins - fromWallet };
+      next = { ...next, overtimePaid: next.overtimePaid + cost };
+      events.push({ type: 'overtime_paid', turn: next.turnsUsed + 1, fromReward, fromWallet });
+    }
   }
   return { ok: true, value: { run: nextRun, stage: next, events, award: null } };
 }

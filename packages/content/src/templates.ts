@@ -29,7 +29,7 @@ export interface Template {
   title: string;
   act: 1 | 2 | 3;
   tier: 'normal' | 'boss';
-  turnLimit: number;
+  mateIn: [number, number];
   spawnPoints?: number;
   placement?: 'generated' | 'fixed';
   enemyArmy?: Partial<Record<PieceType, [number, number]>>;

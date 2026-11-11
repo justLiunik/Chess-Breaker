@@ -2,7 +2,7 @@ id: tpl-act1-open-field
 title: Open Field
 act: 1
 tier: normal
-turnLimit: 8
+mateIn: [4, 5]
 enemyArmy:
   pawn: [5, 6]
   knight: [1, 1]
@@ -23,6 +23,6 @@ preconditions:
   - enemy_value_in_band
   - spawned_pawns_placed
 designNote: >-
-  Teaching template. Enemy army value 8-9 against an 8-turn limit: enough
-  slack to learn summoning and the turn counter without the stage being a
+  Teaching template. Enemy army value 8-9 against a mate in 4-5: enough
+  slack to learn summoning and the par counter without the stage being a
   free win. Depth-2 policy punishes obvious hangs only.

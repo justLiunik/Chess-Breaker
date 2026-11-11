@@ -14,7 +14,7 @@ function searchMove(
 ): Pick {
   // Rarity abilities enlarge the tree: while any player piece has a tier, the depth is capped.
   const capped = hasTiers(t) ? Math.min(depth, config.enemyAI.search.maxDepthWithRarity) : depth;
-  const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, capped, config, frozen, t);
+  const scored = scoreRootMoves(b, Math.min(20, Math.max(1, stage.mateIn - stage.turnsUsed)), capped, config, frozen, t);
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
   const tied = scored.filter((r) => r.score === best);

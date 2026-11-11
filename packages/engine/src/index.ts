@@ -8,3 +8,4 @@ export * from './enemy/policy';
 export { TIERS, compileAbilities, durabilityMaxOf, spawnCostOf } from './abilities';
 export * from './deployment';
 export * from './stage-end';
+export { stageEconomy } from './economy';

@@ -8,7 +8,7 @@ import { config, deepFreeze, stageOf } from './helpers';
 const FIRST_STEPS = { e8: 'k', a7: 'p', b7: 'p', c7: 'p', f7: 'p', g7: 'p', c6: 'n', e1: 'K' };
 
 const tied = (stage: ReturnType<typeof stageOf>, depth: number): string[] => {
-  const res = scoreRootMoves(fromBoard(stage.board), stage.turnLimit - stage.turnsUsed, depth, config);
+  const res = scoreRootMoves(fromBoard(stage.board), stage.mateIn - stage.turnsUsed, depth, config);
   const best = Math.max(...res.map((r) => r.score));
   return res.filter((r) => r.score === best).map((r) => `${toSquare(r.move.from)}${toSquare(r.move.to)}`);
 };

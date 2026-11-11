@@ -99,6 +99,10 @@ for (const entry of MANIFEST) {
         continue;
       }
       itemCount += 1;
+      if (entry.schema === 'template' && doc?.turnLimit !== undefined) {
+        fail(`${doc.id}: turnLimit was replaced by mateIn (docs/04 §2)`);
+        continue;
+      }
       if (!ajv.validate(SCHEMA_IDS[entry.schema], doc)) {
         fail(...formatAjvErrors(label, '', ajv.errors));
         continue;
@@ -271,15 +275,11 @@ for (const t of templates) {
     }
   }
 
-  // Turn limit shape: bosses must be tighter than their act's normal limit.
-  const actLimit = economy.stages?.turnLimits?.[`act${t.act}`];
-  if (t.tier === 'boss' && actLimit !== undefined) {
-    const expected = actLimit - (economy.stages.turnLimits.bossPenalty ?? 1);
-    if (t.turnLimit !== expected) {
-      fail(`${t.id}: boss turnLimit ${t.turnLimit} should be ${expected} for act ${t.act}`);
-    }
-  } else if (t.tier === 'normal' && actLimit !== undefined && t.turnLimit !== actLimit) {
-    fail(`${t.id}: normal turnLimit ${t.turnLimit} should be ${actLimit} for act ${t.act}`);
+  // The par: mateIn replaced the turn limit (docs/04 §2).
+  if (!(Array.isArray(t.mateIn) && t.mateIn.length === 2 && t.mateIn[0] <= t.mateIn[1])) {
+    fail(`${t.id}: mateIn ${JSON.stringify(t.mateIn)} must be [min, max] with min <= max`);
+  } else {
+    ok(`${t.id}: par mate in ${t.mateIn[0]}–${t.mateIn[1]}`);
   }
 }
 
@@ -566,6 +566,23 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     fail('economy.yaml: economy.baseReward.bossMultiplier must be >= 1');
     problems += 1;
   }
+  if (economy.economy?.coinRate !== undefined) {
+    fail('economy.yaml: economy.coinRate was removed; the par economy uses parBonus and overtimeCost (docs/05 §2)');
+    problems += 1;
+  }
+  if (economy.stages?.turnLimits !== undefined) {
+    fail('economy.yaml: stages.turnLimits was removed; each template sets mateIn');
+    problems += 1;
+  }
+  for (const key of ['parBonus', 'overtimeCost']) {
+    for (let act = 1; act <= actCount; act += 1) {
+      const v = economy.economy?.[key]?.[`act${act}`];
+      if (!(Number.isInteger(v) && v > 0)) {
+        fail(`economy.yaml: economy.${key}.act${act} must be a positive integer`);
+        problems += 1;
+      }
+    }
+  }
   if (economy.economy?.dominationPayoutMultiplier !== undefined || economy.stages?.materialThreshold !== undefined) {
     fail('economy.yaml: domination settings must not exist — checkmate is the only win');
     problems += 1;
@@ -590,7 +607,7 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   if (problems === 0) ok(`economy.yaml: base rewards rise by act; merge takes ${merge.inputs}, capped at the act ceiling; capacity ${economy.deck.capacity}`);
 }
 
-// 2a''''. Templates: spawned pawns must be able to promote within the turn limit.
+// 2a''''. Templates: spawned pawns stay out of the enemy zone.
 for (const t of templates) {
   const sp = t.spawnedPawns;
   if (!sp) continue;
@@ -605,12 +622,7 @@ for (const t of templates) {
     fail(`${t.id}: spawnedPawns.ranks overlap enemyZone on rank(s) ${overlap.join(', ')}`);
     problems += 1;
   }
-  const distance = 8 - Math.min(...sp.ranks);
-  if (distance > t.turnLimit) {
-    fail(`${t.id}: a pawn spawned on rank ${Math.min(...sp.ranks)} needs ${distance} moves to promote, but turnLimit is ${t.turnLimit}`);
-    problems += 1;
-  }
-  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, promotion reachable`);
+  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, clear of the enemy zone`);
 }
 
 // 2a-sell. Selling deck pieces (docs/07 §4). The sell factor must stay at or
@@ -818,9 +830,6 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
     if (tpl.act !== act || tpl.tier !== tier) {
       fail(`${where} is act ${act} ${tier} but uses ${tpl.id} (act ${tpl.act} ${tpl.tier})`);
     }
-    if (h.turnsUsed > tpl.turnLimit) {
-      fail(`${where}: turnsUsed ${h.turnsUsed} exceeds ${tpl.id}'s turnLimit ${tpl.turnLimit}`);
-    }
   });
   if ((run.history ?? []).length > 0) ok(`${file}: ${run.history.length} history entries follow the act/boss shape`);
 }
@@ -949,16 +958,13 @@ if (stage) {
     }
   }
 
-  if (stage.turnLimit < stage.turnsUsed) {
-    fail(`stage-state.yaml: turnsUsed ${stage.turnsUsed} exceeds turnLimit ${stage.turnLimit}`);
-  }
   if (stage.focus > stage.focusPool) {
     fail(`stage-state.yaml: focus ${stage.focus} exceeds focusPool ${stage.focusPool}`);
   }
 
   const template = templates.find((t) => t.id === stage.templateId);
-  if (template && template.turnLimit !== stage.turnLimit) {
-    fail(`stage-state.yaml: turnLimit ${stage.turnLimit} does not match template ${template.id}'s ${template.turnLimit}`);
+  if (template && Array.isArray(template.mateIn) && !(stage.mateIn >= template.mateIn[0] && stage.mateIn <= template.mateIn[1])) {
+    fail(`stage-state.yaml: mateIn ${stage.mateIn} is outside template ${template.id}'s range ${JSON.stringify(template.mateIn)}`);
   }
 
   // Enemy board material must sit inside the template's own range.

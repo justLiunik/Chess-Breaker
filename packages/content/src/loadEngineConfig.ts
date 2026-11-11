@@ -142,10 +142,15 @@ export function loadEngineConfig(
         act3: num(y, 'economy.baseReward.act3'),
         bossMultiplier: num(y, 'economy.baseReward.bossMultiplier'),
       },
-      coinRate: {
-        act1: num(y, 'economy.coinRate.act1'),
-        act2: num(y, 'economy.coinRate.act2'),
-        act3: num(y, 'economy.coinRate.act3'),
+      parBonus: {
+        act1: num(y, 'economy.parBonus.act1'),
+        act2: num(y, 'economy.parBonus.act2'),
+        act3: num(y, 'economy.parBonus.act3'),
+      },
+      overtimeCost: {
+        act1: num(y, 'economy.overtimeCost.act1'),
+        act2: num(y, 'economy.overtimeCost.act2'),
+        act3: num(y, 'economy.overtimeCost.act3'),
       },
       salvage: {
         enabled: bool(y, 'economy.salvage.enabled'),

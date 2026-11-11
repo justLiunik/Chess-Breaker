@@ -2,7 +2,7 @@
 // endStage on a win. `npm run play`.
 import { createInterface } from 'node:readline';
 import { loadEngineConfig, loadTemplates } from '@checkbreaker/content';
-import { commitQueue, endStage, simulate, startStage } from '@checkbreaker/engine';
+import { commitQueue, endStage, simulate, stageEconomy, startStage } from '@checkbreaker/engine';
 import type {
   Action, BoardPiece, CommitError, GameEvent, PieceInstance, PieceType, RunState, Square, StageState,
 } from '@checkbreaker/engine';
@@ -44,7 +44,8 @@ function buildStage(): StageState {
     phase: 'deployment',
     board,
     turnsUsed: 0,
-    turnLimit: tpl.turnLimit,
+    mateIn: tpl.mateIn[0],
+    overtimePaid: 0,
     focus: tpl.focusPool,
     focusPool: tpl.focusPool,
     moveCredits: 1,
@@ -109,7 +110,8 @@ function eventText(e: GameEvent): string {
     case 'pawn_promoted': return `pawn reaches the last rank at ${e.square}; promotes to ${e.promotesTo.pieceType} (${e.promotesTo.rarity})`;
     case 'enemy_promoted': return `enemy pawn promoted on ${e.square}`;
     case 'check': return `check on the ${e.king} king (${e.square})`;
-    case 'stage_won': return `stage won: ${e.award.coins} coins (base ${e.award.base} + turn bonus ${e.award.turnBonus})`;
+    case 'stage_won': return `stage won: ${e.award.coins} coins (base ${e.award.base} + par bonus ${e.award.parBonus})`;
+    case 'overtime_paid': return `overtime on turn ${e.turn}: ${e.fromReward} from the reward, ${e.fromWallet} from your coins`;
     case 'stage_lost': return `stage lost: ${e.endReason}`;
     case 'enemy_move': return `enemy moves ${e.from}-${e.to}`;
     case 'enemy_fell_back': return `enemy script ended or was blocked (cursor ${e.cursor}); it now searches`;
@@ -147,7 +149,9 @@ function main(): void {
 
   const show = (): void => {
     console.log(`\n${boardText(stage)}`);
-    console.log(`turn ${stage.turnsUsed + 1}/${stage.turnLimit}   coins ${run.coins}   you are White (upper case)`);
+    const turn = stage.turnsUsed + 1;
+    const overtime = turn > stage.mateIn ? `   OVERTIME −${stageEconomy(run, config).overtimeCost} ◈ / turn` : '';
+    console.log(`turn ${turn}  MATE IN ${stage.mateIn}${overtime}   coins ${run.coins}   you are White (upper case)`);
   };
   const prompt = (): void => console.log(deploying
     ? `place your pieces (Enter = ${DEFAULT_PLACEMENTS}), or quit:`
@@ -223,7 +227,7 @@ function main(): void {
     console.log('preview:');
     for (const e of sim.value.events) console.log(`  ${eventText(e)}`);
     if (sim.value.award) {
-      console.log(`  award: ${sim.value.award.coins} coins (base ${sim.value.award.base}, turn bonus ${sim.value.award.turnBonus})`);
+      console.log(`  award: ${sim.value.award.coins} coins (base ${sim.value.award.base}, par bonus ${sim.value.award.parBonus})`);
     }
     pending = queue;
     prompt();

@@ -5,7 +5,7 @@
   "description": "One generated chess encounter. Ephemeral: discarded at stage end. Emitted by the pipeline in docs/04 §3 and consumed by the engine in docs/02.",
   "type": "object",
   "required": [
-    "stageSeed", "templateId", "playerColor", "phase", "board", "turnsUsed", "turnLimit",
+    "stageSeed", "templateId", "playerColor", "phase", "board", "turnsUsed", "mateIn", "overtimePaid",
     "focus", "focusPool", "moveCredits", "spawnPoints",
     "modifiers", "skillLog", "enemyPolicy", "status"
   ],
@@ -27,7 +27,8 @@
       "additionalProperties": false
     },
     "turnsUsed": { "type": "integer", "minimum": 0 },
-    "turnLimit": { "type": "integer", "minimum": 1 },
+    "mateIn": { "type": "integer", "minimum": 2, "maximum": 5, "description": "The par: the target Mate in X. Turns past it cost overtime." },
+    "overtimePaid": { "type": "integer", "minimum": 0, "description": "Coins of overtime charged so far this stage (reward and wallet together)." },
     "focus": { "type": "integer", "minimum": 0 },
     "focusPool": { "type": "integer", "minimum": 1 },
     "moveCredits": { "type": "integer", "minimum": 0 },
@@ -78,7 +79,7 @@
     },
     "status": { "enum": ["active", "won", "lost"] },
     "endReason": {
-      "enum": ["checkmate", "enemy_stalemated", "out_of_turns", "player_mated", "player_stalemated"],
+      "enum": ["checkmate", "enemy_stalemated", "out_of_coins", "player_mated", "player_stalemated"],
       "description": "Set when status leaves active. checkmate is the only win; every other reason is a loss (docs/02 §7)."
     },
     "provenance": {

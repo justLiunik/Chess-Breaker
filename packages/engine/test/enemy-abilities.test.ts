@@ -34,7 +34,7 @@ type Scored = ReturnType<typeof scoreRootMoves>;
 /** Root scores of the stage at `depth`, with its tiers (or with every tier dropped when `normal`). */
 function rootScores(stage: StageState, depth: number, normal = false): Scored {
   const t = normal ? new Int8Array(64) : tiersOf(stage.board);
-  return scoreRootMoves(fromBoard(stage.board), stage.turnLimit - stage.turnsUsed, depth, config, undefined, t);
+  return scoreRootMoves(fromBoard(stage.board), stage.mateIn - stage.turnsUsed, depth, config, undefined, t);
 }
 const tiedBest = (res: Scored): string[] => {
   const best = Math.max(...res.map((r) => r.score));
@@ -200,7 +200,7 @@ describe('the search depth is capped on rarity boards (docs/02 §8.1)', () => {
   /** enemyMove's pick for a given search depth: the best score, ties broken by the seed. */
   function pickAt(stage: StageState, depth: number, seed: number) {
     const b = fromBoard(stage.board);
-    const scored = scoreRootMoves(b, stage.turnLimit - stage.turnsUsed, depth, config, undefined, tiersOf(stage.board));
+    const scored = scoreRootMoves(b, stage.mateIn - stage.turnsUsed, depth, config, undefined, tiersOf(stage.board));
     const best = Math.max(...scored.map((r) => r.score));
     const tied = scored.filter((r) => r.score === best);
     const m = tied[(seed >>> 0) % tied.length]!.move;
