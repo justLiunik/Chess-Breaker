@@ -100,7 +100,7 @@ by making stage selection a meta-strategy, and multiplies template validation su
 **Status:** **decided — none.** Checkbreaker is a personal, non-commercial project. There is no
 monetization, and no monetization hooks are built into the architecture — no currency other than
 coins, no timers, no ad slots.
-**Constraint if this ever changes:** any model must not gate durability, repairs, or turn limits.
+**Constraint if this ever changes:** any model must not gate durability, repairs, or the par and overtime.
 Selling durability would directly contradict pillar 2. A public or commercial release would also
 reopen the Stockfish licence question ([09 §1](09-technical-architecture.md#stockfish-as-a-design-tool-offline-only))
 and decision I.

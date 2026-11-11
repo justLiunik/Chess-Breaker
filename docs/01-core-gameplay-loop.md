@@ -10,7 +10,7 @@
 │   │ SHOP LOOP       spend coins → power → refill the deck       │   │
 │   │                                                             │   │
 │   │   ┌─────────────────────────────────────────────────────┐   │   │
-│   │   │ STAGE LOOP      clear within the turn limit         │   │   │
+│   │   │ STAGE LOOP      mate within the par ("Mate in X")    │   │   │
 │   │   │                                                     │   │   │
 │   │   │   ┌─────────────────────────────────────────────┐   │   │   │
 │   │   │   │ ACTION LOOP   plan → commit → resolve       │   │   │   │
@@ -35,13 +35,14 @@ between them.
 This is the economic heartbeat of the game. Read it left to right:
 
 ```
-durability  ──►  tempo  ──►  leftover turns  ──►  coins  ──►  power  ──►  (back to durability)
+durability  ──►  tempo  ──►  par / overtime  ──►  coins  ──►  power  ──►  (back to durability)
  (long-run)      (stage)         (stage)          (run)      (run)
 ```
 
 - **Durability buys tempo.** Every piece summoned in the Deployment phase costs one durability. A
   bigger army mates sooner; a smaller one saves durability for later stages.
-- **Tempo buys coins.** Winning in 3 of 8 turns pays 5 remaining turns × the act rate.
+- **Tempo buys coins.** A mate within the par pays the par bonus; every turn past the par costs
+  overtime, first from the stage's reward and then from the wallet.
 - **Coins buy power.** Pieces (new durability), skills (new options), repairs. The deck is capped at
   8 pieces, so power grows by quality — buying higher tiers and merging three pieces into one.
 - **Power buys deeper stages** — which demand *more* tempo, closing the loop.
@@ -81,14 +82,14 @@ are held to it.
 - Exit routes:
   | Route | Payout |
   |---|---|
-  | Checkmate — the **only** way to clear a stage | Base reward + `leftover × coinRate` bonus + salvage |
-  | Turn limit reached | **Loss** |
+  | Checkmate — the **only** way to clear a stage | Base reward (less overtime) + par bonus if within the par + salvage |
+  | A turn past the par that the pending reward and the wallet cannot pay | **Loss, run over** (`out_of_coins`) |
   | King checkmated | **Loss, run over** |
   | Stalemate — the enemy, or the player, has no legal move | **Loss, run over** |
 
 The stage loop's core tension is the **coin preview in the HUD**. It tells you, every turn, exactly
-what mating *right now* is worth — and it goes down by one rate step each turn you hesitate, down to
-the base reward on the final turn. That
+what mating *right now* is worth — the base reward plus the par bonus up to the par, then less and
+less as overtime eats the reward, and then the wallet. That
 single number is the pressure that makes the durability economy bite.
 
 ## Loop 3 — Shop

@@ -1,8 +1,8 @@
 # 08 — Progression & UX
 
 The UI's job is to make a hard planning game feel effortless and fair. Everything here serves one
-goal: **the player should always know three numbers — turns left, what winning is worth, and what
-their army can still do.**
+goal: **the player should always know three numbers — the par and the overtime bill, what winning is
+worth, and what their army can still do.**
 
 ---
 
@@ -10,7 +10,8 @@ their army can still do.**
 
 Priority order when two elements compete for space or attention:
 
-1. **Turns remaining** — the clock the player fears.
+1. **The par** — "Mate in X" and the free turns left to it; past the par, the overtime bill per turn
+   and what is left to pay it. The clock the player fears.
 2. **Coin preview** — what winning *right now* is worth. This number is the game's whole incentive
    structure and must never be hidden behind a tooltip.
 3. **Board threats** — what can capture what. Always visible, never "discoverable."
@@ -38,19 +39,25 @@ No screen has a timer. The game is turn-based; urgency is diegetic (the counter)
 ### 3.1 Coin preview — the load-bearing number
 
 ```
-preview = baseReward(act, tier) + (turnLimit − (turnsUsed + 1)) × coinRate(act)
+preview = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed + 1 ≤ mateIn ? parBonus(act, tier) : 0)
 ```
 
-`turnsUsed` includes the turn currently being played, so the final turn of a stage previews the
-**base reward only** (e.g. **+4** in Act I). Salvage is shown separately as it is earned.
+`turnsUsed + 1` is the turn being played, and `overtimePaid` already includes the overtime paid
+when that turn started. Salvage is shown separately as it is earned.
 
 The HUD shows a live, per-plan value:
 
-- **Checkmate available in this plan** → `+14 ◈` in full color.
+- **Checkmate available in this plan** → `+10 ◈` in full color.
 - **No mate in this plan** → shows the *next-turn* potential in muted text, so the player always sees
-  the decay.
-- On the last turn it shows **`+4 ◈`** with the label `FINAL TURN` — an explicit, unmissable "mate
-  now or lose the run; every saved turn would have paid more."
+  what the next turn would be worth.
+- On the par's last turn it shows **`+10 ◈`** with the label `LAST PAR TURN` — an explicit "mate now
+  for the par bonus".
+- Past the par it shows `OVERTIME −2 ◈ / turn` and the reward and wallet left to pay it, so the
+  player can count how many turns they can still afford before `out_of_coins`.
+
+**The par is hidden only in the shop.** The shop's next-stage preview shows the board and nothing
+about the par ([07 §6](07-shop-phase.md#6-screen-layout)); the Stage screen shows `MATE IN X` from
+the Deployment phase on.
 
 ### 3.2 HUD layout
 
@@ -59,7 +66,7 @@ paid until START.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ACT I · STAGE 2 · DEPLOYMENT     TURNS 8      SPAWN 8/9 ◆◆◆◆◆◆◆◆◇    │
+│ ACT I · STAGE 2 · DEPLOYMENT     MATE IN 4    SPAWN 8/9 ◆◆◆◆◆◆◆◆◇    │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
@@ -83,7 +90,7 @@ paid until START.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ACT I · STAGE 2         TURNS ●●●●●●○○      WIN NOW  +14 ◈           │
+│ ACT I · STAGE 2         MATE IN 4 ●●○○      WIN NOW  +10 ◈           │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │     8  ┌──┬──┬──┬──┬──┬──┬──┬──┐                                     │
@@ -186,10 +193,10 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 
 | Moment | Teaching | Mechanism |
 |---|---|---|
-| Run 1, Act I stage 1 | Piece movement, capture, the turn counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
+| Run 1, Act I stage 1 | Piece movement, capture, the par counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
 | Run 1, Act I stage 2 | Choosing who to summon, spawn points, and durability | The deck holds more pieces than the spawn points pay for; the first START is prompted with its durability cost |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
-| Act I boss | Mating under turn pressure | One turn less than the rest of Act I; the coin preview's decay is highlighted once |
+| Act I boss | Mating under par pressure | A shorter par than the rest of Act I; the overtime bill is highlighted once |
 | Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
 | First time three identical pieces are owned | Merging | The shop highlights the set and its `[MERGE]` action once |
@@ -229,7 +236,9 @@ again. Restarting is for mis-clicked plans, not for scouting the enemy's replies
 - Hints **do not** name coordinates or moves.
 - Hints may be disabled in a run for a discipline option (deferred; see [11](11-open-decisions.md)).
 - The Codex contains a piece-movement reference with diagrams, the full rules of
-  [02](02-rules-framework.md), and a searchable skill glossary.
+  [02](02-rules-framework.md), a searchable skill glossary, and the generation rules a player can
+  feel: every stage's par is proven reachable when the generator can prove it, and a stage it cannot
+  prove gets one extra spawned pawn ([05 §5](05-run-structure-and-economy.md#5-failure-spiral-guardrails)).
 - Algebraic notation appears nowhere in required UI; it is available as an optional overlay for
   chess-literate players.
 

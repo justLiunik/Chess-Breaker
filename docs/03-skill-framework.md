@@ -265,8 +265,7 @@ knight }`, `this_turn`, `once_per_turn`; targets an own piece, never the King or
 - It moves, captures and gives check as a knight during the queue. The override reverts at **R1**,
   so R3 judges mate with the piece's own moves on its new square — Gallop repositions, it does not
   mate by itself.
-- Pawns are excluded so a template's "rank 8 reachable within the turn limit" stays true, and
-  promotion is never two ranks per move.
+- Pawns are excluded so promotion is never two ranks per move.
 - **Edge cases:** a piece that ends the turn somewhere its own moves would expose the player's king
   is refused at commit (I2), as with Ascension. Combined with Twin Step, both moves of the turn are
   knight moves if the same piece makes them.

@@ -10,7 +10,8 @@ This document is the authority. If any other document disagrees with it, this on
 | Term | Definition |
 |---|---|
 | **Run** | One attempt: 3 acts × 3 stages. Ends on any stage loss. State lives in `RunState`. |
-| **Stage** | One chess encounter with a turn limit and terminal conditions. State lives in `StageState`. |
+| **Stage** | One chess encounter with a par (`mateIn`, below) and terminal conditions. State lives in `StageState`. |
+| **Par (`mateIn`)** | The stage's target "Mate in X" (X = 2–5): a mate the solver has proved reachable within X turns. Turns up to X are free; each later turn costs overtime (§7). X is hidden in the shop preview and shown once the stage starts. |
 | **Turn** | One player commit + resolution + one enemy reply. |
 | **Action** | A single entry in the player's action queue: `MOVE` or `ACTIVATE_SKILL`. |
 | **Action Queue** | The ordered list of actions committed for a turn. |
@@ -52,8 +53,9 @@ This document is the authority. If any other document disagrees with it, this on
 
 Pawns cannot be bought and never enter the deck. Each stage **spawns** pawns for the player instead:
 
-- The template sets how many (`spawnedPawns.count`) and on which ranks (`spawnedPawns.ranks`). The
-  ranks are chosen so that rank 8 is reachable within the turn limit.
+- The template sets how many (`spawnedPawns.count`) and on which ranks (`spawnedPawns.ranks`).
+  There is no turn limit, so promotion is always reachable; whether it pays before the par runs out
+  is the player's call.
 - Each spawned pawn gets a rarity rolled from the act's rarity pool
   ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)): Act I pawns are Normal or Rare.
 - Spawned pawns cost nothing: no deck slot, no durability, no summon. They are placed by the stage
@@ -186,8 +188,8 @@ Rules that apply to every ability:
 | Rule | Status | Why |
 |---|---|---|
 | Threefold repetition | Ignored | Stages are short and decisive; repetition cannot stall a decision |
-| Fifty-move rule | Ignored | Turn limits dominate |
-| Insufficient material | Ignored | The turn limit handles "no progress": a stage that cannot be mated in time is lost |
+| Fifty-move rule | Ignored | The par and overtime dominate |
+| Insufficient material | Ignored | Overtime handles "no progress": a stage that cannot be mated drains coins until the run is lost |
 | Draw by agreement | Doesn't exist | There is only win or loss |
 | Stalemate | **Loss for the player**, on either side (see §7) | The enemy is always the losing side, so a draw would be an unearned escape; mate must be exact |
 
@@ -316,8 +318,8 @@ This order is fixed and load-bearing. Changing it changes the game.
 | **R1** | Expire temporary modifiers | All modifiers with duration `this_turn` revert. A bishop-turned-queen becomes a bishop again. |
 | **R2** | Illegal end-state assertion | The post-R1 state must satisfy §9. At runtime this should never fire (commit-time validation already covered it); if it does, it is an engine bug and the turn is rolled back. |
 | **R3** | Terminal evaluation | If the enemy king is in check and the enemy has no legal move, the player **wins by checkmate**. If the enemy king is *not* in check and the enemy has no legal move, the enemy is **stalemated and the player loses**. |
-| **R4** | Stage end and economy evaluation | Stage end conditions checked (§7); turn counter advanced; coin reward computed on a win (see [05](05-run-structure-and-economy.md)). |
-| **R5** | Enemy turn | The enemy makes one move per its policy, then the turn ends: Focus and credits refill, and the player's position is checked for a legal queue (§7) before the new turn begins. |
+| **R4** | Stage end and economy evaluation | Turn counter advanced; coin reward computed on a win, with the par bonus if `turnsUsed ≤ mateIn` (see [05](05-run-structure-and-economy.md)). |
+| **R5** | Enemy turn | The enemy makes one move per its policy, then the turn ends: Focus and credits refill, the player's position is checked for a legal queue (§7), and a turn past the par is paid for (overtime, §7) before the new turn begins. |
 
 **Consequence worth calling out explicitly:** a temporarily transformed piece that delivers mate
 does **not** deliver mate, because R1 reverts it *before* R3 evaluates. Burst transformations cannot
@@ -351,15 +353,15 @@ Evaluated in this order; the first match ends the stage:
 |---|---|---|---|
 | 1 | R3 | Enemy king in check, enemy has no legal move | **WIN** — `checkmate`; stage reward ([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins)) |
 | 2 | R3 | Enemy king not in check, enemy has no legal move | **LOSS** — `enemy_stalemated` |
-| 3 | R4 | Turns remaining = 0 | **LOSS** — `out_of_turns`; the enemy does not move |
-| 4 | after R5 | Player king in check, the player has no legal queue | **LOSS** — `player_mated` |
-| 5 | after R5 | Player king not in check, the player has no legal queue | **LOSS** — `player_stalemated` |
+| 3 | after R5 | Player king in check, the player has no legal queue | **LOSS** — `player_mated` |
+| 4 | after R5 | Player king not in check, the player has no legal queue | **LOSS** — `player_stalemated` |
+| 5 | after R5 | The next turn is past the par and the pending reward plus the wallet cannot pay its overtime | **LOSS** — `out_of_coins` |
 
 Any loss ends the run. A **legal queue** is any queue that satisfies §3–§4 and the invariants of
 §9: at least one `MOVE`, every action legal and affordable, and the player's King not in check at the
 end. The deck is locked, so only moves and skills count. The player can never be mated or stalemated
 at the end of their own turn — I2 forbids ending a turn in check, and the check after R5 catches the
-rest — so priorities 4 and 5 are only ever reached through the enemy's move.
+rest — so priorities 3 to 5 are only ever reached through the enemy's move.
 
 **Stalemate is visible before commit.** The preview evaluates R3 like everything else (I10), so a
 queue that would stalemate the enemy shows **STALEMATE — YOU LOSE** and asks for confirmation. The
@@ -368,11 +370,18 @@ rule never springs on the player; it shapes what they plan.
 **Stage reward:**
 
 ```
-coins = baseReward(act, tier) + (turnLimit − turnsUsed) × coinRate(act) + salvage
+coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0) + salvage
 ```
 
-The base reward is paid in full for every cleared stage, even one cleared on its final turn; every
-unused turn adds bonus coins on top. Salvage for captured enemy pieces is paid as it happens.
+There is **no turn limit**. A mate within the par pays the base reward plus the par bonus. A mate
+after it pays what is left of the base reward. Salvage for captured enemy pieces is paid as it
+happens.
+
+**Overtime.** Turns 1 to X are free. Each later turn costs `overtimeCost(act)` coins, paid when the
+turn starts (after R5), **from the stage's pending base reward first, then from the wallet**. If the
+two together cannot pay, the run is lost (`out_of_coins`). Paying from the reward first means even
+the first stage of a run, played with an empty wallet, allows a few overtime turns. The values live
+in [`data/economy.yaml`](../data/economy.yaml) and [05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins).
 
 **What captures are for.** Capturing no longer wins anything by itself. It is worth doing for three
 reasons: it removes defenders from the mating net, it removes attackers from the player's pieces, and
@@ -381,9 +390,9 @@ capture can also *cost* the stage: taking the enemy's last mobile piece next to 
 the classic way to stalemate it.
 
 **Why checkmate only.** A fallback material win let a player trade down slowly and still clear the
-stage. Without it, every stage is a mating problem against the clock, the solver proves exactly one
-thing (a mate exists within the limit, [04 §5](04-stage-generation-and-authoring.md#5-the-solver)),
-and the turn counter is the only pressure the player has to read.
+stage. Without it, every stage is a mating problem against the par, the solver proves exactly one
+thing (a mate exists within X turns, [04 §5](04-stage-generation-and-authoring.md#5-the-solver)),
+and the par and the overtime bill are the only pressure the player has to read.
 
 **Why stalemate loses.** In chess a stalemate rescues the losing side. Here the enemy is always the
 losing side, so a draw would be a consolation the puzzle never earns — and "enemy passes", the old
@@ -404,8 +413,8 @@ one way to be checkmated, and no way to be smothered into a draw.
     seed and position.
   - `scripted` — a fixed authored line, used for teaching and boss stages.
 - **The enemy AI is our own code.** `best_move` is a small minimax in `packages/engine`, written
-  against *these* rules — multi-action player turns, rarity abilities, stalemate-as-loss, the turn
-  limit. No external chess engine plays the enemy: a standard engine would misread every one of those
+  against *these* rules — multi-action player turns, rarity abilities, stalemate-as-loss, the paid
+  overtime. No external chess engine plays the enemy: a standard engine would misread every one of those
   rules, and could not be called the hundreds of thousands of times the solver needs. Stockfish has a
   role only as an offline design tool ([09 §1](09-technical-architecture.md#1-stack)).
 - **The enemy never passes.** R5 runs only after R3, and R3 has already ended the stage if the enemy
@@ -418,8 +427,8 @@ The enemy is one pure function, `enemyMove(stage, seed, config) → { move | nul
 the solver and replay. Same position + same seed → same move, always. Every constant below lives in
 [`data/economy.yaml`](../data/economy.yaml) → `enemyAI`.
 
-**What the enemy wants.** The enemy "wins" when the player runs out of turns, is mated, or causes a
-stalemate on either side, so its job is to **defend first and punish mistakes**: survive the clock,
+**What the enemy wants.** The enemy "wins" when the player can no longer pay for a turn, is mated, or
+causes a stalemate on either side, so its job is to **defend first and punish mistakes**: survive the clock,
 keep its king safe, take the player's pieces when that is safe, mate the player's king whenever it
 can — and steer toward positions where the player's only remaining moves would stalemate it. It does
 not launch risky attacks.
@@ -433,7 +442,7 @@ not launch risky attacks.
 | One ply | One enemy move, or one player reply |
 | The player's reply | **One standard move**, including rarity movement abilities (leaps, multi-capture). The enemy does **not** imagine skills or a Legendary knight's bonus move — those stay genuine surprises, which is what makes them feel like breaking the rules |
 | Quiescence | At the horizon, keep searching **captures only**, at most 2 more plies, so the enemy never hangs a piece just past its depth |
-| The clock | The search knows how many turns the player has left. A line where the player runs out of turns is a win for the enemy |
+| The clock | Within the par, the search knows the turns left to the par, and treats reaching the par unmated as a win for the enemy (it defends the par bonus). Past the par, it knows the overtime turns the pending reward and the wallet still pay for, and a line past those is a win for the enemy. Within the par the clock never reads the wallet, so the solver's proof cannot depend on what the player spends in the shop |
 
 **Suppression (Lockdown).** A suppressed piece is frozen **at the root of the search only**: the
 enemy may not move it on this turn, but deeper plies are *later* enemy turns, on which the
@@ -450,7 +459,7 @@ so every stage stays provably clearable however the enemy misjudges the player.
 |---|---|
 | Player king mated | +100,000, minus plies to reach it (sooner is better) |
 | Either side stalemated (enemy with no move, or player with no move, neither in check) | Same as player king mated: the player has lost |
-| Player out of turns | +50,000 |
+| The player reaches the par unmated (within the par), or can no longer pay a turn (past it) | +50,000 |
 | Enemy king mated | −100,000, plus plies to reach it (an unavoidable mate is delayed as long as possible) |
 
 | Positional term | Weight |
@@ -499,7 +508,7 @@ These are the contract the engine, the generator, and the tests all share.
 
 ## 10. Worked example: deployment and the first turn
 
-Stage: Act I template, 8 turns, 9 spawn points. The deck holds a Rook and a Bishop (durability 2
+Stage: Act I template, par Mate in 4, 9 spawn points. The deck holds a Rook and a Bishop (durability 2
 each) and two Knights. Board after generation: enemy king on `g8`, enemy rook on `d5`. The enemy rook
 controls the `d`-file down to `d1`, and the fifth rank.
 
@@ -530,7 +539,7 @@ R1: no `this_turn` modifiers to expire.
 R2: end-state legality assertion passes.
 R3: the enemy king on `g8` is not in check. It is not stalemated either: `f8` is free, and the enemy
 rook has moves. Play continues.
-R4: turn 1 of 8 used — play continues.
+R4: turn 1 used, three free turns left to the par — play continues.
 R5: the enemy replies; `best_move` sees that `g8xh7` walks into the bishop and keeps its king on the
 `f8` side.
 

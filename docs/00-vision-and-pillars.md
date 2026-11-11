@@ -3,9 +3,9 @@
 ## Elevator pitch
 
 > Checkbreaker is a run-based chess-puzzle roguelike. Each stage is a tight, sparse-board mating
-> problem on a strict turn limit. Your army is a deck: before the first move you read the board and
-> choose which pieces to bring — each one spends durability, and any of them can die permanently. Every checkmate pays coins, and every turn you
-> save pays more; coins buy new pieces and the skills that let you break chess. You have 9 stages to
+> problem with a par: "Mate in X". Your army is a deck: before the first move you read the board and
+> choose which pieces to bring — each one spends durability, and any of them can die permanently. Every checkmate pays coins, a mate within the par pays a
+> bonus, and every turn past it costs coins; coins buy new pieces and the skills that let you break chess. You have 9 stages to
 > prove you can mate faster than you lose your army.
 
 ## The one-sentence design thesis
@@ -44,7 +44,7 @@ requires reading algebraic notation. Hints describe intent, not coordinates.
 ## Four pillars
 
 ### 1. A stage is the puzzle; a run is the deck
-Puzzle craft lives at stage scale — few pieces, tight turn limit, one best line. Depth lives at run
+Puzzle craft lives at stage scale — few pieces, a tight par, one best line. Depth lives at run
 scale: what you brought, what you can afford to spend, what you can survive losing. Mechanics that
 only serve one scale get cut.
 

@@ -3,9 +3,9 @@
 **A chess-puzzle roguelike where you break one rule at a time.**
 
 Checkbreaker is a single-player, run-based puzzle game built on real chess. Each stage hands you
-a sparse board, a strict turn limit, and a deck to choose your army from before the first move. The
+a sparse board, a par ("Mate in X"), and a deck to choose your army from before the first move. The
 only way to win is to checkmate the enemy king (a stalemate on either side loses). Every mate pays a
-base reward, every turn you save adds bonus coins, and every piece you lose is gone forever. Skills let you violate chess: move twice in one
+base reward, a mate within the par adds a bonus, every turn past it costs coins, and every piece you lose is gone forever. Skills let you violate chess: move twice in one
 turn, turn a bishop into a queen, freeze an enemy piece. They are scarce and they cost Focus.
 
 > **A stage is the puzzle. A run is the deck.**
@@ -41,9 +41,9 @@ Schemas, tuning data, and example content. There is no engine or UI code yet; se
 
 | System | What it is | Clock |
 |---|---|---|
-| **Turn limit** | Per-stage countdown; running out is a loss | Short |
+| **Par** | Per-stage "Mate in X": free turns up to X, overtime coins after; unable to pay is a loss | Short |
 | **Durability** | Per-piece charges spent when summoning into a stage | Long |
-| **Coins** | Base reward per mate, plus leftover turns converted to currency | Run |
+| **Coins** | Base reward per mate, plus a par bonus for a mate within the par; overtime is paid in coins | Run |
 | **Deck capacity** | Fixed cap of 8 pieces; grow by quality (tiers, merges), not by size | Run |
 
 ## Repository layout
@@ -71,7 +71,7 @@ each failure with its JSON pointer path.
 
 | Term | Meaning |
 |---|---|
-| **Stage** | One chess encounter with a turn limit. The unit of puzzle. |
+| **Stage** | One chess encounter with a par ("Mate in X"). The unit of puzzle. |
 | **Run** | One attempt at the game: 3 acts × 3 stages. Ends on loss. |
 | **Action Queue** | The ordered list of actions you commit to in a turn. |
 | **Focus** | Per-turn resource that pays for skills only. |
@@ -82,7 +82,9 @@ each failure with its JSON pointer path.
 | **Stalemate** | A side not in check with no legal move. Either side's stalemate is a loss for the player. |
 | **Durability** | A piece instance's remaining deployments: stages it can still be summoned into. 2 for every deck piece (Legendary queen 1). Zero destroys it. |
 | **Salvage** | Coins earned for capturing an enemy piece. |
-| **Base reward** | Coins paid for every cleared stage; unused turns add bonus coins on top. |
+| **Base reward** | Coins paid for every cleared stage, less the overtime it covered. |
+| **Par (`mateIn`)** | The stage's "Mate in X" target (2–5), proven reachable by the solver. Hidden in the shop preview, shown once the stage starts. A mate within it pays the par bonus. |
+| **Overtime** | The coin cost of each turn past the par: paid from the stage's base reward first, then the wallet. Unable to pay → the run is lost. |
 | **Merge** | Combining 3 pieces of the same type and tier into 1 piece of the next tier, at full durability. |
 | **Hero Piece** | A piece you own, held in your deck. Can be any rarity. Never a pawn. |
 | **Stage Piece** | A piece the stage places itself: the enemy army (always Normal rarity) and your spawned pawns. |

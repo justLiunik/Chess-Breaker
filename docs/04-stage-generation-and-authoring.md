@@ -14,14 +14,16 @@ deck, so a single stored line cannot exist.
 
 The replacement has one elegant property that makes it *more* correct than authored solutions:
 
-> **Stage generation runs after the shop, seeded with the player's actual deck.**
+> **Stage generation runs as soon as the previous stage is cleared, seeded with the player's actual deck.**
+
+The shop then shows the generated board as a preview, without its par ([07 §1](07-shop-phase.md#1-entry-exit-and-flow)).
 
 Every stage is therefore validated as solvable **with the army the player actually owns** — including
 a deck the designer never anticipated. There is no such thing as an unwinable stage caused by a
 bad shop, and no need for the designer to enumerate deck states.
 
 **Puzzle quality is preserved by templates, not by randomness.** A template is a designed encounter:
-it fixes the enemy composition, turn limit, board sparsity, and spawned pawns. Only the *exact
+it fixes the enemy composition, the par range, board sparsity, and spawned pawns. Only the *exact
 placement* and *which of the player's pieces appear* are randomized. The puzzle's shape is authored;
 its instance is generated.
 
@@ -32,7 +34,7 @@ id: tpl-act1-open-field
 title: Open Field
 act: 1
 tier: normal          # normal | boss
-turnLimit: 8
+mateIn: [4, 5]        # the par "Mate in X": the generator picks X in this range; there is no turn limit
 # spawnPoints: 6     # optional: lowers the act's budget (data/economy.yaml), never raises it
 
 enemyArmy:            # ranges are inclusive [min, max]
@@ -44,7 +46,7 @@ enemyZone: [7, 8]     # enemy occupies these ranks; ranks 5-8 only (Black side)
 
 spawnedPawns:         # free, stage-only pawns for the player (docs/02 §2.1)
   count: [2, 2]
-  ranks: [3, 4]       # rank 8 must be reachable within turnLimit
+  ranks: [3, 4]
 
 focusPool: 3          # no deploymentRanks: the player always deploys on ranks 1-4
 
@@ -66,8 +68,8 @@ specify **rarity**: enemy pieces are locked to Normal, and spawned pawns roll th
 rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity)).
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
-further away makes it a costly detour from the coin preview. The validator rejects a template whose
-lowest spawn rank cannot reach rank 8 within `turnLimit`, or whose spawn ranks overlap `enemyZone`.
+further away makes it a costly detour from the par. With no turn limit, rank 8 is always reachable;
+the validator rejects a template whose spawn ranks overlap `enemyZone`.
 Spawn ranks may lie inside the deployment ranks (3 and 4 usually do): a spawned pawn simply takes a
 square the player could otherwise deploy on, and `deployment_squares_available` counts it.
 
@@ -104,7 +106,7 @@ Generation runs once per stage, after the shop resolves. It is deterministic for
 | **G4b** | Spawn pawns: roll the count from `spawnedPawns.count`; for each pawn roll a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)); place on random empty squares in `spawnedPawns.ranks` | Retry placement → regenerate |
 | **G5** | Compute the enemy army value; verify it is inside the act band (§6) | Regenerate |
 | **G6** | Assert preconditions (§4) | Regenerate |
-| **G7** | **Solver check** (§5): a checkmate exists within the turn limit, using the current board + remaining deck | Regenerate |
+| **G7** | **Solver check** (§5): a checkmate exists within the par (X turns, the `mateIn` the generator picked), using the current board + remaining deck | Regenerate |
 | **G8** | Emit `StageState` with provenance `{templateId, seed, attempts}` | — |
 
 Regeneration cap: `maxRegenerations` (20). On exhaustion, fall through to the next-best template for
@@ -138,8 +140,8 @@ show it happening, the check widens to triples (tracked in [10](10-roadmap-and-m
 
 ## 5. The solver
 
-The solver answers exactly one question: **"can this stage be won within the turn limit, with this
-deck and this loadout?"** It does not need to find the *best* line, only a winning one — which keeps
+The solver answers exactly one question: **"can this stage be won within the par (X turns), with
+this deck and this loadout?"** It does not need to find the *best* line, only a winning one — which keeps
 it tractable.
 
 "This deck" includes each Hero Piece's rarity, because rarity changes movement: the solver generates
@@ -176,7 +178,7 @@ generation, the solver sees exactly what the player sees.
   branching, and a Legendary knight roughly squares its own; these are the first places to look if
   solver budgets are exceeded.
 - **Losing leaves are pruned at once.** A queue that stalemates the enemy, a reply that leaves the
-  player with no legal queue, and a position with no turns left are all losses
+  player with no legal queue, and a position past the par are all failures
   ([02 §7](02-rules-framework.md#7-stage-end-evaluation)); the solver never expands them.
 - **Enemy replies are not branched.** The enemy is a deterministic function
   (`enemyMove`, [02 §8.1](02-rules-framework.md#81-enemy-ai)), so after each candidate queue the solver
@@ -200,7 +202,7 @@ generation, the solver sees exactly what the player sees.
 ### Cost control
 
 The solver is affordable **only** because templates are narrow. With ~8–10 pieces on the board,
-~3 skills, and an 8-turn limit, the branching factor per ply stays in the low hundreds in practice;
+~3 skills, and a par of at most 5 turns, the branching factor per ply stays in the low hundreds in practice;
 the mate-first ordering typically resolves Act I stages in well under 10k nodes. The deployment ply
 multiplies everything below it, so its candidate set is the first knob to turn: fewer candidate
 squares per piece, or only the strongest few subsets.
@@ -210,28 +212,30 @@ Mitigations if real numbers exceed budget (tracked in [10](10-roadmap-and-milest
    starting decks.
 2. Precompute: validate a template family offline against a set of representative deck archetypes,
    then verify only the deck-specific deployment online.
-3. Loosen: reduce Act I turn limits, which shrinks the search depth.
+3. Loosen: shorten the Act I par range, which shrinks the search depth.
 
 ## 6. Difficulty curve
 
-| Act | Turn limit | Enemy army value | Spawn points | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
+| Act | Par (`mateIn`) | Enemy army value | Spawn points | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
 |---|---|---|---|---|---|---|
-| **I** | 8 | 7–9 | 9 | 2 (3–4) | Normal–Rare | 2 |
-| **II** | 6 | 10–14 | 12 | 1–2 (3–4) | up to Unique | 3 |
-| **III** | 5 | 14–22 | 15 | 1–2 (3–5) | up to Legendary | 3 |
-| **Boss** | limit − 1 | its act's band ×1.25 | its act's + 3 (12 / 15 / 18) | 1–2, ranks still reachable in the tighter limit | as its act | 4 or `scripted` |
+| **I** | 4–5 | 7–9 | 9 | 2 (3–4) | Normal–Rare | 2 |
+| **II** | 3–4 | 10–14 | 12 | 1–2 (3–4) | up to Unique | 3 |
+| **III** | 2–3 | 14–22 | 15 | 1–2 (3–5) | up to Legendary | 3 |
+| **Boss** | its act's shorter end (4 / 3 / 2) | its act's band ×1.25 | its act's + 3 (12 / 15 / 18) | 1–2 | as its act | 4 or `scripted` |
 
 A normal stage's spawn points are three times the number of minors it can field (3 / 4 / 5 by act);
 a boss affords one more. The player's summoned value therefore tracks the enemy army value band, with
 the spawned pawns, the first move and the skills as the player's edge.
 
-Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only that
-rank 8 must be reachable within the turn limit from every spawn rank (§2). Rarity comes from the act's
+The par ranges are starting values, tuned at the end of M3 once `gen:report` measures the real
+solver. Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only
+that spawn ranks stay out of `enemyZone` (§2). Rarity comes from the act's
 pool ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
 
 Three independent difficulty dials, applied in this order:
 
-1. **Turn limit** — the harshest dial; it removes slack rather than adding difficulty.
+1. **Par** — the harshest dial; it removes slack rather than adding difficulty, and missing it costs
+   the par bonus and then overtime.
 2. **Enemy army** — scales the material problem and the amount of capture risk.
 3. **Policy depth** — makes the enemy punish loose play.
 
@@ -250,18 +254,19 @@ Act I should be cleared on a first run by a player who understands the rules; Ac
 ## 8. Authoring workflow (for template designers)
 
 1. **Pick the lesson.** What should this template teach or test? (e.g., "don't leave the rook
-   hanging while chasing the turn counter.")
+   hanging while chasing the par.")
 2. **Draft the template** in `content/templates/`. Keep it ~15 lines.
 3. **Run the validator** (M3) which generates 200 seeded instances and reports:
-   solver success rate, distribution of turns-to-win, and the failure-reason histogram.
-4. **Tune** the four numbers that matter: `turnLimit`, `enemyArmy`, `spawnPoints`, and
+   solver success rate within the par, distribution of turns-to-win, and the failure-reason histogram.
+4. **Tune** the four numbers that matter: `mateIn`, `enemyArmy`, `spawnPoints`, and
    `spawnedPawns`.
 5. **Acceptance for a template:** ≥95% of generated instances solvable (a mate exists within the
-   limit), and median mating turn around 60% of the turn limit.
+   par), and the solver's median mating turn close to X: mates that all come well before X mean the
+   par is too loose.
 
 Checkmate is the only win, so the **median mating turn** is the single best health metric for a
-template: one whose mates cluster on the final turn is too tight (and pays only the base reward);
-one that always mates in 2 is too loose.
+template: one whose mates all need exactly X turns is tight (a player who misses the solver's line
+pays overtime); one that always mates in 2 against a par of 5 is too loose.
 
 ## 9. Test plan for generation (M3 acceptance)
 
@@ -273,7 +278,7 @@ one that always mates in 2 is too loose.
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
 | Deployment availability | 100% of stages have at least `floor(spawnPoints / 3) + 1` free squares on ranks 1–4, and no enemy piece on ranks 1–4 |
 | Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
-| Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks, with promotion reachable in the turn limit |
+| Spawned pawns | 100% of stages spawn a count within the template range, on spawn ranks outside `enemyZone` |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |
-| Difficulty banding | Median solver win turn within ±20% of the template's target band |
+| Difficulty banding | Median solver mating turn within one turn of the stage's par |

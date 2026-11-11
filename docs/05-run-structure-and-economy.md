@@ -31,37 +31,43 @@ The last stage of the run is followed by a results screen, not a shop.
 ## 2. Income: stage reward + turns → coins
 
 Checkmate is the only way to clear a stage ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
-Every cleared stage pays its **base reward in full**, plus **bonus coins** for every unused turn,
-plus **salvage** for captures.
+Every stage has a **par**, "Mate in X" (X = 2–5), that the solver has proved reachable
+([04 §5](04-stage-generation-and-authoring.md#5-the-solver)). There is **no turn limit**: turns 1 to
+X are free, and every later turn costs **overtime**. A cleared stage pays its **base reward**, less
+any overtime it covered, plus a **par bonus** for a mate within X, plus **salvage** for captures.
 
 ```
-coins = baseReward(act, tier) + (turnLimit − turnsUsed) × coinRate(act) + salvage
+coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0) + salvage
 ```
 
-| Act | Base reward (normal) | Base reward (boss, ×1.5) | `coinRate` per unused turn |
+| Act | Base reward (normal / boss ×1.5) | Par bonus (normal / boss ×1.5) | `overtimeCost` per turn past the par |
 |---|---|---|---|
-| I | 4 | 6 | 2 |
-| II | 6 | 9 | 3 |
-| III | 8 | 12 | 4 |
+| I | 4 / 6 | 6 / 9 | 2 |
+| II | 6 / 9 | 9 / 14 | 3 |
+| III | 8 / 12 | 12 / 18 | 4 |
 
-### Reward table — Act I normal stage, turn limit 8
+Boss amounts are rounded to the nearest coin.
 
-| Cleared on turn | Turns remaining | Base | Turn bonus | Total (before salvage) |
-|---|---|---|---|---|
-| 2 | 6 | 4 | 12 | 16 |
-| 3 | 5 | 4 | 10 | 14 |
-| 4 | 4 | 4 | 8 | 12 |
-| 5 | 3 | 4 | 6 | 10 |
-| 6 | 2 | 4 | 4 | 8 |
-| 7 | 1 | 4 | 2 | 6 |
-| 8 | 0 | 4 | **0** | **4** |
+**Overtime** is paid when a turn past the par starts: **from the stage's pending base reward first,
+then from the wallet**. If the two together cannot pay, the run is lost (`out_of_coins`,
+[02 §7](02-rules-framework.md#7-stage-end-evaluation)). Drawing on the reward first means the first
+stage of a run, played with an empty wallet, still allows a few overtime turns.
 
-Winning on the final turn still pays the base reward — clearing the stage is always worth something —
-but nothing more. That must be legible on the HUD: the coin preview reads **"+4 ◈ FINAL TURN"**,
-so the player sees that every turn they saved would have been worth extra.
+### Reward table — Act I normal stage, par Mate in 5
 
-The base reward is the floor; the turn bonus is the incentive. Speed is still the main lever: in Act
-I, a turn-4 clear pays three times a turn-8 clear.
+| Mated on turn | Overtime paid (reward / wallet) | Base left | Par bonus | Stage pays (before salvage) | Wallet |
+|---|---|---|---|---|---|
+| 2–5 | — | 4 | 6 | **10** | ±0 |
+| 6 | 2 / 0 | 2 | 0 | 2 | ±0 |
+| 7 | 4 / 0 | 0 | 0 | 0 | ±0 |
+| 8 | 4 / 2 | 0 | 0 | 0 | −2 |
+| 9 | 4 / 4 | 0 | 0 | 0 | −4 |
+
+The par is the incentive and the overtime is the clock. A mate within the par pays two and a half
+times the base reward; past it, the stage first eats its own reward and then the run's savings, and a
+player who cannot pay loses the run. **The par is hidden in the shop preview** — the player plans
+the deployment from the board alone — and **shown on the HUD once the stage starts**, with the
+overtime bill counting up after it ([08](08-progression-and-ux.md)).
 
 ### Salvage
 
@@ -141,43 +147,47 @@ it back would print coins — the validator enforces this.
 
 ### Income vs. expenditure sanity check
 
-An Act I stage cleared on turn 4 pays 12 coins. A Normal knight costs 8 and a Rare knight 12. So
-**one well-played stage ≈ one meaningful piece** — the run's core pacing unit. Stages cleared late
-pay 4–8 coins, which buys a repair, a Normal piece, or a banked surplus.
+An Act I stage mated within the par pays 10 coins. A Normal knight costs 8 and a Rare knight 12. So
+**one well-played stage ≈ one meaningful piece** — the run's core pacing unit. A stage mated past
+the par pays at most 2, and can cost savings, which buys nothing.
 
 There is no capacity to buy: the deck is fixed at 8 pieces ([06 §2](06-deck-durability-and-permadeath.md#2-deck-capacity)),
 so coins go into pieces, skills, repairs and rerolls only; selling a piece is the only way back from
 pieces to coins, at half price. Merging three identical pieces into one
 of the next tier is free ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)) — it costs pieces,
-not coins. If a player is clearing most stages on their last turn, they are on an
+not coins. If a player is clearing most stages past the par, they are on an
 economic treadmill and will visibly fall behind in Act II. That is the intended failure mode: the
 game tells you that you are losing before it kills you.
 
 ## 4. Illustrative run
 
-Assumptions: no losses, one salvage per stage on average, no promotions. Coins earned are
-base + turn bonus + salvage. Prices shown at that act's inflation and the item's rarity.
+Assumptions: no losses, one salvage per stage on average, no promotions. Coins earned are base (less
+overtime) + par bonus + salvage. Prices shown at that act's inflation and the item's rarity.
 
-| Stage | Limit | Cleared on | Coins earned | Balance | Purchase / merge | Balance after | Deck |
+| Stage | Par | Mated on | Coins earned | Balance | Purchase / merge | Balance after | Deck |
 |---|---|---|---|---|---|---|---|
-| I-1 | 8 | 4 | 4 + 8 + 1 = 13 | 13 | Knight (8), then merge 3 Knights → Rare Knight | 5 | 3/8 |
-| I-2 | 8 | 4 | 4 + 8 + 1 = 13 | 18 | Rook (10) | 8 | 4/8 |
-| I-3 ★ | 7 | 4 | 6 + 6 + 1 = 13 | 21 | Reroll (free) + Repair (4) + Bishop (8), then merge 3 Bishops → Rare Bishop | 9 | 3/8 |
-| II-1 | 6 | 3 | 6 + 9 + 1 = 16 | 25 | Skill: Twin Step (10) | 15 | 3/8 |
-| II-2 | 6 | 3 | 6 + 9 + 1 = 16 | 31 | Rare Rook (18) | 13 | 4/8 |
-| II-3 ★ | 5 | 3 | 9 + 6 + 1 = 16 | 29 | Rare Knight (14) | 15 | 5/8 |
-| III-1 | 5 | 3 | 8 + 8 + 1 = 17 | 32 | Repair ×2 (8) | 24 | 5/8 |
-| III-2 | 5 | 2 | 8 + 12 + 1 = 21 | 45 | Rare Queen (35) | 10 | 6/8 |
-| III-3 ★ | 4 | — | — | — | — | — | — |
+| I-1 | 5 | 4 | 4 + 6 + 1 = 11 | 11 | Knight (8), then merge 3 Knights → Rare Knight | 3 | 3/8 |
+| I-2 | 5 | 5 | 4 + 6 + 1 = 11 | 14 | Rook (10) | 4 | 4/8 |
+| I-3 ★ | 4 | 4 | 6 + 9 + 1 = 16 | 20 | Reroll (free) + Repair (4) + Bishop (8), then merge 3 Bishops → Rare Bishop | 8 | 3/8 |
+| II-1 | 4 | 3 | 6 + 9 + 1 = 16 | 24 | Skill: Twin Step (10) | 14 | 3/8 |
+| II-2 | 3 | 4 | (6 − 3) + 0 + 1 = 4 | 18 | Rare Rook (18) | 0 | 4/8 |
+| II-3 ★ | 3 | 3 | 9 + 14 + 1 = 24 | 24 | Rare Knight (14) | 10 | 5/8 |
+| III-1 | 3 | 3 | 8 + 12 + 1 = 21 | 31 | Repair ×2 (8) | 23 | 5/8 |
+| III-2 | 2 | 2 | 8 + 12 + 1 = 21 | 44 | Rare Queen (35) | 9 | 6/8 |
+| III-3 ★ | 2 | — | — | — | — | — | — |
+
+II-2 shows a missed par: one overtime turn eats 3 of the 6 base coins and the par bonus is lost, so
+the stage pays 4 instead of 16 and the Rare Rook empties the wallet.
 
 Read the shape: the player oscillates between rich (can buy power) and broke (must survive on what
 they have), and merges trade deck width for tier — the deck shrinks to 3 twice in Act I to buy two
 Rare pieces early. That oscillation is the desired texture. A run should never let a player feel
 permanently comfortable.
 
-Compared with the earlier turn-bonus-only economy, the base reward raises income by roughly 40%, and
-the 12–14-coin deck-slot sink is gone. Prices have not been re-tuned for that yet; it is the first
-item for the M6 balance pass.
+The par economy (2026-11-11) replaced the leftover-turn bonus. A run that hits every par earns
+about what the old economy paid for a turn-4 clear, but a missed par now costs more than it used to:
+the bonus is gone and overtime eats the base reward. Prices have not been re-tuned for that yet; it is
+the first item for the M6 balance pass.
 
 ## 5. Failure-spiral guardrails
 
@@ -186,17 +196,24 @@ levers, in order of precedence:
 
 | # | Lever | Rule | Rationale |
 |---|---|---|---|
-| 1 | **Base reward** | Every cleared stage pays its base reward, even on the final turn | A slow clear is never worthless |
+| 1 | **Base reward** | Overtime is paid from the stage's base reward before the wallet | A slow clear spends its own prize before the run's savings |
 | 2 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
 | 3 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
 | 4 | **Recovery offer** | If pieces were lost in the stage just cleared and the non-king deck is now < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage — not a reward for merging down |
 | 5 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
-| 6 | **Turn limits** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
+| 6 | **Par** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
 | 7 | **Summon choice** | Pieces left in the deck at Deployment spend no durability and cannot be captured ([02 §5](02-rules-framework.md#5-deployment)) | A fragile deck can be protected by bringing less, at the price of a slower mate |
 
 **Explicit non-lever:** the game will **not** quietly raise income when the player is losing, and
 will **not** scale the enemy to the deck. Hidden assistance would destroy the "fair and provable"
 pillar. A lost run must be *diagnosable* from the numbers on screen.
+
+**The one documented exception — the unproven-stage pawn.** When the generator cannot prove a stage
+within its par (three boards, [04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)), it
+adds one spawned pawn to the first board. Weak decks fail the proof more often, so this pawn reaches
+them more often. It stays inside the pillar because the rule is public (the Codex states it, [08 §7](08-progression-and-ux.md#7-hints-and-chess-literacy)) and
+the pawn is on the board like any other: nothing about the run is hidden except *which* stage got it.
+The shop preview carries no label ([07 §1](07-shop-phase.md#1-entry-exit-and-flow)).
 
 ## 6. What "rich" and "poor" mean
 
@@ -217,7 +234,8 @@ lose. They are only forced to play well.
 |---|---|---|
 | `baseReward.{act}` | 4/6/8 | Makes every clear worth more, regardless of speed |
 | `baseReward.bossMultiplier` | 1.5 | Makes bosses pay more |
-| `coinRate.{act}` | 2/3/4 | Makes speed pay more |
+| `parBonus.{act}` | 6/9/12 | Makes a mate within the par pay more |
+| `overtimeCost.{act}` | 2/3/4 | Makes every turn past the par cost more; raises the risk of `out_of_coins` |
 | `salvage.divisor` | 3 | Makes contact play more profitable |
 | `priceInflationPerAct` | 0.20 | Tightens Act II–III economy |
 | `starterCoins` | 0 | Front-loads build choices before stage 1 |
@@ -231,6 +249,7 @@ lose. They are only forced to play well.
 | `services.sell.priceFactor` | 0.5 | Makes selling pay more; must stay ≤ `shop.recoveryDiscount` |
 | `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |
 
-**Tuning order:** `baseReward` and `coinRate` first (together they set income; `coinRate` alone sets
-the reward for speed), then `priceInflationPerAct`, then prices. Never tune `turnLimit` and `coinRate` in the same pass — you will not be able to attribute
-the change.
+**Tuning order:** `baseReward` and `parBonus` first (together they set income; `parBonus` alone sets
+the reward for speed), then `overtimeCost`, then `priceInflationPerAct`, then prices. Never tune a
+template's `mateIn` range and `parBonus` in the same pass — you will not be able to attribute the
+change.

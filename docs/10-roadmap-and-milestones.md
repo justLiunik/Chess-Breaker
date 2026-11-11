@@ -24,7 +24,8 @@ repository scaffolding.
 - [x] Rarity rules for pawns (stage-only, promotion), knights, bishops, rooks and queens are specified (`docs/02 §2.1–2.3`),
       with abilities as data in `pieces.yaml` and prices in `economy.yaml`; rook and queen abilities
       follow-up questions are logged as decision O in `docs/11`.
-- [x] Checkmate is the only win; stage reward = base reward + unused-turn bonus + salvage; the deck is
+- [x] Checkmate is the only win; stage reward = base reward + unused-turn bonus + salvage (replaced
+      in M3 by the par economy: base reward less overtime + par bonus + salvage); the deck is
       fixed at 8; merging (3 → 1, next tier) is specified (`docs/02 §7`, `docs/05 §2`, `docs/06 §4.5`).
 
 **Explicitly not delivered:** engine code, UI code, the full skill list.
@@ -120,31 +121,53 @@ must be resisted — that would silently delete the game's core mechanic.
 
 ## M3 — Stage Generation & Solver
 
-**Delivers:** `packages/gen` — templates, generation pipeline G0–G8, bounded solver, template health
-report.
+**Delivers:** `packages/gen` — templates, formations from Lichess puzzle data, the generation
+pipeline, a two-stage beam solver, and the template health report; the par economy in the engine.
+Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.md).
 
 **Scope**
-- 6+ templates (≥2 per act, ≥1 boss per act).
-- Precondition suite + regeneration with fail-loud path.
-- Solver with node/time budgets and mate-first ordering.
-- `npm run gen:report` producing solvability rate (mate within the limit) and median mating turn.
+- 6+ templates (≥2 per act, ≥1 boss per act); each takes a `mateIn` range instead of `turnLimit`.
+- Formations: Black's side of Lichess puzzle positions (CC0), filtered per template offline, 50 per
+  template to start; random placement as the fallback.
+- The next stage is generated as soon as a stage is cleared, from the deck after the stage-end
+  chooser; up to three boards are tried, and an unproven stage gets one extra spawned pawn (the
+  documented exception of [05 §5](05-run-structure-and-economy.md#5-failure-spiral-guardrails)).
+- Precondition suite + regeneration with a fail-loud path for content errors only.
+- Solver: two-stage beam search (deployment screening, then deep search) with **node** budgets, no
+  wall-clock budget, so generation depends only on the seed and the deck.
+- `npm run gen:report` producing solvability rate (mate within the par) and median mating turn.
+- **Par economy** (decided 2026-11-11, docs/02 §7, docs/05 §2): `mateIn` and `overtimePaid` on
+  `StageState` replace `turnLimit`; overtime is charged after R5 from the pending base reward, then
+  the wallet; `out_of_coins` replaces `out_of_turns`; `Award.parBonus` replaces `turnBonus`; the
+  enemy's clock is the turns left to the par, then the overtime turns the player can afford.
+  `economy.yaml` gains `parBonus` and `overtimeCost` and drops `coinRate`; schemas and the
+  validator follow. Data, schemas and engine change together in M3, because the current engine and
+  its tests read `turnLimit` and `coinRate`.
 
 **Acceptance criteria**
-- [ ] 10,000 generated stages: ≥95% solvable, 100% pass the enemy-king, safe-King-square,
-      enemy-has-moves, enemy-value and deployment preconditions ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
-- [ ] Same seed twice → byte-identical `StageState`.
-- [ ] Median accepted stage generated in < 250 ms on a laptop.
-- [ ] Every template reports a median mating turn within ±20% of its band.
-- [ ] Exhausted-regeneration path terminates and falls through to another template.
+- [ ] 10,000 generated stages (`gen:report`): ≥95% proven mateable within the par, 100% pass the
+      enemy-king, safe-King-square, enemy-has-moves, enemy-value and deployment preconditions
+      ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
+- [ ] Same seed and deck twice → byte-identical `StageState`.
+- [ ] Generation (solver included) takes a median ≤ 3 s and a p95 ≤ 15 s on a laptop; it runs in the
+      background over the results screen and the shop.
+- [ ] Every template reports a median solver mating turn within one turn of its par.
+- [ ] A turn past the par charges `overtimeCost` from the pending reward, then the wallet; a turn
+      neither can pay ends the run with `out_of_coins`; a mate within the par pays `parBonus`.
+- [ ] Three unproven boards always end in a stage (first board + one spawned pawn); `validationFailed`
+      is emitted only when 20 boards fail the preconditions in every template.
 - [ ] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
       results never exceed the act ceiling (I14).
 - [ ] Solver models rarity abilities and promotion; measured node counts reported per tier mix.
 - [ ] Solver searches the deployment ply (bounded candidates, sound but incomplete) and prunes
       stalemate leaves; node counts reported separately for the deployment ply.
+- [ ] Every solver line is replayed through `startStage` and `commitQueue` before a stage counts as
+      proven.
 
-**Risks:** solver cost. Mitigations staged in
-[04 §5](04-stage-generation-and-authoring.md#5-the-solver) (cache → offline archetypes → tighter
-limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add the cached table.
+**Risks:** solver cost, above all the deployment ply (the 2026-11-10 spike solved Act II–III in
+0.2–7 s but needed 200 deployment candidates and 13 s for a hard Act I board), and a thin formation
+pool for narrow enemy zones. Mitigations: tune the candidate and beam parameters with
+`gen:report`; widen `enemyZone` or the par range; if CI time exceeds 10 minutes, cut the CI sample.
 
 ---
 
@@ -154,7 +177,7 @@ limits). If CI generation time exceeds 10 minutes, cut to 2,000 stages and add t
 
 **Scope**
 - Run advancement across 9 stages, boss flagging, no shop after the final stage.
-- Stage reward math (base reward + unused-turn bonus) and salvage on capture.
+- Stage reward math (base reward less overtime + par bonus) and salvage on capture.
 - Shop stock generation with recovery offer (no pawns are sold).
 - Rarity roll on random piece offers from the act-gated pool and rarity pricing (`docs/07 §2.1–2.2`).
 - Stage-end over-capacity chooser after a promotion (merge, sell or cut), before the shop opens.
@@ -197,7 +220,7 @@ One complete run playable start to finish in a browser.
 **Scope**
 - Board rendering with ghost preview and step-through.
 - Queue builder with reorder, inline affordability, named commit errors.
-- HUD: turns, live coin preview (base + turn bonus), focus, credits, salvage.
+- HUD: the par (`MATE IN X`) and the overtime bill, live coin preview (base + par bonus), focus, credits, salvage.
 - Deployment-phase screen: deck tray with durability pips, summon counter, capture telegraphing,
   START with its durability summary.
 - `STALEMATE — YOU LOSE` preview warning with confirm.
@@ -268,7 +291,7 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Legendary knight is the strongest piece per spawn point (two moves a turn for 3 points) | Medium | Medium | Kept at 3 by decision; measure its solver win rate next to the Legendary bishop's (5) and raise it only on evidence | M3, M6 |
 | Legendary-heavy boards slow the enemy search: up to ~160 ms at depth 4 in Node, over the 50 ms target (tree growth up to ~4.6× nodes; per-node cost 1.3–1.9×) | Medium | Medium | Decided (2026-11-10): the search depth is capped at 3 while any player piece is Rare or higher (`enemyAI.search.maxDepthWithRarity`, docs/02 §8.1); measured ≤ 40 ms on every rarity bench board. The enemy plays a little weaker against rarity decks. Optimising the tiered search (incremental ability-aware check for Black's line moves, no full ability check in move ordering, the ability table cached in the search context) can lift the cap later | M3, M5 |
 | Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
-| Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune turn limits and enemy bands first in M6 | M3, M6 |
+| Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune par ranges and enemy bands first in M6 | M3, M6 |
 | Base reward + no capacity sink inflates coins | Medium | Medium | Headless-bot tuning of `baseReward` before prices; merges as the main deck-growth path | M4, M6 |
 | Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
 | Deployment ply blows up the solver | Medium | High | Bounded candidate subsets and squares, sound-but-incomplete search, regeneration on miss; measure first | M3 |

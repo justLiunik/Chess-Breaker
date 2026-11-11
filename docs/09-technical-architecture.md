@@ -45,7 +45,7 @@ Rules for using it:
   from a dev script or by hand. `packages/engine`, `packages/gen` and `apps/web` must not depend on
   it, and it is not vendored into the repository.
 - **Advisory only.** Stockfish plays standard chess: one move per side, no rarity abilities, no
-  multi-action turns, no turn limit. Its verdict is a hint; the M3 solver, which uses the game's own
+  multi-action turns, no par or overtime. Its verdict is a hint; the M3 solver, which uses the game's own
   rules, is the only authority on whether a stage is solvable.
 - **Scripted lines are re-checked.** A line drafted with Stockfish must replay legally in our engine
   before it goes into a template.
@@ -146,7 +146,8 @@ interface StageState {
   phase: 'deployment' | 'action';  // deployment: only Stage Pieces on the board; action: deck locked
   board: Record<Square, BoardPiece | undefined>;
   turnsUsed: number;
-  turnLimit: number;
+  mateIn: number;                 // the par "Mate in X" (2–5); no turn limit: turns past it cost overtime (docs/02 §7)
+  overtimePaid: number;           // overtime paid so far this stage, from the pending reward and the wallet together
   focus: number;
   focusPool: number;
   moveCredits: number;             // reset to freeMovesPerTurn each turn
@@ -155,7 +156,7 @@ interface StageState {
   skillLog: { skillId: string; turn: number; targetId?: string }[];   // every accepted ACTIVATE_SKILL: once_per_turn and already_targeted read it
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
-  endReason?: 'checkmate' | 'enemy_stalemated' | 'out_of_turns' | 'player_mated' | 'player_stalemated';
+  endReason?: 'checkmate' | 'enemy_stalemated' | 'out_of_coins' | 'player_mated' | 'player_stalemated';
 }
 ```
 
@@ -189,7 +190,7 @@ commitQueue(
   CommitError
 >
 
-type Award = { coins: number; base: number; turnBonus: number };   // null unless the stage was won
+type Award = { coins: number; base: number; parBonus: number };   // null unless the stage was won; base is net of overtime
 ```
 
 Every engine function takes `config: EngineConfig` (from `loadEngineConfig()`) as its last argument;

@@ -8,9 +8,9 @@ possibility, and it is the only screen where the player holds full information a
 ## 1. Entry, exit, and flow
 
 ```
-stage cleared (win)  ──►  SHOP  ──►  stage generated  ──►  stage
-                            │
-                            └─► (or skipped / final stage → results)
+stage cleared (win)  ──►  next stage generated  ──►  SHOP (with its preview)  ──►  stage
+                         (in the background)          │
+                                                      └─► (or skipped / final stage → results)
 ```
 
 | Property | Rule |
@@ -21,6 +21,8 @@ stage cleared (win)  ──►  SHOP  ──►  stage generated  ──►  sta
 | Time limit | None. The shop never pressures. |
 | Can be re-entered | No. One visit per stage. |
 | Losing a stage | No shop; the run ends |
+| Next-stage preview | The next stage is generated as soon as this one is cleared, with the deck as it stands after the stage-end chooser, and shown in the shop as a full board: enemy formation, spawned pawns and their promotion results. **The par (`mateIn`) is never shown here** ([08 §3.1](08-progression-and-ux.md#31-coin-preview--the-load-bearing-number)). The panel reads "preparing the stage…" until generation finishes; buying never waits for it |
+| Deck changes after the preview | The preview is proven against the deck the shop opened with. Buying cannot break it; selling or merging a piece the plan needs is the player's informed choice, and nothing is re-checked |
 
 The shop is deliberately unhurried. The *stage* is where time pressure lives; the shop is where the
 player is meant to think about the next three stages at once.
@@ -224,6 +226,8 @@ genuine strategic option, not a failure state, and the UI should not frame it as
 │  │[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   ││[BUY]   │                  │
 │  └────────┘└────────┘└────────┘└────────┘└────────┘                  │
 │  POOL Act II · up to Unique   [ Reroll ◈ 0 ]   [ Leave shop ]        │
+├──────────────────────────────────────────────────────────────────────┤
+│  NEXT STAGE  (board preview: enemy formation, spawned pawns — no par)│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -239,6 +243,8 @@ Design notes:
 - **No pawn card, ever** — the deck shows no pawns either; they belong to the stage.
 - **The pool line** states the current act's ceiling ("up to Unique"); hovering it shows the weight
   table from §2.1. The player can always see what the shop *could* have offered.
+- **Next-stage preview** shows the board the next stage will start from, so the player can buy for
+  it. It never shows the par: how fast the mate must come is learned only on the Stage screen.
 - The loadout panel shows **remaining charges** (they refresh next stage — the shop should say so on
   hover, once).
 
