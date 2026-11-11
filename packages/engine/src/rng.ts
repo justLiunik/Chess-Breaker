@@ -11,3 +11,16 @@ export function hash(...parts: (string | number)[]): number {
 export function rng(seed: string, cursor: number): { value: number; next: number } {
   return { value: hash(seed, cursor) / 2 ** 32, next: cursor + 1 };
 }
+
+export function mix32(h: number): number {
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+export function draw(seed: string, ...parts: (string | number)[]): number {
+  return mix32(hash(seed, ...parts)) / 2 ** 32;
+}
