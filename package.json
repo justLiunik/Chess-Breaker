@@ -10,7 +10,8 @@
     "test": "vitest run",
     "bench": "vitest run --config vitest.bench.config.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "play": "tsx scripts/play.ts"
+    "play": "tsx scripts/play.ts",
+    "formations:extract": "tsx tools/formations/extract.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

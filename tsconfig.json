@@ -9,5 +9,5 @@
     "noUncheckedIndexedAccess": true,
     "types": ["node"]
   },
-  "include": ["packages/*/src", "packages/*/test", "scripts/*.ts"]
+  "include": ["packages/*/src", "packages/*/test", "scripts/*.ts", "tools/**/*.ts"]
 }

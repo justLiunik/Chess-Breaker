@@ -31,3 +31,6 @@ desktop.ini
 
 # Local save games exported during development
 *.checkbreaker-save.json
+
+# Local data caches (Lichess puzzle dump)
+.cache/
