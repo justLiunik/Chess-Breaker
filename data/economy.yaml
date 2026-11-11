@@ -236,15 +236,19 @@ stages:
 generation:
   maxRegenerations: 20
   maxPlacementTries: 50
+  maxBoards: 3                     # boards that passed G5 sent to the solver per stage
+  formations: { maxPerTemplate: 50, minPerTemplate: 20 }
   solver:
-    nodeBudget: 200000
-    timeMs: 2000
-    minSolveTurns: 2                # rejects free wins
-    orderHeuristic: mate_first
+    nodeBudget: 40000              # enemy replies needed (computed or memoized), per board
+    minSolveTurns: 2               # a mate on turn 1 is never a proof
+    memoizeEnemyReplies: true      # the enemy is a pure function: cache its reply per position
+    deployment: { maxSubsets: 6, kingSquares: 4, squaresPerPiece: 6, maxCandidates: 200 }
+    screen: { width: 4, turns: 3 }
+    deep: { candidates: 8, width: 32 }
+    expansion: 3
   acceptance:
     minSolvableRate: 0.95
-    medianWinTurnTolerance: 0.20
-  memoizeEnemyReplies: true       # the enemy is a pure function: cache its reply per position
+    medianMateTurnTolerance: 1     # turns, docs/10 M3
 
 # ---------------------------------------------------------------------------
 # Enemy AI — see docs/02 §8.1

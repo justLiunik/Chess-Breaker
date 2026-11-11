@@ -547,6 +547,44 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   if (problems === 0) ok(`economy.yaml: enemy AI terminal scores outrank positional bound ${bound}`);
 }
 
+// Generation and solver keys (docs/04 §5).
+{
+  let problems = 0;
+  const bad = (msg) => { fail(`economy.yaml: ${msg}`); problems += 1; };
+  const g = economy.generation ?? {};
+  const pos = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
+  const positive = (obj, keys, where) => {
+    for (const k of keys) if (!pos(obj?.[k])) bad(`${where}.${k} must be a positive number`);
+  };
+  for (const k of ['timeMs', 'orderHeuristic', 'memoizeEnemyReplies']) {
+    if (g[k] !== undefined) bad(`generation.${k} was removed (docs/04 §5)`);
+  }
+  if (g.solver?.timeMs !== undefined) bad('generation.solver.timeMs was removed; the solver budget is nodeBudget only');
+  if (g.solver?.orderHeuristic !== undefined) bad('generation.solver.orderHeuristic was removed (docs/04 §5)');
+  if (g.acceptance?.medianWinTurnTolerance !== undefined) bad('generation.acceptance.medianWinTurnTolerance was renamed medianMateTurnTolerance');
+  positive(g, ['maxRegenerations', 'maxPlacementTries', 'maxBoards'], 'generation');
+  positive(g.formations, ['maxPerTemplate', 'minPerTemplate'], 'generation.formations');
+  positive(g.solver, ['nodeBudget', 'minSolveTurns', 'expansion'], 'generation.solver');
+  positive(g.solver?.deployment, ['maxSubsets', 'kingSquares', 'squaresPerPiece', 'maxCandidates'], 'generation.solver.deployment');
+  positive(g.solver?.screen, ['width', 'turns'], 'generation.solver.screen');
+  positive(g.solver?.deep, ['candidates', 'width'], 'generation.solver.deep');
+  positive(g.acceptance, ['minSolvableRate', 'medianMateTurnTolerance'], 'generation.acceptance');
+  if (typeof g.solver?.memoizeEnemyReplies !== 'boolean') bad('generation.solver.memoizeEnemyReplies must be a boolean');
+  if (pos(g.solver?.screen?.turns) && g.solver.screen.turns > 5) bad('generation.solver.screen.turns must be <= 5');
+  if (pos(g.solver?.deep?.candidates) && pos(g.solver?.deployment?.maxCandidates)
+    && g.solver.deep.candidates > g.solver.deployment.maxCandidates) {
+    bad('generation.solver.deep.candidates must be <= generation.solver.deployment.maxCandidates');
+  }
+  if (pos(g.formations?.minPerTemplate) && pos(g.formations?.maxPerTemplate)
+    && g.formations.minPerTemplate > g.formations.maxPerTemplate) {
+    bad('generation.formations.minPerTemplate must be <= generation.formations.maxPerTemplate');
+  }
+  if (pos(g.acceptance?.minSolvableRate) && g.acceptance.minSolvableRate > 1) {
+    bad('generation.acceptance.minSolvableRate must be <= 1');
+  }
+  if (problems === 0) ok('economy.yaml: generation and solver keys present and consistent');
+}
+
 // Base reward and merge configuration (docs/05 §2, docs/06 §5).
 {
   let problems = 0;

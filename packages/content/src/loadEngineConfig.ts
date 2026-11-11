@@ -6,13 +6,13 @@ import type {
   AbilityTable, DeckType, EngineConfig, PieceType, Rarity, SkillDef,
 } from '@checkbreaker/engine';
 
-const DEFAULT_PATH = fileURLToPath(new URL('../../../data/economy.yaml', import.meta.url));
+export const DEFAULT_PATH = fileURLToPath(new URL('../../../data/economy.yaml', import.meta.url));
 const DEFAULT_PIECES_PATH = fileURLToPath(new URL('../../../content/examples/pieces.yaml', import.meta.url));
 const DEFAULT_SKILLS_PATH = fileURLToPath(new URL('../../../content/examples/skills.yaml', import.meta.url));
 const DECK_TYPES: DeckType[] = ['knight', 'bishop', 'rook', 'queen'];
 const PIECE_TYPES: PieceType[] = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'];
 
-function need(root: unknown, path: string): unknown {
+export function need(root: unknown, path: string): unknown {
   let cur: unknown = root;
   for (const key of path.split('.')) {
     if (cur === null || typeof cur !== 'object' || !(key in cur)) {
@@ -26,18 +26,18 @@ function need(root: unknown, path: string): unknown {
   return cur;
 }
 
-const num = (root: unknown, path: string): number => {
+export const num = (root: unknown, path: string): number => {
   const v = need(root, path);
   if (typeof v !== 'number') throw new Error(`economy.yaml field ${path} must be a number`);
   return v;
 };
-const bool = (root: unknown, path: string): boolean => {
+export const bool = (root: unknown, path: string): boolean => {
   const v = need(root, path);
   if (typeof v !== 'boolean') throw new Error(`economy.yaml field ${path} must be a boolean`);
   return v;
 };
 
-function deepFreeze<T>(x: T): T {
+export function deepFreeze<T>(x: T): T {
   if (x !== null && typeof x === 'object' && !Object.isFrozen(x)) {
     Object.freeze(x);
     for (const v of Object.values(x as object)) deepFreeze(v);
@@ -45,7 +45,7 @@ function deepFreeze<T>(x: T): T {
   return x;
 }
 
-function readYaml(path: string, label: string): unknown {
+export function readYaml(path: string, label: string): unknown {
   try {
     return parse(readFileSync(path, 'utf8'));
   } catch (e) {
