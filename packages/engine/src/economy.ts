@@ -18,7 +18,7 @@ export function stageEconomy(
   };
 }
 
-/** The part of the base reward still unspent by overtime (docs/05 ง2). */
+/** The part of the base reward still unspent by overtime (docs/05 ยง2). */
 export function pendingBase(run: RunState, stage: StageState, config: EngineConfig): number {
   return Math.max(0, stageEconomy(run, config).baseFull - stage.overtimePaid);
 }
