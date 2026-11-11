@@ -2,6 +2,8 @@ import { rng } from '../rng';
 
 const SEED = 'checkbreaker-zobrist';
 const TURNS = 21;
+/** The largest clock the table holds (turns 0..MAX_CLOCK); callers clamp to it. */
+export const MAX_CLOCK = TURNS - 1;
 
 let cursor = 0;
 function draw32(): number {

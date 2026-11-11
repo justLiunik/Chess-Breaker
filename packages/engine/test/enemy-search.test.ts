@@ -142,7 +142,7 @@ describe('mateBound', () => {
       ...config,
       enemyAI: {
         ...config.enemyAI,
-        terminal: { playerMated: 200000, playerOutOfTurns: 50000, enemyMated: -200000 },
+        terminal: { playerMated: 200000, playerOutOfClock: 50000, enemyMated: -200000 },
       },
     };
     expect(mateBound(big)).toBe(125000);

@@ -32,7 +32,7 @@ type Entry = { depth: number; score: number; bound: Bound; best: Move | null };
  */
 export function mateBound(config: EngineConfig): number {
   const t = config.enemyAI.terminal;
-  return (t.playerMated + t.playerOutOfTurns) / 2;
+  return (t.playerMated + t.playerOutOfClock) / 2;
 }
 const INF = Number.POSITIVE_INFINITY;
 
@@ -57,7 +57,7 @@ interface Ctx {
   attackerRank: Int32Array;
   qmax: number;
   playerMated: number;
-  playerOutOfTurns: number;
+  playerOutOfClock: number;
   enemyMated: number;
   mateBound: number;
   /** Legality scratch per ply, so a node keeps its own across its children. */
@@ -187,7 +187,7 @@ function terminal(ctx: Ctx, blackToMove: boolean, hasMove: boolean, ply: number,
     if (blackToMove && blackInCheck(ctx)) return ctx.enemyMated + ply;
     return ctx.playerMated - ply; // player mated, or either side stalemated
   }
-  if (turns <= 0) return ctx.playerOutOfTurns;
+  if (turns <= 0) return ctx.playerOutOfClock;
   return null;
 }
 
@@ -207,7 +207,7 @@ function quiesce(
   ctx: Ctx, blackToMove: boolean, alpha: number, beta: number, ply: number, turns: number,
   qleft: number,
 ): number {
-  if (!blackToMove && turns <= 0) return ctx.playerOutOfTurns;
+  if (!blackToMove && turns <= 0) return ctx.playerOutOfClock;
   const b = ctx.b;
   const side = blackToMove ? -1 : 1;
   const sf = safetyAt(ctx, ply);
@@ -307,7 +307,7 @@ function search(
   // At the horizon, quiescence makes the same terminal checks first, so a mate or stalemate on the
   // horizon is scored as a terminal.
   if (depth <= 0) return quiesce(ctx, blackToMove, alpha, beta, ply, turns, ctx.qmax);
-  if (!blackToMove && turns <= 0) return ctx.playerOutOfTurns;
+  if (!blackToMove && turns <= 0) return ctx.playerOutOfClock;
   const b = ctx.b;
   const moves = legalMovesInPlace(b, blackToMove ? 'black' : 'white', [], safetyAt(ctx, ply));
   const t = terminal(ctx, blackToMove, moves.length > 0, ply, turns);
@@ -402,7 +402,7 @@ export function scoreRootMoves(
     attackerRank: ranks(attacker),
     qmax: config.enemyAI.search.quiescenceMaxDepth,
     playerMated: term.playerMated,
-    playerOutOfTurns: term.playerOutOfTurns,
+    playerOutOfClock: term.playerOutOfClock,
     enemyMated: term.enemyMated,
     mateBound: mateBound(config),
     safety: [],

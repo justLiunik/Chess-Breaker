@@ -515,15 +515,15 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   const bound =
     8 * Math.abs(w.kingEscapeSquare ?? 0) + 8 * Math.abs(w.kingZoneAttacked ?? 0) +
     Math.abs(w.kingInCheck ?? 0) + 2 * 39 * Math.abs(w.materialPerPoint ?? 0) + 120 * Math.abs(w.mobilityPerMove ?? 0);
-  if (!(term.playerMated > term.playerOutOfTurns && term.playerOutOfTurns > 10 * bound)) {
-    fail(`economy.yaml: enemyAI.terminal must satisfy playerMated > playerOutOfTurns > 10 × positional bound (${bound})`);
+  if (!(term.playerMated > term.playerOutOfClock && term.playerOutOfClock > 10 * bound)) {
+    fail(`economy.yaml: enemyAI.terminal must satisfy playerMated > playerOutOfClock > 10 × positional bound (${bound})`);
     problems += 1;
   }
   // The search stores scores beyond this bound node-relative (ply-adjusted); mates must clear it and
   // out-of-turns scores must not (src/enemy/search.ts mateBound).
-  const mateBound = (term.playerMated + term.playerOutOfTurns) / 2;
-  if (!(term.playerOutOfTurns + 40 < mateBound && mateBound < term.playerMated - 40)) {
-    fail(`economy.yaml: enemyAI.terminal mate bound ${mateBound} must lie within (playerOutOfTurns + 40, playerMated - 40)`);
+  const mateBound = (term.playerMated + term.playerOutOfClock) / 2;
+  if (!(term.playerOutOfClock + 40 < mateBound && mateBound < term.playerMated - 40)) {
+    fail(`economy.yaml: enemyAI.terminal mate bound ${mateBound} must lie within (playerOutOfClock + 40, playerMated - 40)`);
     problems += 1;
   }
   if (term.enemyMated !== -term.playerMated) {

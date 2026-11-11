@@ -166,7 +166,7 @@ export function loadEngineConfig(
       },
       terminal: {
         playerMated: num(y, 'enemyAI.terminal.playerMated'),
-        playerOutOfTurns: num(y, 'enemyAI.terminal.playerOutOfTurns'),
+        playerOutOfClock: num(y, 'enemyAI.terminal.playerOutOfClock'),
         enemyMated: num(y, 'enemyAI.terminal.enemyMated'),
       },
       weights: {

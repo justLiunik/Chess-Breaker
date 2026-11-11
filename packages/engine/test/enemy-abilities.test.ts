@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { abilityTargets } from '../src/abilities';
 import { enemyMove } from '../src/enemy/policy';
+import { enemyClock } from '../src/economy';
 import { scoreRootMoves } from '../src/enemy/search';
 import { zobristKey } from '../src/enemy/zobrist';
 import { legalMovesInPlace, newSafety } from '../src/legality';
@@ -15,6 +16,8 @@ import type { Rarity, Square, StageState } from '../src/types';
 import {
   GAME_FENS, MIDGAME_FENS, RARITY_FENS, config, deepFreeze, fenToStage, randomBoard, rarityStage, runOf, stageOf,
 } from './helpers';
+
+const clockOf = (s: StageState): number => enemyClock(runOf(), s, config);
 
 /** A stage from `{ square: 'R' | 'R:legendary' | 'p' ... }`; a White Hero Piece takes the rarity after the colon. */
 function stageWith(spec: Record<Square, string>, over: Partial<StageState> = {}): StageState {
@@ -34,7 +37,7 @@ type Scored = ReturnType<typeof scoreRootMoves>;
 /** Root scores of the stage at `depth`, with its tiers (or with every tier dropped when `normal`). */
 function rootScores(stage: StageState, depth: number, normal = false): Scored {
   const t = normal ? new Int8Array(64) : tiersOf(stage.board);
-  return scoreRootMoves(fromBoard(stage.board), stage.mateIn - stage.turnsUsed, depth, config, undefined, t);
+  return scoreRootMoves(fromBoard(stage.board), clockOf(stage), depth, config, undefined, t);
 }
 const tiedBest = (res: Scored): string[] => {
   const best = Math.max(...res.map((r) => r.score));
@@ -49,8 +52,8 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
     const normal = stageWith({ ...spec, d4: 'N' });
     expect(tiedBest(rootScores(normal, 2))).toEqual(['d8d6']);
     expect(tiedBest(rootScores(rare, 2))).not.toContain('d8d6');
-    expect(enemyMove(normal, 0, config).move).toEqual({ from: 'd8', to: 'd6' });
-    expect(enemyMove(rare, 0, config).move).not.toEqual({ from: 'd8', to: 'd6' });
+    expect(enemyMove(normal, 0, clockOf(normal), config).move).toEqual({ from: 'd8', to: 'd6' });
+    expect(enemyMove(rare, 0, clockOf(rare), config).move).not.toEqual({ from: 'd8', to: 'd6' });
   });
 
   it("the enemy sees a Legendary queen's double capture", () => {
@@ -80,7 +83,7 @@ describe('the enemy search with rarity abilities (docs/02 §8.1, spec §9.4)', (
     expect(legendary).toEqual(rootScores(stageWith({ ...spec, b1: 'N:unique' }), 3));
     // Skills live in the run's loadout, which enemyMove never sees; Focus left changes nothing.
     const s = stageWith(spec);
-    expect(enemyMove(stageWith(spec, { focus: 0 }), 5, config)).toEqual(enemyMove(s, 5, config));
+    expect(enemyMove(stageWith(spec, { focus: 0 }), 5, clockOf(stageWith(spec, { focus: 0 })), config)).toEqual(enemyMove(s, 5, clockOf(s), config));
   });
 
   it('R3 sees a mate given through an ability', () => {
@@ -200,7 +203,7 @@ describe('the search depth is capped on rarity boards (docs/02 §8.1)', () => {
   /** enemyMove's pick for a given search depth: the best score, ties broken by the seed. */
   function pickAt(stage: StageState, depth: number, seed: number) {
     const b = fromBoard(stage.board);
-    const scored = scoreRootMoves(b, stage.mateIn - stage.turnsUsed, depth, config, undefined, tiersOf(stage.board));
+    const scored = scoreRootMoves(b, clockOf(stage), depth, config, undefined, tiersOf(stage.board));
     const best = Math.max(...scored.map((r) => r.score));
     const tied = scored.filter((r) => r.score === best);
     const m = tied[(seed >>> 0) % tied.length]!.move;
@@ -212,7 +215,7 @@ describe('the search depth is capped on rarity boards (docs/02 §8.1)', () => {
     const stage = rarityStage(GAME_FENS[1]!, 'legendary');
     const deep = deepFreeze({ ...stage, enemyPolicy: { type: 'best_move' as const, depth: 4 } });
     for (const seed of [1, 7, 42]) {
-      expect(enemyMove(deep, seed, config).move).toEqual(pickAt(deep, 3, seed));
+      expect(enemyMove(deep, seed, clockOf(deep), config).move).toEqual(pickAt(deep, 3, seed));
     }
   }, 60_000);
 
@@ -223,12 +226,12 @@ describe('the search depth is capped on rarity boards (docs/02 §8.1)', () => {
       ...config,
       enemyAI: { ...config.enemyAI, search: { ...config.enemyAI.search, maxDepthWithRarity: 4 } },
     });
-    expect(enemyMove(deep, 5, raised).move).toEqual(pickAt(deep, 4, 5));
+    expect(enemyMove(deep, 5, clockOf(deep), raised).move).toEqual(pickAt(deep, 4, 5));
   }, 60_000);
 
   it('tier-free boards keep the policy depth', () => {
     const stage = fenToStage(GAME_FENS[3]!);
     const deep = deepFreeze({ ...stage, enemyPolicy: { type: 'best_move' as const, depth: 4 } });
-    expect(enemyMove(deep, 5, config).move).toEqual(pickAt(deep, 4, 5));
+    expect(enemyMove(deep, 5, clockOf(deep), config).move).toEqual(pickAt(deep, 4, 5));
   }, 60_000);
 });

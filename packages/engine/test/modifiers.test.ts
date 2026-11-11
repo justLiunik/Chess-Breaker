@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commitQueue, simulate } from '../src/rules';
 import { enemyMove } from '../src/enemy/policy';
+import { enemyClock } from '../src/economy';
 import { scoreRootMoves } from '../src/enemy/search';
 import { legalMoves } from '../src/legality';
 import { fromBoard } from '../src/position';
@@ -8,6 +9,8 @@ import { toIndex } from '../src/square';
 import { frozenMask } from '../src/skills/registry';
 import type { Action, EngineConfig, PieceType, RunState, SkillDef, StageState } from '../src/types';
 import { config, deckFor, deepFreeze, runOf, stageOf } from './helpers';
+
+const clockOf = (s: StageState): number => enemyClock(runOf(), s, config);
 
 const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
 const skill = (skillId: string, target?: string): Action => ({
@@ -210,8 +213,8 @@ describe('R5: the enemy reply with suppression at the root only', () => {
         duration: 'next_enemy_turn', appliedOnTurn: 1,
       }],
     });
-    expect(enemyMove(s, 0, config).move).not.toBeNull();
-    expect(enemyMove(locked, 0, config).move).toBeNull();
+    expect(enemyMove(s, 0, clockOf(s), config).move).not.toBeNull();
+    expect(enemyMove(locked, 0, clockOf(locked), config).move).toBeNull();
   });
 });
 

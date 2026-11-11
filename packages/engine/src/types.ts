@@ -243,7 +243,7 @@ export interface EngineConfig {
       /** Depth cap while any player piece has a rarity tier (docs/02 §8.1). */
       maxDepthWithRarity: number;
     };
-    terminal: { playerMated: number; playerOutOfTurns: number; enemyMated: number };
+    terminal: { playerMated: number; playerOutOfClock: number; enemyMated: number };
     weights: {
       kingEscapeSquare: number;
       kingZoneAttacked: number;

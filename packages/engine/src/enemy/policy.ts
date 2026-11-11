@@ -5,16 +5,17 @@ import { legalMoves } from '../legality';
 import { frozenMask } from '../skills/registry';
 import { isSquare, toIndex, toSquare } from '../square';
 import { scoreRootMoves } from './search';
+import { MAX_CLOCK } from './zobrist';
 
-type Pick = { move: { from: Square; to: Square } | null; policy: EnemyPolicy };
+export type EnemyPick = { move: { from: Square; to: Square } | null; policy: EnemyPolicy };
 
 function searchMove(
-  stage: StageState, b: Int8Array, t: Int8Array, frozen: Uint8Array, seed: number, depth: number,
+  b: Int8Array, t: Int8Array, frozen: Uint8Array, seed: number, clock: number, depth: number,
   policy: EnemyPolicy, config: EngineConfig,
-): Pick {
+): EnemyPick {
   // Rarity abilities enlarge the tree: while any player piece has a tier, the depth is capped.
   const capped = hasTiers(t) ? Math.min(depth, config.enemyAI.search.maxDepthWithRarity) : depth;
-  const scored = scoreRootMoves(b, Math.min(20, Math.max(1, stage.mateIn - stage.turnsUsed)), capped, config, frozen, t);
+  const scored = scoreRootMoves(b, Math.min(clock, MAX_CLOCK), capped, config, frozen, t);
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
   const tied = scored.filter((r) => r.score === best);
@@ -25,9 +26,9 @@ function searchMove(
 /**
  * The enemy's move for this stage. Never mutates `stage`; returns the updated policy: a scripted
  * line advances `cursor`, and a line that cannot be played falls back to search for good. Pieces
- * under a live `suppress_piece` modifier do not move; a scripted move by one is unplayable (Ruling R7).
+ * under a live `suppress_piece` modifier do not move; `clock` is the player's turns left (`enemyClock`); a scripted move by one is unplayable (Ruling R7).
  */
-export function enemyMove(stage: StageState, seed: number, config: EngineConfig): Pick {
+export function enemyMove(stage: StageState, seed: number, clock: number, config: EngineConfig): EnemyPick {
   const policy = stage.enemyPolicy;
   const b = fromBoard(stage.board);
   const t = tiersOf(stage.board);
@@ -51,11 +52,11 @@ export function enemyMove(stage: StageState, seed: number, config: EngineConfig)
       }
     }
     const next: EnemyPolicy = { ...policy, fellBack: true, cursor };
-    return searchMove(stage, b, t, frozen, seed, policy.fallbackDepth ?? fallbackDepth, next, config);
+    return searchMove(b, t, frozen, seed, clock, policy.fallbackDepth ?? fallbackDepth, next, config);
   }
 
   const depth = policy.type === 'scripted'
     ? (policy.fallbackDepth ?? fallbackDepth)
     : (policy.depth ?? fallbackDepth);
-  return searchMove(stage, b, t, frozen, seed, depth, { ...policy }, config);
+  return searchMove(b, t, frozen, seed, clock, depth, { ...policy }, config);
 }

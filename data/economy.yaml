@@ -265,7 +265,7 @@ enemyAI:
     maxDepthWithRarity: 3           # cap on the search depth while any player piece is Rare or higher (docs/02 §8.1): rarity abilities enlarge the tree, Legendary boards took ~160 ms at depth 4
   terminal:                         # always outrank every positional score
     playerMated: 100000             # minus plies to reach it: sooner is better; either side's stalemate scores the same (player loses)
-    playerOutOfTurns: 50000         # the clock runs out on the player
+    playerOutOfClock: 50000         # the clock runs out on the player
     enemyMated: -100000             # plus plies to reach it: delayed as long as possible
   weights:                          # positional terms, "defend first, punish mistakes"
     kingEscapeSquare: 30            # per legal enemy-king move

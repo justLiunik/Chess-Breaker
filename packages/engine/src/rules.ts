@@ -4,13 +4,14 @@ import type {
 import { inCheck, legalMoves } from './legality';
 import { hasLegalQueue } from './legal-queue';
 import { enemyMove } from './enemy/policy';
+import type { EnemyPick } from './enemy/policy';
 import { hash } from './rng';
 import { KING, fromBoard, tiersOf } from './position';
 import { toSquare } from './square';
 import { resolveQueue } from './queue';
 import { frozenMask } from './skills/registry';
 import { lifelineSaves } from './abilities';
-import { stageEconomy } from './economy';
+import { enemyClock, pendingBase, stageEconomy } from './economy';
 
 export function simulate(
   run: RunState,
@@ -43,8 +44,8 @@ export function simulate(
   next = { ...next, turnsUsed: next.turnsUsed + 1 };
 
   if (next.status === 'won') {
-    const { baseFull, parBonusFull } = stageEconomy(run, config);
-    const base = Math.max(0, baseFull - next.overtimePaid);
+    const { parBonusFull } = stageEconomy(run, config);
+    const base = pendingBase(run, next, config);
     const parBonus = next.turnsUsed <= next.mateIn ? parBonusFull : 0;
     award = { coins: base + parBonus, base, parBonus };
     nextRun = { ...nextRun, coins: nextRun.coins + award.coins };
@@ -82,8 +83,8 @@ function loseInstance(
 }
 
 /**
- * `simulate` (Resolve to R4) followed by the enemy's reply (R5), the expiry of next_enemy_turn
- * modifiers, and the start of the next turn. A stage that `simulate` already ended gets no reply.
+ * `simulate` (Resolve to R4) followed by the enemy's reply: `enemyMove` with the player's clock,
+ * then `applyEnemyTurn`. A stage that `simulate` already ended gets no reply.
  */
 export function commitQueue(
   run: RunState,
@@ -94,12 +95,35 @@ export function commitQueue(
   const sim = simulate(run, stage, queue, config);
   if (!sim.ok || sim.value.stage.status !== 'active') return sim;
 
-  const events = [...sim.value.events];
-  let next: StageState = sim.value.stage;
-  let nextRun = sim.value.run;
+  const { run: simRun, stage: next } = sim.value;
+  const pick = enemyMove(next, hash(next.stageSeed, next.turnsUsed), enemyClock(simRun, next, config), config);
+  const turn = applyEnemyTurn(simRun, next, pick, config);
+  if (!turn.ok) return turn;
+  return {
+    ok: true,
+    value: {
+      run: turn.value.run, stage: turn.value.stage, events: [...sim.value.events, ...turn.value.events], award: null,
+    },
+  };
+}
+
+/**
+ * The enemy's half of a committed turn, given its pick: the move (R5), the expiry of
+ * next_enemy_turn modifiers, the start of the next turn, White's check, the loss when no legal
+ * queue remains, and the overtime charge for a turn past the par. The solver reuses it with
+ * memoized picks.
+ */
+export function applyEnemyTurn(
+  run: RunState,
+  stage: StageState,
+  picked: EnemyPick,
+  config: EngineConfig,
+): Result<{ run: RunState; stage: StageState; events: GameEvent[] }, CommitError> {
+  const events: GameEvent[] = [];
+  let next: StageState = stage;
+  let nextRun = run;
 
   // R5: the enemy replies; suppressed pieces do not move.
-  const picked = enemyMove(next, hash(next.stageSeed, next.turnsUsed), config);
   if (picked.policy.fellBack && !next.enemyPolicy.fellBack) {
     events.push({ type: 'enemy_fell_back', cursor: picked.policy.cursor ?? 0 });
   }
@@ -152,8 +176,8 @@ export function commitQueue(
     events.push({ type: 'stage_lost', endReason });
   } else if (next.turnsUsed + 1 > next.mateIn) {
     // Past the par every turn costs overtime: from the pending reward first, then from the wallet.
-    const { baseFull, overtimeCost: cost } = stageEconomy(nextRun, config);
-    const fromReward = Math.min(cost, Math.max(0, baseFull - next.overtimePaid));
+    const { overtimeCost: cost } = stageEconomy(nextRun, config);
+    const fromReward = Math.min(cost, pendingBase(nextRun, next, config));
     const fromWallet = cost - fromReward;
     if (nextRun.coins < fromWallet) {
       next = { ...next, status: 'lost', endReason: 'out_of_coins' };
@@ -164,5 +188,5 @@ export function commitQueue(
       events.push({ type: 'overtime_paid', turn: next.turnsUsed + 1, fromReward, fromWallet });
     }
   }
-  return { ok: true, value: { run: nextRun, stage: next, events, award: null } };
+  return { ok: true, value: { run: nextRun, stage: next, events } };
 }

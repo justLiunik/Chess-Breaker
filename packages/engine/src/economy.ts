@@ -1,4 +1,4 @@
-import type { EngineConfig, RunState } from './types';
+import type { EngineConfig, RunState, StageState } from './types';
 
 /**
  * The amounts of the stage the run is playing (docs/05 ยง2): the full base reward and par bonus,
@@ -16,4 +16,20 @@ export function stageEconomy(
     parBonusFull: Math.round(parBonus[act] * scale),
     overtimeCost: overtimeCost[act],
   };
+}
+
+/** The part of the base reward still unspent by overtime (docs/05 ง2). */
+export function pendingBase(run: RunState, stage: StageState, config: EngineConfig): number {
+  return Math.max(0, stageEconomy(run, config).baseFull - stage.overtimePaid);
+}
+
+/**
+ * How many turns the enemy's search should assume the player has left. Within the par it is the
+ * turns to the par and never reads the wallet, so a proof found before the shop survives whatever
+ * the player buys. Past the par it is the overtime turns still affordable (at least 1).
+ */
+export function enemyClock(run: RunState, stage: StageState, config: EngineConfig): number {
+  if (stage.turnsUsed < stage.mateIn) return stage.mateIn - stage.turnsUsed;
+  const { overtimeCost } = stageEconomy(run, config);
+  return Math.max(1, Math.floor((pendingBase(run, stage, config) + run.coins) / overtimeCost));
 }
