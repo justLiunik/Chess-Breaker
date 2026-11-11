@@ -1,3 +1,4 @@
+import { draw } from '@checkbreaker/engine';
 import { describe, expect, it } from 'vitest';
 import { selectTemplates } from '../src/select';
 import { tpl } from './helpers';
@@ -27,6 +28,18 @@ describe('selectTemplates', () => {
     const b = selectTemplates([...templates].reverse(), 1, 'normal', 'x');
     expect(a.map((t) => t.id)).toEqual(b.map((t) => t.id));
     expect(a.slice(1).map((t) => t.id)).toEqual(a.slice(1).map((t) => t.id).sort());
+  });
+
+  it('picks pool[floor(draw(seed, template) * n)] of the id-sorted pool without the previous template', () => {
+    for (let i = 0; i < 60; i++) {
+      const seed = `seed${i}`;
+      const all = ['a', 'b', 'c'];
+      expect(selectTemplates(templates, 1, 'normal', seed)[0]!.id).toBe(all[Math.floor(draw(seed, 'template') * 3)]);
+      for (const prev of all) {
+        const pool = all.filter((id) => id !== prev);
+        expect(selectTemplates(templates, 1, 'normal', seed, prev)[0]!.id).toBe(pool[Math.floor(draw(seed, 'template') * pool.length)]);
+      }
+    }
   });
 
   it('throws on an empty act and tier', () => {

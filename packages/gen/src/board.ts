@@ -42,7 +42,7 @@ function randomPlacement(tpl: Template, stageSeed: string, attempt: number, conf
     for (let k = 0; k < n; k++) types.push(type);
   }
   const zone = new Set(tpl.enemyZone ?? [1, 2, 3, 4, 5, 6, 7, 8]);
-  for (let attempt2 = 0; attempt2 < config.gen.maxPlacementTries; attempt2++) {
+  for (let placeTry = 0; placeTry < config.gen.maxPlacementTries; placeTry++) {
     const placed: Record<Square, PieceType> = {};
     const taken = new Set<number>();
     let ok = true;
@@ -58,7 +58,7 @@ function randomPlacement(tpl: Template, stageSeed: string, attempt: number, conf
         ok = false;
         break;
       }
-      const s = free[Math.floor(draw(stageSeed, 'place', attempt, attempt2, i) * free.length)]!;
+      const s = free[Math.floor(draw(stageSeed, 'place', attempt, placeTry, i) * free.length)]!;
       taken.add(s);
       placed[toSquare(s)] = type;
     }
@@ -79,7 +79,8 @@ export function enemyBoard(
   let formationId: string | null = null;
   let mirrored = false;
   if (tpl.placement === 'fixed') {
-    placement = tpl.fixedEnemy ?? {};
+    if (!tpl.fixedEnemy) throw new Error(`fixed template ${tpl.id} has no fixedEnemy`);
+    placement = tpl.fixedEnemy;
   } else if (formations.length > 0) {
     const f = formations[Math.floor(draw(stageSeed, 'formation', attempt) * formations.length)]!;
     formationId = f.id;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankOf, toIndex } from '@checkbreaker/engine';
+import { draw, rankOf, toIndex } from '@checkbreaker/engine';
 import type { PieceType } from '@checkbreaker/engine';
 import { enemyBoard, parsePlacement } from '../src/board';
 import { config, stubFormations, tpl } from './helpers';
@@ -49,16 +49,18 @@ describe('enemyBoard', () => {
     expect(sawMirror && sawPlain).toBe(true);
   });
 
-  it('the mirror stream never changes formationId', () => {
+  it('formationId reads the formation stream and mirrored reads the mirror stream, nothing else', () => {
     const t = tpl({ id: 'g' });
-    // A one-formation list pins the formation stream; mirrored still flips, formationId never moves.
-    const one = run(30, (a) => enemyBoard(t, [stubFormations[0]!], 'seed', a, config));
-    expect(one.every((r) => r.formationId === 'f1')).toBe(true);
-    expect(new Set(one.map((r) => r.mirrored))).toEqual(new Set([true, false]));
-    // With the full list, a mirrored and an unmirrored attempt can still pick the same formation id sequence
-    // as the formation stream alone dictates.
-    const many = run(30, (a) => enemyBoard(t, stubFormations, 'seed', a, config)).map((r) => r.formationId);
-    expect(many).toEqual(run(30, (a) => enemyBoard(t, stubFormations, 'seed', a, config)).map((r) => r.formationId));
+    for (const seed of ['seed', 'other']) {
+      run(60, (a) => enemyBoard(t, stubFormations, seed, a, config)).forEach((r, a) => {
+        expect(r.formationId).toBe(stubFormations[Math.floor(draw(seed, 'formation', a) * 3)]!.id);
+        expect(r.mirrored).toBe(draw(seed, 'mirror', a) < 0.5);
+      });
+    }
+  });
+
+  it('a fixed template without fixedEnemy throws', () => {
+    expect(() => enemyBoard(tpl({ id: 'bad', placement: 'fixed' }), [], 's', 0, config)).toThrow('fixed template bad has no fixedEnemy');
   });
 
   it('random fallback stays in enemyZone with counts in range and one king', () => {
@@ -75,7 +77,9 @@ describe('enemyBoard', () => {
       expect(count.pawn).toBeGreaterThanOrEqual(5);
       expect(count.pawn).toBeLessThanOrEqual(6);
       expect(count.knight).toBe(1);
+      expect(count.rook ?? 0).toBeGreaterThanOrEqual(0);
       expect(count.rook ?? 0).toBeLessThanOrEqual(2);
+      expect(Object.keys(r.board)).toHaveLength(Object.values(count).reduce((x, y) => x + y, 0));
     }
   });
 
