@@ -55,7 +55,8 @@ describe('generateStage with the real solver', () => {
     const content1 = { templates: t1, formations: loadFormations() };
     const { provenance } = generateStage({ run, actIndex: 0, stageIndex: 0 }, content1, config);
     expect(provenance.proven).toBe(false);
-    // The bonus pawn is added only when a free square passes the preconditions; either way nothing throws.
-    expect(typeof provenance.bonusPawn).toBe('boolean');
+    expect(provenance.bonusPawn).toBe(true);
+    expect(provenance.validationFailed).toBeUndefined();
+    expect(provenance.solverNodes).toBeGreaterThan(0);
   }, TIMEOUT);
 });

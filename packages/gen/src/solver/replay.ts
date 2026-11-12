@@ -6,8 +6,9 @@ import type { SolveResult } from '../types';
 /**
  * ยง9.4: plays `win` through the engine's own `startStage` and `commitQueue`. True only when every
  * queue is accepted, the stage stays active until the last queue, and the last queue ends it in a
- * checkmate win on turn `win.mateTurn`, no later than `stage.mateIn`. The solver's own search
- * never touches coins or the shop, so a line that replays here holds for any `run.coins`.
+ * checkmate win on turn `win.mateTurn`, no later than `stage.mateIn`. Replay stops at `mateIn`
+ * and the enemy clock does not read the wallet inside the par (spec ง7.3), so a line that
+ * replays here holds for any `run.coins`.
  */
 export function replayLine(
   run: RunState,
@@ -15,7 +16,7 @@ export function replayLine(
   win: NonNullable<SolveResult['win']>,
   config: GenConfig,
 ): boolean {
-  if (win.line.length === 0 || win.mateTurn > stage.mateIn) return false;
+  if (win.line.length === 0 || win.line.length !== win.mateTurn || win.mateTurn > stage.mateIn) return false;
   const started = startStage(run, stage, win.placements, config);
   if (!started.ok) return false;
   let cur = started.value;

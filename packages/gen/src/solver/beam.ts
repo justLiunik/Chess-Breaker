@@ -54,8 +54,9 @@ const LETTER: Record<BoardPiece['pieceType'], string> = {
  * it keys the reply memo. That holds under two assumptions: solver boards carry no skills or
  * modifiers on pieces (so piece ids, which `enemyMove` reads through `frozenMask`, are not needed),
  * and every White non-pawn piece is a Hero piece (so tiers follow from colour, type and rarity). A
- * future skill-aware solver must extend the key; and two states with one key have the same future within the par, so it
- * deduplicates the beam.
+ * future skill-aware solver must extend the key.
+ *
+ * Two states with one key have the same future within the par, so the key also deduplicates the beam.
  */
 export function positionKey(run: RunState, stage: StageState, config: GenConfig): string {
   const parts: string[] = [];
