@@ -5,6 +5,7 @@ import type { Placement, SolveResult } from '../types';
 import { deploymentCandidates } from './deployment';
 import { byText, newSearch, runBeam } from './beam';
 import type { BeamState } from './beam';
+import { replayLine } from './replay';
 
 /** A deployment's text, for tie-breaks: `instanceId@square` per placement, in order, joined by `,`. */
 const deploymentText = (placements: Placement[]): string => placements.map((p) => `${p.instanceId}@${p.to}`).join(',');
@@ -23,14 +24,24 @@ const deploymentText = (placements: Placement[]): string => placements.map((p) =
 export function solveStage(run: RunState, stage: StageState, config: GenConfig): SolveResult {
   const { minSolveTurns, screen, deep } = config.gen.solver;
   const search = newSearch(config);
-  const done = (win: SolveResult['win']): SolveResult => ({ win, stats: { ...search.stats } });
+  const done = (win: SolveResult['win']): SolveResult => {
+    // Replay before trusting a win: a line the engine does not confirm is a solver bug, reported as "not found".
+    if (win !== null && !replayLine(run, stage, win, config)) {
+      search.stats.replayFailures++;
+      return { win: null, stats: { ...search.stats } };
+    }
+    return { win, stats: { ...search.stats } };
+  };
   if (stage.mateIn < minSolveTurns) return done(null);
 
   // Stage 1: screening.
   const ranked: { placements: Placement[]; start: BeamState; text: string; score: number }[] = [];
   for (const placements of deploymentCandidates(run, stage, config)) {
     const started = startStage(run, stage, placements, config);
-    if (!started.ok) continue; // never: deploymentCandidates keeps only what startStage accepts
+    if (!started.ok) {
+      // deploymentCandidates keeps only what startStage accepts: a refusal is an engine or candidate bug.
+      throw new Error(`startStage refused a deployment candidate: ${JSON.stringify(started.error)}`);
+    }
     search.stats.deployments++;
     const { run: run0, stage: stage0 } = started.value;
     const start: BeamState = { run: run0, stage: stage0, line: [], text: '', score: -Infinity };

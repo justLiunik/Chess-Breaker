@@ -115,8 +115,9 @@ describe('solveStage on the frozen fixtures', () => {
   }, TIMEOUT);
 
   it('memoizeEnemyReplies: false finds the same win with the same nodes, every one an enemy call', () => {
-    const f = fixture('mate2');
-    const memo = solve('mate2');
+    const f = fixture('bonus');
+    const memo = solve('bonus');
+    expect(memo.stats.memoHits).toBeGreaterThan(0); // otherwise the comparison below cannot fail
     const plain = solveStage(f.run, f.stage, withSolver(configOf(f), { memoizeEnemyReplies: false }));
     expect(plain.win).toEqual(memo.win);
     expect(plain.stats).toEqual({

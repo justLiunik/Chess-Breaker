@@ -13,7 +13,7 @@ const templates = loadTemplates();
 const content = { templates, formations: loadFormations() };
 const first: SolveResult = {
   win: { placements: [], line: [], mateTurn: 1 },
-  stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0 },
+  stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0, replayFailures: 0 },
 };
 const schema = JSON.parse(readFileSync(new URL('../../../schemas/stage.schema.json', import.meta.url), 'utf8'));
 const validate = new Ajv2020({ allErrors: true, strict: false }).compile(schema);

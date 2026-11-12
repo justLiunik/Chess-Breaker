@@ -51,7 +51,10 @@ const LETTER: Record<BoardPiece['pieceType'], string> = {
  * transformed type) and rarity, plus `turnsUsed`, the policy's `cursor` and `fellBack`, the enemy
  * clock and the live modifiers. It covers everything `enemyMove` reads (codes and tiers come from
  * colour, type and rarity; the stage seed and the policy's other fields are fixed within a solve), so
- * it keys the reply memo; and two states with one key have the same future within the par, so it
+ * it keys the reply memo. That holds under two assumptions: solver boards carry no skills or
+ * modifiers on pieces (so piece ids, which `enemyMove` reads through `frozenMask`, are not needed),
+ * and every White non-pawn piece is a Hero piece (so tiers follow from colour, type and rarity). A
+ * future skill-aware solver must extend the key; and two states with one key have the same future within the par, so it
  * deduplicates the beam.
  */
 export function positionKey(run: RunState, stage: StageState, config: GenConfig): string {
@@ -86,7 +89,7 @@ export function newSearch(config: GenConfig): Search {
   return {
     config,
     memo: config.gen.solver.memoizeEnemyReplies ? new Map() : null,
-    stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0 },
+    stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0, replayFailures: 0 },
     phase: 'screenNodes',
   };
 }

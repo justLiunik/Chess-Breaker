@@ -11,7 +11,7 @@ import { config, deckRun, tpl } from './helpers';
 const templates = loadTemplates();
 const formations = loadFormations();
 const content = { templates, formations };
-const ZERO = { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0 };
+const ZERO = { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0, replayFailures: 0 };
 const proof = (nodes = 0): SolveResult => ({
   win: { placements: [], line: [], mateTurn: 1 },
   stats: { ...ZERO, screenNodes: nodes },

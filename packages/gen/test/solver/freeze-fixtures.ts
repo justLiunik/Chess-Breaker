@@ -68,7 +68,7 @@ const base = loadGenConfig();
 const config: GenConfig = { ...base, rules: { ...base.rules, deploymentRanks: DEPLOYMENT_RANKS } };
 const content = { templates: loadTemplates(), formations: loadFormations() };
 const neverProves = () => ({
-  win: null, stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0 },
+  win: null, stats: { screenNodes: 0, deepNodes: 0, deployments: 0, enemyCalls: 0, memoHits: 0, replayFailures: 0 },
 });
 
 /** The run seed of scanned stage `i`, in the run schema's XXXX-XXXX format. */

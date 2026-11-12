@@ -19,5 +19,5 @@ export type Provenance = {
 
 export type SolveResult = {
   win: { placements: Placement[]; line: Action[][]; mateTurn: number } | null;
-  stats: { screenNodes: number; deepNodes: number; deployments: number; enemyCalls: number; memoHits: number };
+  stats: { screenNodes: number; deepNodes: number; deployments: number; enemyCalls: number; memoHits: number; replayFailures: number };
 };
