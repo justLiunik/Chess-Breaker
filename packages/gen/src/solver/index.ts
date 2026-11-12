@@ -1,5 +1,6 @@
 import { startStage } from '@checkbreaker/engine';
 import type { RunState, StageState } from '@checkbreaker/engine';
+import { solverSettingsFor } from '@checkbreaker/content';
 import type { GenConfig } from '@checkbreaker/content';
 import type { Placement, SolveResult } from '../types';
 import { deploymentCandidates } from './deployment';
@@ -21,7 +22,9 @@ const deploymentText = (placements: Placement[]): string => placements.map((p) =
  * `mateIn` turns. The first win ends the solve. Both stages share the budget and the reply memo,
  * so the result depends only on the run, the stage and the config.
  */
-export function solveStage(run: RunState, stage: StageState, config: GenConfig): SolveResult {
+export function solveStage(run: RunState, stage: StageState, base: GenConfig): SolveResult {
+  // One effective config: the act's solver override merged over the global block (docs/04 §5).
+  const config: GenConfig = { ...base, gen: { ...base.gen, solver: solverSettingsFor(run.actIndex, base) } };
   const { minSolveTurns, screen, deep } = config.gen.solver;
   const search = newSearch(config);
   const done = (win: SolveResult['win']): SolveResult => {

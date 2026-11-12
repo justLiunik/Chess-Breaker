@@ -3,6 +3,15 @@ import { bool, deepFreeze, loadEngineConfig, need, num, readYaml, DEFAULT_PATH }
 
 export type ActKey = 'act1' | 'act2' | 'act3';
 
+/** The solver's tuning keys, partial; what a per-act override may change (docs/04 §5). */
+export interface SolverOverride {
+  nodeBudget?: number;
+  deployment?: Partial<Pick<GenSettings['solver']['deployment'], 'maxSubsets' | 'kingSquares' | 'squaresPerPiece' | 'maxCandidates'>>;
+  screen?: Partial<GenSettings['solver']['screen']>;
+  deep?: Partial<GenSettings['solver']['deep']>;
+  expansion?: number;
+}
+
 export interface GenSettings {
   valueBands: Record<ActKey, [number, number]>;
   bossValueMultiplier: number;
@@ -28,6 +37,8 @@ export interface GenSettings {
     screen: { width: number; turns: number };
     deep: { candidates: number; width: number };
     expansion: number;
+    /** Per-act overrides of the tuning keys; read through solverSettingsFor. */
+    byAct?: Partial<Record<ActKey, SolverOverride>>;
   };
   acceptance: { minSolvableRate: number; medianMateTurnTolerance: number };
 }
@@ -92,6 +103,9 @@ export function loadGenConfig(path: string = DEFAULT_PATH): GenConfig {
         width: num(y, 'generation.solver.deep.width'),
       },
       expansion: num(y, 'generation.solver.expansion'),
+      ...(optional(y, 'generation.solver.byAct') === undefined
+        ? {}
+        : { byAct: structuredClone(optional(y, 'generation.solver.byAct')) as NonNullable<GenSettings['solver']['byAct']> }),
     },
     acceptance: {
       minSolvableRate: num(y, 'generation.acceptance.minSolvableRate'),
@@ -99,6 +113,30 @@ export function loadGenConfig(path: string = DEFAULT_PATH): GenConfig {
     },
   };
   return deepFreeze({ ...base, gen });
+}
+
+function optional(y: unknown, path: string): unknown {
+  let cur: unknown = y;
+  for (const k of path.split('.')) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  return cur;
+}
+
+/** The solver settings for an act (0-based `actIndex`): `byAct[act<n>]` deep-merged over the global block, without `byAct`. */
+export function solverSettingsFor(actIndex: number, config: GenConfig): Omit<GenSettings['solver'], 'byAct'> {
+  const { byAct, ...global } = config.gen.solver;
+  const o = byAct?.[`act${actIndex + 1}` as ActKey];
+  if (!o) return global;
+  return {
+    ...global,
+    nodeBudget: o.nodeBudget ?? global.nodeBudget,
+    deployment: { ...global.deployment, ...o.deployment },
+    screen: { ...global.screen, ...o.screen },
+    deep: { ...global.deep, ...o.deep },
+    expansion: o.expansion ?? global.expansion,
+  };
 }
 
 /** Sum of piece values over an enemy army; the king is excluded (mirrors scripts/validate-content.mjs). */

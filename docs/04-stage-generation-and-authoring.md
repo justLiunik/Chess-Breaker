@@ -264,6 +264,7 @@ the line and is counted as a solver bug in `gen:report`.
 | `generation.solver.screen` | `width` 4, `turns` 3 | Stage 1 |
 | `generation.solver.deep` | `candidates` 8, `width` 32 | Stage 2 |
 | `generation.solver.expansion` | 3 | Queues given an enemy reply per beam slot |
+| `generation.solver.byAct` | absent (no override shipped) | Per-act override, deep-merged over the keys above for that act (`solverSettingsFor`). Overridable: `nodeBudget`, `deployment.{maxSubsets,kingSquares,squaresPerPiece,maxCandidates}`, `screen.{width,turns}`, `deep.{candidates,width}`, `expansion`. `minSolveTurns`, `memoizeEnemyReplies`, `deployment.score` and `advanceRanks` are rejected, as is any unknown key; the merged block must pass the global rules. Measured in M3 Task 18b: `act1: { nodeBudget: 5500, deployment: { kingSquares: 8 }, screen: { width: 1 }, deep: { candidates: 48 } }` lifts First Steps from 30 % to 64 % proven (200 stages) and keeps Open Field at 92.5 %, but takes the Gatehouse boss's single-worker p95 from 15.8 s to 67 s (depth-4 enemy), so it is not enabled; a per-template override would be needed |
 | Acceptance | A deployment and line that mate within `mateIn`, on turn 2 or later, and replay | The first found wins |
 | Rejection | `nodeBudget` exhausted with no mate | Next board (G6); after `maxBoards`, the bonus pawn (G7) |
 

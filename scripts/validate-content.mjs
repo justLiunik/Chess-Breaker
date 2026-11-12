@@ -24,7 +24,7 @@ import { parse as parseYaml } from 'yaml';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_DIR = path.join(ROOT, 'schemas');
 const CONTENT_DIR = path.join(ROOT, 'content', 'examples');
-const ECONOMY_FILE = path.join(ROOT, 'data', 'economy.yaml');
+const ECONOMY_FILE = process.env.CHECKBREAKER_ECONOMY ?? path.join(ROOT, 'data', 'economy.yaml'); // the env override exists for the validator's own tests
 
 const SCHEMA_IDS = {
   piece: 'https://checkbreaker.dev/schemas/piece.schema.json',
@@ -582,10 +582,48 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   positive(g.solver?.deep, ['candidates', 'width'], 'generation.solver.deep');
   positive(g.acceptance, ['minSolvableRate', 'medianMateTurnTolerance'], 'generation.acceptance');
   if (typeof g.solver?.memoizeEnemyReplies !== 'boolean') bad('generation.solver.memoizeEnemyReplies must be a boolean');
-  if (pos(g.solver?.screen?.turns) && g.solver.screen.turns > 5) bad('generation.solver.screen.turns must be <= 5');
-  if (pos(g.solver?.deep?.candidates) && pos(g.solver?.deployment?.maxCandidates)
-    && g.solver.deep.candidates > g.solver.deployment.maxCandidates) {
-    bad('generation.solver.deep.candidates must be <= generation.solver.deployment.maxCandidates');
+  // The global block and every act's merged block obey the same cross-key rules.
+  const crossKeys = (s, where) => {
+    if (pos(s?.screen?.turns) && s.screen.turns > 5) bad(`${where}.screen.turns must be <= 5`);
+    if (pos(s?.deep?.candidates) && pos(s?.deployment?.maxCandidates) && s.deep.candidates > s.deployment.maxCandidates) {
+      bad(`${where}.deep.candidates must be <= ${where}.deployment.maxCandidates`);
+    }
+  };
+  crossKeys(g.solver, 'generation.solver');
+  // byAct: a partial of the tuning keys per act (docs/04 §5); semantics keys are rejected.
+  const byAct = g.solver?.byAct;
+  if (byAct !== undefined) {
+    const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+    const allowed = {
+      nodeBudget: null,
+      deployment: ['maxSubsets', 'kingSquares', 'squaresPerPiece', 'maxCandidates'],
+      screen: ['width', 'turns'],
+      deep: ['candidates', 'width'],
+      expansion: null,
+    };
+    if (!isObj(byAct)) bad('generation.solver.byAct must be a mapping');
+    else {
+      for (const [act, o] of Object.entries(byAct)) {
+        const where = `generation.solver.byAct.${act}`;
+        if (!/^act[1-9]\d*$/.test(act) || Number(act.slice(3)) > actCount) { bad(`generation.solver.byAct.${act} is not an act key (act1..act${actCount})`); continue; }
+        if (!isObj(o)) { bad(`${where} must be a mapping`); continue; }
+        for (const [k, v] of Object.entries(o)) {
+          if (!(k in allowed)) { bad(`${where}.${k} is not an overridable tuning key`); continue; }
+          if (allowed[k] === null) { if (!pos(v)) bad(`${where}.${k} must be a positive number`); continue; }
+          if (!isObj(v)) { bad(`${where}.${k} must be a mapping`); continue; }
+          for (const [k2, v2] of Object.entries(v)) {
+            if (!allowed[k].includes(k2)) bad(`${where}.${k}.${k2} is not an overridable tuning key`);
+            else if (!pos(v2)) bad(`${where}.${k}.${k2} must be a positive number`);
+          }
+        }
+        const merged = {
+          screen: { ...g.solver.screen, ...(isObj(o.screen) ? o.screen : {}) },
+          deep: { ...g.solver.deep, ...(isObj(o.deep) ? o.deep : {}) },
+          deployment: { ...g.solver.deployment, ...(isObj(o.deployment) ? o.deployment : {}) },
+        };
+        crossKeys(merged, `${where} (merged)`);
+      }
+    }
   }
   if (pos(g.formations?.minPerTemplate) && pos(g.formations?.maxPerTemplate)
     && g.formations.minPerTemplate > g.formations.maxPerTemplate) {
