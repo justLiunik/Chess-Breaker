@@ -1,0 +1,91 @@
+# RunState at the start of Act III stage 1: a strong, Legendary-heavy deck.
+#
+# The deck the report (npm run gen:report) and the bulk test use for Act III. It holds one
+# piece of every tier and the full seven non-King slots' worth of variety: a Legendary knight,
+# a Unique bishop, a Rare rook, a Normal queen, a Rare knight and a Normal bishop. Every piece
+# is at full durability (its durabilityMax), so nothing about the deck limits the solver.
+# The King occupies no slot and has null durability and null rarity.
+
+version: 1
+seed: 7F3A-2210
+actIndex: 2
+stageIndex: 0
+coins: 30
+deckCapacity: 8
+
+deck:
+  - instanceId: p_king_01
+    pieceType: king
+    rarity: null
+    durability: null
+    durabilityMax: null
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+  - instanceId: p_knight_02
+    pieceType: knight
+    rarity: legendary
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 9
+    status: in_deck
+
+  - instanceId: p_bishop_03
+    pieceType: bishop
+    rarity: unique
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 7
+    status: in_deck
+
+  - instanceId: p_rook_04
+    pieceType: rook
+    rarity: rare
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 5
+    status: in_deck
+
+  - instanceId: p_queen_05
+    pieceType: queen
+    rarity: normal
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 8
+    status: in_deck
+
+  - instanceId: p_knight_06
+    pieceType: knight
+    rarity: rare
+    durability: 2
+    durabilityMax: 2
+    origin: shop
+    acquiredAtStage: 3
+    status: in_deck
+
+  - instanceId: p_bishop_07
+    pieceType: bishop
+    rarity: normal
+    durability: 2
+    durabilityMax: 2
+    origin: starter
+    acquiredAtStage: 0
+    status: in_deck
+
+loadout:
+  - skillId: twin_step
+    charges: 3
+    chargesMax: 3
+  - skillId: lockdown
+    charges: 3
+    chargesMax: 3
+
+history: []
+
+rngCursor: 0
+status: in_progress

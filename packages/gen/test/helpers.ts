@@ -38,9 +38,9 @@ export function exampleRun(name: 'starter' | 'mid'): RunState {
   return deepFreeze(parse(readFileSync(url, 'utf8')) as RunState);
 }
 
-/** The example deck `name` at (actIndex, stageIndex), deep-frozen. The 'strong' deck arrives in Task 17; Act III uses 'mid' until then. */
+/** The example deck `name` at (actIndex, stageIndex), deep-frozen. 'strong' is content/examples/run-act3-strong.yaml. */
 export function deckRun(name: 'starter' | 'mid' | 'strong', actIndex: number, stageIndex: number): RunState {
-  const file = name === 'strong' ? 'mid' : name; // TODO Task 17: load run-strong.yaml
+  const file = name === 'strong' ? 'act3-strong' : name;
   const url = new URL(`../../../content/examples/run-${file}.yaml`, import.meta.url);
   return deepFreeze({ ...(parse(readFileSync(url, 'utf8')) as RunState), actIndex, stageIndex });
 }

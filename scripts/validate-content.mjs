@@ -41,6 +41,7 @@ const MANIFEST = [
   { dir: 'content/templates', schema: 'template' },
   { file: 'run-starter.yaml', schema: 'run' },
   { file: 'run-mid.yaml', schema: 'run' },
+  { file: 'run-act3-strong.yaml', schema: 'run' },
   { file: 'stage-state.yaml', schema: 'stage' },
 ];
 
@@ -811,7 +812,7 @@ for (const t of templates) {
 }
 
 // 2b. Runs: deck legality and economy invariants.
-for (const file of ['run-starter.yaml', 'run-mid.yaml']) {
+for (const file of ['run-starter.yaml', 'run-mid.yaml', 'run-act3-strong.yaml']) {
   const run = docs[file];
   if (!run) continue;
 

@@ -10,6 +10,7 @@
     "test": "vitest run",
     "bench": "vitest run --config vitest.bench.config.ts",
     "typecheck": "tsc -p tsconfig.json",
+    "gen:report": "tsx scripts/gen-report.ts",
     "play": "tsx scripts/play.ts",
     "formations:extract": "tsx tools/formations/extract.ts"
   },
