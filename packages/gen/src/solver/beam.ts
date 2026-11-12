@@ -165,9 +165,13 @@ function step(search: Search, beam: BeamState[], width: number): Step {
   const ranked = [...children.values()];
   for (const c of ranked) c.score = scoreOf(c.stage, config);
   ranked.sort(byScore);
-  // 5. The top width × expansion get the enemy's reply (memoized by position), as commitQueue applies it.
+  // 5. The top width × expansion get the enemy's reply (memoized by position), as commitQueue applies it,
+  //    lazily in rank order: step 7 keeps the top `width` survivors by this same pre-reply rank, so once
+  //    `width` have survived, no further reply can change the kept beam and none is needed (§9.4 counts
+  //    only replies needed). A child dropped at step 6 lets the next one in order be tried.
   const kept: BeamState[] = [];
   for (const c of ranked.slice(0, width * expansion)) {
+    if (kept.length >= width) break;
     const pick = reply(search, c.run, c.stage, c.key);
     if (pick === null) return { kind: 'out_of_budget' };
     const after = applyEnemyTurn(c.run, c.stage, pick, config);
@@ -176,8 +180,8 @@ function step(search: Search, beam: BeamState[], width: number): Step {
     if (after.value.stage.status !== 'active') continue;
     kept.push({ run: after.value.run, stage: after.value.stage, line: c.line, text: c.text, score: c.score });
   }
-  // 7. The top width are kept (`kept` is already in score order).
-  return { kind: 'next', beam: kept.slice(0, width) };
+  // 7. The top width are kept (`kept` is already in score order and holds at most `width`).
+  return { kind: 'next', beam: kept };
 }
 
 /**
