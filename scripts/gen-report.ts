@@ -1,6 +1,8 @@
 // gen:report — solvability, mating turn vs par, nodes and wall time per template (M3 spec §11).
 //   npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]
 // Each stage is one `generateWith` call whose solver is wrapped to record `SolveResult.stats`.
+// The precondition histogram covers only the emitted board of validationFailed stages; per-attempt failures of
+// stages that later passed are not exposed by gen and are not counted.
 // Numbers are deterministic whatever --workers is; only the wall times differ.
 import { writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
