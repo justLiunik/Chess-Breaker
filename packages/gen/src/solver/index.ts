@@ -23,8 +23,8 @@ const deploymentText = (placements: Placement[]): string => placements.map((p) =
  * so the result depends only on the run, the stage and the config.
  */
 export function solveStage(run: RunState, stage: StageState, base: GenConfig): SolveResult {
-  // One effective config: the act's solver override merged over the global block (docs/04 §5).
-  const config: GenConfig = { ...base, gen: { ...base.gen, solver: solverSettingsFor(run.actIndex, base) } };
+  // One effective config: the act's and template's solver overrides merged over the global block (docs/04 §5).
+  const config: GenConfig = { ...base, gen: { ...base.gen, solver: solverSettingsFor(run.actIndex, stage.templateId, base) } };
   const { minSolveTurns, screen, deep } = config.gen.solver;
   const search = newSearch(config);
   const done = (win: SolveResult['win']): SolveResult => {

@@ -3,6 +3,9 @@ import { bool, deepFreeze, loadEngineConfig, need, num, readYaml, DEFAULT_PATH }
 
 export type ActKey = 'act1' | 'act2' | 'act3';
 
+/** The solver block without the override maps. */
+export type SolverBlock = Omit<GenSettings['solver'], 'byAct' | 'byTemplate'>;
+
 /** The solver's tuning keys, partial; what a per-act override may change (docs/04 §5). */
 export interface SolverOverride {
   nodeBudget?: number;
@@ -39,6 +42,8 @@ export interface GenSettings {
     expansion: number;
     /** Per-act overrides of the tuning keys; read through solverSettingsFor. */
     byAct?: Partial<Record<ActKey, SolverOverride>>;
+    /** Per-template overrides, applied after byAct; read through solverSettingsFor. */
+    byTemplate?: Record<string, SolverOverride>;
   };
   acceptance: { minSolvableRate: number; medianMateTurnTolerance: number };
 }
@@ -106,6 +111,9 @@ export function loadGenConfig(path: string = DEFAULT_PATH): GenConfig {
       ...(optional(y, 'generation.solver.byAct') === undefined
         ? {}
         : { byAct: structuredClone(optional(y, 'generation.solver.byAct')) as NonNullable<GenSettings['solver']['byAct']> }),
+      ...(optional(y, 'generation.solver.byTemplate') === undefined
+        ? {}
+        : { byTemplate: structuredClone(optional(y, 'generation.solver.byTemplate')) as NonNullable<GenSettings['solver']['byTemplate']> }),
     },
     acceptance: {
       minSolvableRate: num(y, 'generation.acceptance.minSolvableRate'),
@@ -124,19 +132,26 @@ function optional(y: unknown, path: string): unknown {
   return cur;
 }
 
-/** The solver settings for an act (0-based `actIndex`): `byAct[act<n>]` deep-merged over the global block, without `byAct`. */
-export function solverSettingsFor(actIndex: number, config: GenConfig): Omit<GenSettings['solver'], 'byAct'> {
-  const { byAct, ...global } = config.gen.solver;
-  const o = byAct?.[`act${actIndex + 1}` as ActKey];
-  if (!o) return global;
+function mergeOverride(base: SolverBlock, o: SolverOverride | undefined): SolverBlock {
+  if (!o) return base;
   return {
-    ...global,
-    nodeBudget: o.nodeBudget ?? global.nodeBudget,
-    deployment: { ...global.deployment, ...o.deployment },
-    screen: { ...global.screen, ...o.screen },
-    deep: { ...global.deep, ...o.deep },
-    expansion: o.expansion ?? global.expansion,
+    ...base,
+    nodeBudget: o.nodeBudget ?? base.nodeBudget,
+    deployment: { ...base.deployment, ...o.deployment },
+    screen: { ...base.screen, ...o.screen },
+    deep: { ...base.deep, ...o.deep },
+    expansion: o.expansion ?? base.expansion,
   };
+}
+
+/**
+ * The solver settings for a stage of template `templateId` in act `actIndex` (0-based): the global block, then
+ * `byAct[act<n>]`, then `byTemplate[templateId]`, deep-merged in that order, without `byAct` or `byTemplate`.
+ */
+export function solverSettingsFor(actIndex: number, templateId: string, config: GenConfig): SolverBlock {
+  const { byAct, byTemplate, ...global } = config.gen.solver;
+  const withAct = mergeOverride(global, byAct?.[`act${actIndex + 1}` as ActKey]);
+  return mergeOverride(withAct, byTemplate?.[templateId]);
 }
 
 /** Sum of piece values over an enemy army; the king is excluded (mirrors scripts/validate-content.mjs). */

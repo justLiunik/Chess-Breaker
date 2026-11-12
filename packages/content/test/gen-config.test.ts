@@ -47,17 +47,17 @@ describe('loadGenConfig', () => {
 
 describe('solverSettingsFor', () => {
   const c = loadGenConfig();
-  const withByAct = (byAct: unknown): GenConfig =>
-    ({ ...c, gen: { ...c.gen, solver: { ...c.gen.solver, byAct } } }) as GenConfig;
+  const withByAct = (byAct: unknown, byTemplate?: unknown): GenConfig =>
+    ({ ...c, gen: { ...c.gen, solver: { ...c.gen.solver, byAct, byTemplate } } }) as GenConfig;
 
   it('returns the global block when byAct has no entry for the act', () => {
-    const { byAct: _drop, ...global } = c.gen.solver;
-    expect(solverSettingsFor(0, c)).toEqual(global);
-    expect(solverSettingsFor(1, withByAct({ act1: { expansion: 9 } }))).toEqual(global);
+    const { byAct: _a, byTemplate: _t, ...global } = c.gen.solver;
+    expect(solverSettingsFor(0, 'tpl-x', c)).toEqual(global);
+    expect(solverSettingsFor(1, 'tpl-x', withByAct({ act1: { expansion: 9 } }))).toEqual(global);
   });
 
   it('deep-merges a partial override and keeps the other keys', () => {
-    const r = solverSettingsFor(0, withByAct({ act1: { deep: { candidates: 64 }, deployment: { kingSquares: 8 } } }));
+    const r = solverSettingsFor(0, 'tpl-x', withByAct({ act1: { deep: { candidates: 64 }, deployment: { kingSquares: 8 } } }));
     expect(r.deep).toEqual({ candidates: 64, width: c.gen.solver.deep.width });
     expect(r.deployment.kingSquares).toBe(8);
     expect(r.deployment.maxSubsets).toBe(c.gen.solver.deployment.maxSubsets);
@@ -66,14 +66,31 @@ describe('solverSettingsFor', () => {
   });
 
   it('never leaks byAct into the result', () => {
-    expect('byAct' in solverSettingsFor(0, withByAct({ act1: { expansion: 4 } }))).toBe(false);
-    expect('byAct' in solverSettingsFor(2, c)).toBe(false);
+    const r = solverSettingsFor(0, 'tpl-x', withByAct({ act1: { expansion: 4 } }, { 'tpl-x': { expansion: 6 } }));
+    expect('byAct' in r || 'byTemplate' in r).toBe(false);
+    expect('byAct' in solverSettingsFor(2, 'tpl-x', c)).toBe(false);
   });
 
   it('does not mutate a frozen config', () => {
     const cfg = withByAct({ act1: { deep: { candidates: 64 } } });
-    solverSettingsFor(0, cfg);
+    solverSettingsFor(0, 'tpl-x', cfg);
     expect(cfg.gen.solver.deep.candidates).toBe(c.gen.solver.deep.candidates);
+  });
+
+  it('byTemplate overrides byAct, which overrides global; other templates are untouched', () => {
+    const cfg = withByAct(
+      { act1: { expansion: 4, deep: { width: 16 } } },
+      { 'tpl-x': { expansion: 6, deployment: { kingSquares: 8 } } },
+    );
+    const x = solverSettingsFor(0, 'tpl-x', cfg);
+    expect(x.expansion).toBe(6);
+    expect(x.deep.width).toBe(16);
+    expect(x.deployment.kingSquares).toBe(8);
+    const y = solverSettingsFor(0, 'tpl-y', cfg);
+    expect(y.expansion).toBe(4);
+    expect(y.deployment.kingSquares).toBe(c.gen.solver.deployment.kingSquares);
+    expect(solverSettingsFor(1, 'tpl-y', cfg).expansion).toBe(c.gen.solver.expansion);
+    expect(solverSettingsFor(1, 'tpl-x', cfg).expansion).toBe(6);
   });
 
   it('loads byAct from economy.yaml, frozen; absent when the yaml has none', () => {
@@ -84,7 +101,7 @@ describe('solverSettingsFor', () => {
     const loaded = loadGenConfig(file);
     expect(loaded.gen.solver.byAct).toEqual({ act1: { expansion: 5 } });
     expect(Object.isFrozen(loaded.gen.solver.byAct)).toBe(true);
-    expect(solverSettingsFor(0, loaded).expansion).toBe(5);
-    expect(solverSettingsFor(1, loaded).expansion).toBe(3);
+    expect(solverSettingsFor(0, 'tpl-x', loaded).expansion).toBe(5);
+    expect(solverSettingsFor(1, 'tpl-x', loaded).expansion).toBe(3);
   });
 });

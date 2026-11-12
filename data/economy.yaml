@@ -254,6 +254,9 @@ generation:
     screen: { width: 4, turns: 3 }
     deep: { candidates: 8, width: 32 }
     expansion: 3
+    byTemplate:                    # per-template overrides of the tuning keys above (docs/04 §5)
+      tpl-act1-first-steps: { nodeBudget: 5500, deployment: { kingSquares: 8 }, screen: { width: 1 }, deep: { candidates: 48 } }
+      tpl-act1-open-field: { nodeBudget: 5500, deployment: { kingSquares: 8 }, screen: { width: 1 }, deep: { candidates: 48 } }
   acceptance:
     minSolvableRate: 0.95
     medianMateTurnTolerance: 1     # turns, docs/10 M3

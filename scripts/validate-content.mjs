@@ -590,38 +590,58 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     }
   };
   crossKeys(g.solver, 'generation.solver');
-  // byAct: a partial of the tuning keys per act (docs/04 §5); semantics keys are rejected.
+  // byAct / byTemplate: a partial of the tuning keys per act or template (docs/04 §5); semantics keys are rejected.
+  // A template's block is global -> byAct[its act] -> byTemplate[its id], and each merged block obeys crossKeys.
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const allowed = {
+    nodeBudget: null,
+    deployment: ['maxSubsets', 'kingSquares', 'squaresPerPiece', 'maxCandidates'],
+    screen: ['width', 'turns'],
+    deep: ['candidates', 'width'],
+    expansion: null,
+  };
+  const overrideOf = (map, key, label) => {
+    const where = `generation.solver.${label}.${key}`;
+    const o = map[key];
+    if (!isObj(o)) { bad(`${where} must be a mapping`); return false; }
+    for (const [k, v] of Object.entries(o)) {
+      if (!(k in allowed)) { bad(`${where}.${k} is not an overridable tuning key`); continue; }
+      if (allowed[k] === null) { if (!pos(v)) bad(`${where}.${k} must be a positive number`); continue; }
+      if (!isObj(v)) { bad(`${where}.${k} must be a mapping`); continue; }
+      for (const [k2, v2] of Object.entries(v)) {
+        if (!allowed[k].includes(k2)) bad(`${where}.${k}.${k2} is not an overridable tuning key`);
+        else if (!pos(v2)) bad(`${where}.${k}.${k2} must be a positive number`);
+      }
+    }
+    return true;
+  };
+  const mergeOver = (base, o) => ({
+    screen: { ...base.screen, ...(isObj(o?.screen) ? o.screen : {}) },
+    deep: { ...base.deep, ...(isObj(o?.deep) ? o.deep : {}) },
+    deployment: { ...base.deployment, ...(isObj(o?.deployment) ? o.deployment : {}) },
+  });
   const byAct = g.solver?.byAct;
+  const byTemplate = g.solver?.byTemplate;
+  const actBlocks = {};
   if (byAct !== undefined) {
-    const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-    const allowed = {
-      nodeBudget: null,
-      deployment: ['maxSubsets', 'kingSquares', 'squaresPerPiece', 'maxCandidates'],
-      screen: ['width', 'turns'],
-      deep: ['candidates', 'width'],
-      expansion: null,
-    };
     if (!isObj(byAct)) bad('generation.solver.byAct must be a mapping');
     else {
-      for (const [act, o] of Object.entries(byAct)) {
-        const where = `generation.solver.byAct.${act}`;
+      for (const act of Object.keys(byAct)) {
         if (!/^act[1-9]\d*$/.test(act) || Number(act.slice(3)) > actCount) { bad(`generation.solver.byAct.${act} is not an act key (act1..act${actCount})`); continue; }
-        if (!isObj(o)) { bad(`${where} must be a mapping`); continue; }
-        for (const [k, v] of Object.entries(o)) {
-          if (!(k in allowed)) { bad(`${where}.${k} is not an overridable tuning key`); continue; }
-          if (allowed[k] === null) { if (!pos(v)) bad(`${where}.${k} must be a positive number`); continue; }
-          if (!isObj(v)) { bad(`${where}.${k} must be a mapping`); continue; }
-          for (const [k2, v2] of Object.entries(v)) {
-            if (!allowed[k].includes(k2)) bad(`${where}.${k}.${k2} is not an overridable tuning key`);
-            else if (!pos(v2)) bad(`${where}.${k}.${k2} must be a positive number`);
-          }
-        }
-        const merged = {
-          screen: { ...g.solver.screen, ...(isObj(o.screen) ? o.screen : {}) },
-          deep: { ...g.solver.deep, ...(isObj(o.deep) ? o.deep : {}) },
-          deployment: { ...g.solver.deployment, ...(isObj(o.deployment) ? o.deployment : {}) },
-        };
-        crossKeys(merged, `${where} (merged)`);
+        if (!overrideOf(byAct, act, 'byAct')) continue;
+        actBlocks[act] = mergeOver(g.solver, byAct[act]);
+        crossKeys(actBlocks[act], `generation.solver.byAct.${act} (merged)`);
+      }
+    }
+  }
+  if (byTemplate !== undefined) {
+    if (!isObj(byTemplate)) bad('generation.solver.byTemplate must be a mapping');
+    else {
+      for (const id of Object.keys(byTemplate)) {
+        const tpl = templates.find((t) => t.id === id);
+        if (!tpl) { bad(`generation.solver.byTemplate.${id} is not the id of a template in content/templates`); continue; }
+        if (!overrideOf(byTemplate, id, 'byTemplate')) continue;
+        crossKeys(mergeOver(actBlocks[`act${tpl.act}`] ?? g.solver, byTemplate[id]), `generation.solver.byTemplate.${id} (merged with its act)`);
       }
     }
   }

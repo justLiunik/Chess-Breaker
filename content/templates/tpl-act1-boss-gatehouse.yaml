@@ -42,4 +42,4 @@ designNote: >-
   vs 4 / 23% / 12.6 s, 36.5 s). The depth-4 enemy costs about 10
   ms a reply, so an unproven board alone takes 10 s: not yet at the 95%
   acceptance rate nor the 15 s p95.
-  Task 18b (solver.byAct probe, not enabled; 40 stages, 1 worker): the wider act1 override 72.5% proven, p95 67 s against 15.8 s with the global solver, so a per-act Act I override cannot ship.
+  Task 18c: stays on the global solver. The depth-4 enemy costs about 6-10 ms a node, and the wider First Steps / Open Field override took its single-worker p95 from 15.8 s to 67 s (40 stages, 72.5% proven); it is 75% proven, p95 15.8 s as is (20 stages).

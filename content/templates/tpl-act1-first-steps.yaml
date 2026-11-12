@@ -50,4 +50,4 @@ designNote: >-
   deployment candidate searched deep (kingSquares 8, deep.candidates 64),
   spawnPoints 9 is 83% proven at about 15,000 nodes and 22 s a stage, over
   the 15 s p95 target. Not yet at the 95% acceptance rate.
-  Task 18b (solver.byAct probe, not enabled; 200 stages): the global solver 30% proven; act1 {nodeBudget 5500, kingSquares 8, screen.width 1, deep.candidates 48} 64% / p95 38 s with 7 workers, 14 s with 1 (40 stages, 55%).
+  Task 18c (solver.byTemplate, enabled: nodeBudget 5500, kingSquares 8, screen.width 1, deep.candidates 48; the mating deployments rank 16th-23rd in screening, outside the default top 8): 200 stages 64% proven (global solver 30%), 4 vs 5 mating turn vs par; single worker, 40 stages: 55% / median 8.6 s / p95 13.9 s.
