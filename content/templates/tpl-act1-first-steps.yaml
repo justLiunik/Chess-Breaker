@@ -4,7 +4,6 @@ act: 1
 tier: normal
 mateIn: [4, 5]
 placement: fixed
-spawnPoints: 6      # Act I's 9 minus a minor: two summons at most on the very first stage
 fixedEnemy:
   e8: king
   a7: pawn
@@ -14,8 +13,8 @@ fixedEnemy:
   g7: pawn
   c6: knight
 spawnedPawns:
-  count: [2, 2]
-  ranks: [3, 4]
+  count: [4, 4]
+  ranks: [5]
 focusPool: 3
 enemyPolicy:
   type: scripted
@@ -34,4 +33,20 @@ designNote: >-
   is hand-placed and the knight follows a short script; if the player
   captures it or blocks its path, the enemy falls back to a depth-2
   best_move. The solver still validates the stage against the player's
-  actual deck before it is shown.
+  actual deck before it is shown. The player gets Act I's full 9 spawn
+  points and four pawns on rank 5, close enough to the open d- and e-files
+  in front of the king to join the attack.
+  Tuned on gen:report evidence (M3 Task 18; starter deck, seeds
+  report-tpl-act1-first-steps-0..23, default solver; proven / median mating
+  turn vs par / bonus pawn / wall p95). Before: spawnPoints 6, 2 pawns on
+  ranks 3-4: 0% / - vs 4.0 / 100% / 6.6 s (20 seeds). spawnPoints 9: 0% (12
+  seeds). spawnPoints 9, 2 pawns on rank 5: 8% (12 seeds). spawnPoints 6, 4
+  pawns on rank 5: 0% / - / 100% / 7.1 s. spawnPoints 9, 3 pawns on rank 5: 8%
+  (12 seeds); 4 pawns on ranks 4-5: 17% (12 seeds). spawnPoints 9, mate in 5:
+  0% (12 seeds). After, spawnPoints 9 and 4 pawns on rank 5: 38% / 3 vs 4 /
+  63% / 9.3 s (gen:report, 200 stages: 30% / 4 vs 5 / 70% / 8.3 s); 5 pawns:
+  33%; 6 pawns: 33%; with mate in 5: 38% / 3 vs 5.
+  The mates exist but sit outside the solver's default reach: with every
+  deployment candidate searched deep (kingSquares 8, deep.candidates 64),
+  spawnPoints 9 is 83% proven at about 15,000 nodes and 22 s a stage, over
+  the 15 s p95 target. Not yet at the 95% acceptance rate.

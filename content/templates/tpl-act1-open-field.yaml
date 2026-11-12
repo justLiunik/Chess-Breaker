@@ -2,14 +2,14 @@ id: tpl-act1-open-field
 title: Open Field
 act: 1
 tier: normal
-mateIn: [4, 5]
+mateIn: [5, 5]
 enemyArmy:
-  pawn: [5, 6]
-  knight: [1, 1]
+  pawn: [2, 4]
+  rook: [1, 1]
 enemyZone: [7, 8]
 spawnedPawns:
-  count: [2, 2]
-  ranks: [3, 4]
+  count: [3, 4]
+  ranks: [6]
 focusPool: 3
 enemyPolicy:
   type: best_move
@@ -23,6 +23,22 @@ preconditions:
   - enemy_value_in_band
   - spawned_pawns_placed
 designNote: >-
-  Teaching template. Enemy army value 8-9 against a mate in 4-5: enough
+  Teaching template. Enemy army value 7-9 against a mate in 5: enough
   slack to learn summoning and the par counter without the stage being a
-  free win. Depth-2 policy punishes obvious hangs only.
+  free win. Depth-2 policy punishes obvious hangs only. The pawns spawned on
+  rank 6, right under the enemy's pawn line, are the starter deck's mating
+  material and a two-move promotion, so Act I teaches both.
+  Tuned on gen:report evidence (M3 Task 18; starter deck, seeds
+  report-tpl-act1-open-field-0..23, default solver; proven / median mating
+  turn vs par / bonus pawn / wall p95). Before: pawn 5-6 + knight in [7, 8],
+  2 pawns on ranks 3-4, mate in 4-5: 35% / 2.0 vs 4.5 / 65% / 9.4 s (20
+  seeds), formation pool 1. Zone [6, 8], same army: 4% / 2 vs 4 / 96% / 10.4 s.
+  Zone [6, 8], pawn 2-4 + rook (the Lichess pool's most common Act I
+  composition): 13% / 4 vs 4 / 88% / 9.2 s. Zone [7, 8], pawn 2-4 + rook: 0%
+  / - / 100% / 9.3 s (pool 50 of 425). Zone [6, 8], pawn 4-5 + bishop: 17% /
+  4 vs 4 / 83% / 9.9 s. Zone [7, 8] rook army with 3-4 pawns on ranks 5-6:
+  67% / 4 vs 4 / 33% / 8.9 s; 4 pawns on ranks 5-6: 71% / 4 vs 4 / 29% /
+  9.1 s; 3-4 pawns on rank 6: 92% / 4 vs 4 / 8% / 8.6 s; 4 pawns on rank 6:
+  88% / 4 vs 4 / 13% / 9.8 s. After, 3-4 pawns on rank 6 and mate in 5: 96%
+  / 4 vs 5 / 4% / 8.8 s on seeds 0-23, but 82% / 4 vs 5 / 18% / 8.7 s on
+  gen:report's 200 stages: not yet at the 95% acceptance rate.

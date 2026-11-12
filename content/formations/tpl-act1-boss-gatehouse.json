@@ -8,20 +8,15 @@
   },
   "filters": {
     "enemyZone": [
-      6,
       7,
       8
     ],
     "enemyArmy": {
       "pawn": [
-        3,
-        4
+        4,
+        6
       ],
-      "knight": [
-        1,
-        1
-      ],
-      "bishop": [
+      "rook": [
         1,
         1
       ]
@@ -34,254 +29,254 @@
   },
   "formations": [
     {
-      "id": "HNB0f",
-      "rating": 820,
-      "black": "8/5ppp/b1kn4/8/8/8/8/8"
+      "id": "Gbyn5",
+      "rating": 399,
+      "black": "1k6/pppr3p/8/8/8/8/8/8"
     },
     {
-      "id": "PWkCJ",
-      "rating": 451,
-      "black": "5n1k/p5pp/1b6/8/8/8/8/8"
+      "id": "MHSSm",
+      "rating": 1376,
+      "black": "4r3/1p1k1ppp/8/8/8/8/8/8"
     },
     {
-      "id": "PJszu",
-      "rating": 1606,
-      "black": "2bk4/1p1n2p1/2p4p/8/8/8/8/8"
+      "id": "nKYQg",
+      "rating": 565,
+      "black": "6k1/ppp1rppp/8/8/8/8/8/8"
     },
     {
-      "id": "GpbQX",
-      "rating": 1054,
-      "black": "8/p4p2/1b2p1nk/8/8/8/8/8"
+      "id": "p4g06",
+      "rating": 816,
+      "black": "6k1/pp1r1ppp/8/8/8/8/8/8"
     },
     {
-      "id": "MYR8K",
-      "rating": 1182,
-      "black": "6k1/p1b2pp1/2n4p/8/8/8/8/8"
+      "id": "obeGh",
+      "rating": 2622,
+      "black": "6k1/p1p1r1pp/8/8/8/8/8/8"
     },
     {
-      "id": "P3nN4",
-      "rating": 965,
-      "black": "8/2k2pbp/2n2p2/8/8/8/8/8"
+      "id": "cMBdr",
+      "rating": 658,
+      "black": "6k1/p2r1ppp/8/8/8/8/8/8"
     },
     {
-      "id": "MMskv",
-      "rating": 632,
-      "black": "4k3/1bn2ppp/8/8/8/8/8/8"
-    },
-    {
-      "id": "4qoIu",
-      "rating": 948,
-      "black": "6k1/5npp/p1p2b2/8/8/8/8/8"
-    },
-    {
-      "id": "d5GEj",
-      "rating": 806,
-      "black": "4n1k1/5p1p/p4bp1/8/8/8/8/8"
-    },
-    {
-      "id": "NayMN",
-      "rating": 1863,
-      "black": "5k2/5bp1/1n3p1p/8/8/8/8/8"
-    },
-    {
-      "id": "l35cI",
-      "rating": 1250,
-      "black": "8/1p3p2/p1k1n1b1/8/8/8/8/8"
-    },
-    {
-      "id": "xsiXl",
-      "rating": 2493,
-      "black": "4n3/p2b1kp1/1p5p/8/8/8/8/8"
-    },
-    {
-      "id": "TEvZI",
-      "rating": 852,
-      "black": "1b6/5pp1/pn2k2p/8/8/8/8/8"
-    },
-    {
-      "id": "C0z9e",
-      "rating": 941,
-      "black": "8/1p3b1p/n1p1k1p1/8/8/8/8/8"
-    },
-    {
-      "id": "G6uMU",
-      "rating": 2140,
-      "black": "5n2/2bk3p/1p4p1/8/8/8/8/8"
-    },
-    {
-      "id": "GKOFv",
-      "rating": 1593,
-      "black": "8/5pkp/1b1n2p1/8/8/8/8/8"
-    },
-    {
-      "id": "iacI0",
-      "rating": 1401,
-      "black": "2k5/2p3p1/1n1p1b1p/8/8/8/8/8"
-    },
-    {
-      "id": "nz6bj",
-      "rating": 1674,
-      "black": "3k4/5ppp/3bpn2/8/8/8/8/8"
-    },
-    {
-      "id": "WDeXf",
-      "rating": 1877,
-      "black": "3k4/pp6/2pb1n2/8/8/8/8/8"
-    },
-    {
-      "id": "i4ZVU",
-      "rating": 1253,
-      "black": "4k3/5ppp/1n3b2/8/8/8/8/8"
-    },
-    {
-      "id": "w1oEl",
-      "rating": 624,
-      "black": "8/pp4k1/n1pb4/8/8/8/8/8"
-    },
-    {
-      "id": "2BN8k",
-      "rating": 778,
-      "black": "2b3k1/5pp1/p4n1p/8/8/8/8/8"
-    },
-    {
-      "id": "ddNjB",
-      "rating": 2069,
-      "black": "1k2b3/1pp2p2/p3n3/8/8/8/8/8"
-    },
-    {
-      "id": "PMCoV",
-      "rating": 1129,
-      "black": "5kn1/pb3p1p/6p1/8/8/8/8/8"
-    },
-    {
-      "id": "QQAy4",
-      "rating": 1247,
-      "black": "1n6/b2k2pp/5p2/8/8/8/8/8"
-    },
-    {
-      "id": "k779j",
-      "rating": 784,
-      "black": "5b2/ppn2k1p/2p5/8/8/8/8/8"
-    },
-    {
-      "id": "3Yixc",
-      "rating": 1080,
-      "black": "4n3/1p1bk2p/p5p1/8/8/8/8/8"
-    },
-    {
-      "id": "oRpba",
-      "rating": 790,
-      "black": "2n5/1p3pk1/2b3p1/8/8/8/8/8"
-    },
-    {
-      "id": "aS3kD",
-      "rating": 973,
-      "black": "5k2/1p3ppp/n3b3/8/8/8/8/8"
-    },
-    {
-      "id": "IcFmo",
-      "rating": 1447,
-      "black": "8/p6k/1p1nbpp1/8/8/8/8/8"
-    },
-    {
-      "id": "PCO3i",
-      "rating": 2107,
-      "black": "8/3bnppp/4k3/8/8/8/8/8"
-    },
-    {
-      "id": "lR5EB",
-      "rating": 1337,
-      "black": "5k2/p4p1p/1b3np1/8/8/8/8/8"
-    },
-    {
-      "id": "3dO9g",
-      "rating": 1556,
-      "black": "1n6/p2kppb1/6p1/8/8/8/8/8"
-    },
-    {
-      "id": "V6GnN",
-      "rating": 2450,
-      "black": "2k5/1pp2p1b/p4n2/8/8/8/8/8"
-    },
-    {
-      "id": "Xq8HF",
-      "rating": 1577,
-      "black": "1b6/1p3p2/1k1pnp2/8/8/8/8/8"
-    },
-    {
-      "id": "owqGZ",
-      "rating": 2525,
-      "black": "4b1k1/p5p1/n6p/8/8/8/8/8"
-    },
-    {
-      "id": "p0kZK",
-      "rating": 1691,
-      "black": "8/1p4p1/p1b1n1kp/8/8/8/8/8"
-    },
-    {
-      "id": "Encir",
-      "rating": 888,
-      "black": "4k3/p5p1/1bn2p1p/8/8/8/8/8"
-    },
-    {
-      "id": "bMgzz",
-      "rating": 490,
-      "black": "8/5kpp/p1bn4/8/8/8/8/8"
-    },
-    {
-      "id": "EX1q3",
-      "rating": 1365,
-      "black": "8/p6p/1bpk1n2/8/8/8/8/8"
-    },
-    {
-      "id": "zuYXU",
-      "rating": 943,
-      "black": "4n3/6p1/p3bpkp/8/8/8/8/8"
-    },
-    {
-      "id": "JvZgM",
-      "rating": 865,
-      "black": "4b3/8/1p1k1npp/8/8/8/8/8"
-    },
-    {
-      "id": "BWD0o",
-      "rating": 1278,
-      "black": "2n3k1/1p3p1p/1b4p1/8/8/8/8/8"
-    },
-    {
-      "id": "dub5X",
-      "rating": 1624,
-      "black": "6k1/2n4p/3b1pp1/8/8/8/8/8"
-    },
-    {
-      "id": "jkCsg",
-      "rating": 1626,
-      "black": "6k1/1pp1b2p/p1n5/8/8/8/8/8"
-    },
-    {
-      "id": "JbXZw",
-      "rating": 856,
-      "black": "8/4kpp1/1b2pn1p/8/8/8/8/8"
-    },
-    {
-      "id": "91qRt",
+      "id": "0t1cf",
       "rating": 400,
-      "black": "4k3/p2np3/1p3b2/8/8/8/8/8"
+      "black": "6k1/pp2rppp/8/8/8/8/8/8"
     },
     {
-      "id": "gTPfj",
-      "rating": 2413,
-      "black": "4n3/1p3k2/p1b2p2/8/8/8/8/8"
+      "id": "u5x4H",
+      "rating": 540,
+      "black": "7k/ppp2rpp/8/8/8/8/8/8"
     },
     {
-      "id": "KyaWQ",
-      "rating": 1153,
-      "black": "8/3n1pp1/2b2k1p/8/8/8/8/8"
+      "id": "jpA0c",
+      "rating": 1002,
+      "black": "4r2k/pp3p1p/8/8/8/8/8/8"
     },
     {
-      "id": "YNqxV",
-      "rating": 582,
-      "black": "6k1/p2n2p1/1p2b2p/8/8/8/8/8"
+      "id": "zSmSK",
+      "rating": 625,
+      "black": "3r2k1/p4ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "K2kZS",
+      "rating": 491,
+      "black": "7k/pp1r2pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "9FGvO",
+      "rating": 482,
+      "black": "7k/pp3rpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ixRuo",
+      "rating": 767,
+      "black": "8/ppr1kppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "0WUGu",
+      "rating": 570,
+      "black": "6k1/pr3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "v3Zle",
+      "rating": 600,
+      "black": "7k/pp2r1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "RK6QI",
+      "rating": 1870,
+      "black": "5r2/pp2k1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "cIUb3",
+      "rating": 399,
+      "black": "5r1k/p1p3pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "8ZEIM",
+      "rating": 458,
+      "black": "7k/pp2rppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "awpkY",
+      "rating": 400,
+      "black": "6k1/pppr1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "wa9L7",
+      "rating": 400,
+      "black": "6k1/ppr2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "Kh5d6",
+      "rating": 815,
+      "black": "5k2/ppp1r1p1/8/8/8/8/8/8"
+    },
+    {
+      "id": "4V8c7",
+      "rating": 616,
+      "black": "4r1k1/pp3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "NzfwL",
+      "rating": 618,
+      "black": "2r3k1/pp3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "OzMqu",
+      "rating": 458,
+      "black": "6k1/p1r2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ZzBl6",
+      "rating": 946,
+      "black": "7k/p1p1r1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "tPRfl",
+      "rating": 1320,
+      "black": "5rk1/pp4pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "NkT2U",
+      "rating": 2162,
+      "black": "4r1k1/p4ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ImEqj",
+      "rating": 663,
+      "black": "5k2/pr3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ISDRi",
+      "rating": 1085,
+      "black": "1r6/pp2kp1p/8/8/8/8/8/8"
+    },
+    {
+      "id": "l8RDv",
+      "rating": 1334,
+      "black": "4r3/pp1k2pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ui2ic",
+      "rating": 1938,
+      "black": "6k1/rp3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "Ccd1k",
+      "rating": 1391,
+      "black": "1r6/p1k2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "EImZN",
+      "rating": 580,
+      "black": "7k/ppp1r1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "713g4",
+      "rating": 603,
+      "black": "6k1/2pr1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ddNLf",
+      "rating": 1471,
+      "black": "5r2/ppp1k1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "iuESb",
+      "rating": 1154,
+      "black": "4k3/prp2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "K4bte",
+      "rating": 432,
+      "black": "6k1/1p1r1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "C7BVD",
+      "rating": 554,
+      "black": "2k1r3/ppp3pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ypyhH",
+      "rating": 572,
+      "black": "k3r3/pp3p1p/8/8/8/8/8/8"
+    },
+    {
+      "id": "Lc2j1",
+      "rating": 813,
+      "black": "6k1/1pr2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "GhTR9",
+      "rating": 925,
+      "black": "8/p1kr1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "uKO3f",
+      "rating": 2622,
+      "black": "1k1r4/pp4pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "G1Nyh",
+      "rating": 699,
+      "black": "2r2k2/p4ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "GnHou",
+      "rating": 553,
+      "black": "4r2k/pp4pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "GQTtt",
+      "rating": 549,
+      "black": "2r3k1/pp3pp1/8/8/8/8/8/8"
+    },
+    {
+      "id": "GkEL3",
+      "rating": 1087,
+      "black": "8/prp1kppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "2yywv",
+      "rating": 754,
+      "black": "5k2/p3rppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "j9IV3",
+      "rating": 1066,
+      "black": "6k1/1p2rppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "jDqIo",
+      "rating": 1416,
+      "black": "4k3/pr3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "DLMz8",
+      "rating": 579,
+      "black": "5k2/ppp2pr1/8/8/8/8/8/8"
     }
   ]
 }

@@ -30,13 +30,19 @@ for (const t of templates) {
 pairs.sort((a, b) => a.actIndex - b.actIndex || a.stageIndex - b.stageIndex);
 
 const ACT3_STAGES = 40; // Act III stages in the run
-const ACT3_MAX_FAILED_RATE = 0.35; // observed ~0.25
-const TIMEOUT_MS = 110_000; // ~2x the measured 54 s
+// validationFailed stages allowed per act, as measured: none in Acts I-II; in Act III one of the 40
+// (BULK-34, tpl-act3-last-line), whose 20 boards all have a turn-1 mate for the strong deck.
+const MAX_VALIDATION_FAILED = [0, 0, 1];
+const TIMEOUT_MS = 110_000; // ~2x the measured 50 s
 
 describe('1,000-stage CI run', () => {
+  it('covers all nine (act, stage) pairs', () => {
+    expect(pairs).toEqual([0, 1, 2].flatMap((actIndex) => [0, 1, 2].map((stageIndex) => ({ actIndex, stageIndex }))));
+  });
+
   it('every stage is a valid, deterministic Deployment-phase stage', { timeout: TIMEOUT_MS }, () => {
     let act3 = 0;
-    let act3Failed = 0;
+    const failedByAct = [0, 0, 0];
     for (let i = 0; i < 1000; i++) {
       const { actIndex, stageIndex } = pairs[i % pairs.length]!;
       // Act III is the slow one (strong Legendary deck): cap its share, Acts I-II run as before.
@@ -53,11 +59,10 @@ describe('1,000-stage CI run', () => {
       expect(stage.phase, where).toBe('deployment');
       const pieces = Object.values(stage.board);
       expect(pieces.some((p) => p.color === 'white' && !p.spawned), where).toBe(false);
-      // The strong Act III deck turn-1 mates a share of Act III boss boards, so G5 can fail on every attempt;
-      // the pipeline then emits the last board flagged validationFailed. Only Act III may do so; such a stage
-      // must still have a failing precondition, and every other stage must pass all of them.
-      if (actIndex !== 2) expect(provenance.validationFailed, where).toBeUndefined();
-      if (provenance.validationFailed) act3Failed++;
+      // A template whose 20 attempts all fail G5 (the strong Act III deck mating on turn 1, say) makes the
+      // pipeline emit the last board flagged validationFailed: such a stage must still have a failing
+      // precondition, every other stage must pass all of them, and the run counts them per act.
+      if (provenance.validationFailed) failedByAct[actIndex]!++;
       const failed = checkPreconditions(run, stage, tpl, { extraPawns: 0 }, config);
       if (provenance.validationFailed) expect(failed, where).not.toBeNull();
       else expect(failed, where).toBeNull();
@@ -73,8 +78,9 @@ describe('1,000-stage CI run', () => {
         JSON.stringify({ stage, provenance }),
       );
     }
-    // Task 18 tunes the Act III templates and tightens this bound.
     expect(act3, 'Act III stages run').toBe(ACT3_STAGES);
-    expect(act3Failed / act3, 'Act III validationFailed rate').toBeLessThanOrEqual(ACT3_MAX_FAILED_RATE);
+    failedByAct.forEach((n, a) => {
+      expect(n, `act ${a + 1} validationFailed stages`).toBeLessThanOrEqual(MAX_VALIDATION_FAILED[a]!);
+    });
   });
 });

@@ -84,7 +84,7 @@ describe('mirrorPlacement', () => {
 describe('rejectReason', () => {
   const open = tpl('tpl-act1-open-field');
   it('accepts a matching formation', () => {
-    expect(rejectReason(placementOf('oF001'), open, config)).toBeNull();
+    expect(rejectReason(placementOf('oR001'), open, config)).toBeNull();
   });
   it('rejects zone', () => {
     expect(rejectReason(placementOf('zN001'), open, config)).toBe('zone');
@@ -100,10 +100,10 @@ describe('rejectReason', () => {
       ...redoubt,
       act: 1,
       tier: 'normal',
-      enemyArmy: { pawn: [0, 8], knight: [0, 2], bishop: [0, 1], rook: [0, 1] },
+      enemyArmy: { pawn: [0, 8], knight: [0, 2], bishop: [0, 1], rook: [0, 1], queen: [0, 1] },
     };
-    expect(rejectReason(placementOf('rD001'), redoubt, config)).toBeNull();
-    expect(rejectReason(placementOf('rD001'), loose, config)).toBe('value');
+    expect(rejectReason(placementOf('rQ001'), redoubt, config)).toBeNull();
+    expect(rejectReason(placementOf('rQ001'), loose, config)).toBe('value');
   });
   it('rejects a pawn on rank 8 (chess.js cannot produce one, so the placement is given directly)', () => {
     expect(rejectReason('pn4k1/pp3ppp/8/8/8/8/8/8', { ...open, enemyArmy: { pawn: [6, 6], knight: [1, 1] } }, config)).toBe('pawn_rank8');
@@ -124,20 +124,22 @@ describe('extractFormations', () => {
   });
 
   it('keeps only the first of mirrored (and identical) formations in mix32 order', () => {
-    const first = ['oF001', 'oF002', 'oF003'].sort(byOrder)[0]!;
-    expect(open.map((f) => f.id).filter((i) => i.startsWith('oF'))).toEqual([first]);
+    const first = ['oR001', 'oR002', 'oR003'].sort(byOrder)[0]!;
+    expect(open.map((f) => f.id).filter((i) => i.startsWith('oR'))).toEqual([first]);
   });
 
   it('sorts survivors by (mix32(hash(id)), id) and stores the black placement', () => {
     const ids = open.map((f) => f.id);
     expect(ids).toEqual([...ids].sort(byOrder));
-    expect(open.find((f) => f.id === 'wD001')).toEqual({ id: 'wD001', rating: 1400, black: '1n5k/p1p2ppp/8/8/8/8/8/8' });
+    expect(open.find((f) => f.id === 'wR001')).toEqual({ id: 'wR001', rating: 1420, black: 'r6k/p5pp/8/8/8/8/8/8' });
   });
 
   it('finds survivors for the other templates and records rejections', () => {
-    expect(out.byTemplate['tpl-act1-boss-gatehouse']!.map((f) => f.id).sort()).toEqual(['gH001', 'gH002']);
+    expect(out.byTemplate['tpl-act1-boss-gatehouse']!.map((f) => f.id).sort()).toEqual(['gR001', 'gR002']);
+    expect(out.byTemplate['tpl-act2-boss-citadel']!.map((f) => f.id).sort()).toEqual(['cT001']);
     expect(out.byTemplate['tpl-act2-fortress']!.map((f) => f.id).sort()).toEqual(['fT001', 'fT002']);
-    expect(out.byTemplate['tpl-act3-boss-redoubt']!.map((f) => f.id).sort()).toEqual(['rD001', 'rD002']);
+    expect(out.byTemplate['tpl-act3-boss-redoubt']!.map((f) => f.id).sort()).toEqual(['rQ001', 'rQ002']);
+    expect(out.byTemplate['tpl-act3-last-line']!.map((f) => f.id).sort()).toEqual(['lL001']);
     expect(out.stats.rejected['tpl-act1-open-field']!['zone']).toBeGreaterThan(0);
     expect(out.stats.rejected['tpl-act1-open-field']!['army']).toBeGreaterThan(0);
   });
@@ -155,8 +157,10 @@ describe('main', () => {
       expect(files).toEqual([
         'tpl-act1-boss-gatehouse.json',
         'tpl-act1-open-field.json',
+        'tpl-act2-boss-citadel.json',
         'tpl-act2-fortress.json',
         'tpl-act3-boss-redoubt.json',
+        'tpl-act3-last-line.json',
       ]);
       for (const f of files) expect(readFileSync(join(a, f))).toEqual(readFileSync(join(b, f)));
       const text = readFileSync(join(a, 'tpl-act1-open-field.json'), 'utf8');

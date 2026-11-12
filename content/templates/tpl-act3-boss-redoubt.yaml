@@ -4,13 +4,14 @@ act: 3
 tier: boss
 mateIn: [2, 2]
 enemyArmy:
-  pawn: [6, 7]
-  knight: [2, 2]
+  pawn: [5, 6]
+  knight: [1, 1]
   bishop: [1, 1]
   rook: [1, 1]
+  queen: [1, 1]
 enemyZone: [6, 7, 8]
 spawnedPawns:
-  count: [1, 1]
+  count: [1, 2]
   ranks: [4, 5]
 focusPool: 3
 enemyPolicy:
@@ -25,7 +26,22 @@ preconditions:
   - enemy_value_in_band
   - spawned_pawns_placed
 designNote: >-
-  Boss. Enemy value 20-21, mate in 2, depth-4 policy. There is no line that
+  Boss. Enemy value 25-26, mate in 2, depth-4 policy. There is no line that
   does not spend charges and durability. The player who banked coins into
   Act III wins here; the player who emptied the deck in Act I does not.
   Enemy skills are reserved for M6 (docs/11 §B).
+  Tuned on gen:report evidence (M3 Task 18; strong deck, seeds
+  report-tpl-act3-boss-redoubt-0..23, default solver; proven / validationFailed
+  / bonus pawn / wall p95, every mate on turn 2 against a par of 2). Before:
+  pawn 6-7 + two knights + bishop + rook, 1 pawn on ranks 4-5: 71% / 7 of 24
+  / 0% / 6.8 s, the strong deck mating on turn 1 so often that a stage used
+  all 20 attempts. spawnPoints 15: 67% / 7. Pawn 3-5 + two rooks + queen in
+  [7, 8]: 13% / 21, the back rank mates in one. Pawn 5 + bishop + two rooks +
+  queen (the Lichess pool's most common boss composition for the zone): 83% /
+  3 / 4% / 7.8 s; with spawnPoints 15: 83% / 3; with the pawn on ranks 3-4:
+  88% / 2. Pawn 5-6 + knight + bishop + rook + queen: 92% / 1 / 4% / 13.4 s;
+  pawn 4-6: 75% / 4; spawnPoints 15: 88% / 1. After, pawn 5-6 + knight +
+  bishop + rook + queen with 1-2 pawns on ranks 4-5: 96% / 1 / 0% / 10.7 s
+  on seeds 0-23, but 85.5% / 21 of 200 / 4% / 13.0 s on gen:report's 200
+  stages: the strong deck's turn-1 mates still exhaust all 20 attempts on
+  about one stage in ten, short of the 95% acceptance rate.

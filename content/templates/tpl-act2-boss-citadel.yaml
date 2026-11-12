@@ -1,0 +1,40 @@
+id: tpl-act2-boss-citadel
+title: The Citadel
+act: 2
+tier: boss
+mateIn: [4, 4]
+enemyArmy:
+  pawn: [3, 5]
+  rook: [2, 2]
+enemyZone: [6, 7, 8]
+spawnedPawns:
+  count: [1, 2]
+  ranks: [3, 4]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 4
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Act II boss. Enemy value 13-15 (the Act II band x1.25 is 12.5-17.5), mate
+  in 4 (Act II's par after Fortress was tuned), depth-4 policy. Two rooks hold
+  the back ranks behind a thin pawn screen: the player's summons must cut the
+  rooks off from the king before the par runs out, or be traded off by them.
+  Army from the Lichess pool (M3 Task 18 compositions report, zone [6, 8],
+  band 12.5-17.5): pawn 3 + rook + queen is the most common single
+  composition (1,871 rows), pawn 3-5 + two rooks the most common family
+  (2,982 rows over its three counts). Measured with gen:report's mid deck and
+  seeds report-tpl-act2-boss-citadel-<i>, default solver (proven / median
+  mating turn vs par / bonus pawn / wall p95). Mate in 3, 1-2 pawns on ranks
+  3-4: pawn 2-3 + rook + queen 71% / 2 vs 3 / 29% / 14.1 s (seeds 0-23); pawn
+  3-5 + two rooks 96% / 2 vs 3 / 4% / 9.1 s (seeds 0-23), 91% / 3 vs 3 / 9% /
+  11.7 s (seeds 0-79), 89% / 3 vs 3 / 11% / 12.4 s (gen:report, 200 stages).
+  On seeds 0-79: 2-3 pawns on rank 5 89%; 1-2 pawns on rank 5 91%; 2 pawns on
+  ranks 4-5 85%. After, mate in 4: 99% / 3 vs 4 / 1% / 10.0 s (seeds 0-79).

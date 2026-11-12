@@ -1,0 +1,283 @@
+{
+  "templateId": "tpl-act2-boss-citadel",
+  "source": {
+    "url": "https://database.lichess.org/#puzzles",
+    "licence": "CC0",
+    "date": "2026-11-01",
+    "sha256": "7b0d235fa40cfd7fdb7df1fec56a96b3b6ee1496b32ed2eb05be90d0ebf94253"
+  },
+  "filters": {
+    "enemyZone": [
+      6,
+      7,
+      8
+    ],
+    "enemyArmy": {
+      "pawn": [
+        3,
+        5
+      ],
+      "rook": [
+        2,
+        2
+      ]
+    },
+    "valueBand": [
+      12.5,
+      17.5
+    ],
+    "noPawnOnRank8": true
+  },
+  "formations": [
+    {
+      "id": "y9ThH",
+      "rating": 917,
+      "black": "7k/3r2pp/1pp4r/8/8/8/8/8"
+    },
+    {
+      "id": "OX9nl",
+      "rating": 961,
+      "black": "3r2k1/1r3pp1/7p/8/8/8/8/8"
+    },
+    {
+      "id": "cu0Mv",
+      "rating": 1055,
+      "black": "8/pp2rpkp/4rp2/8/8/8/8/8"
+    },
+    {
+      "id": "Mq7KZ",
+      "rating": 1058,
+      "black": "2r1r3/ppp5/5kpp/8/8/8/8/8"
+    },
+    {
+      "id": "tULhU",
+      "rating": 873,
+      "black": "r7/1r3k2/4p1pp/8/8/8/8/8"
+    },
+    {
+      "id": "ofU3y",
+      "rating": 1520,
+      "black": "6r1/ppk2r2/2p5/8/8/8/8/8"
+    },
+    {
+      "id": "USXWv",
+      "rating": 1083,
+      "black": "8/2r2ppk/2r3p1/8/8/8/8/8"
+    },
+    {
+      "id": "LO3La",
+      "rating": 2060,
+      "black": "7k/1r3rpp/p7/8/8/8/8/8"
+    },
+    {
+      "id": "s93ur",
+      "rating": 1048,
+      "black": "r4k2/4p2p/p5pr/8/8/8/8/8"
+    },
+    {
+      "id": "KzSpR",
+      "rating": 479,
+      "black": "7k/1p2r1pp/r7/8/8/8/8/8"
+    },
+    {
+      "id": "h04lS",
+      "rating": 513,
+      "black": "6k1/r3r1pp/p7/8/8/8/8/8"
+    },
+    {
+      "id": "c34ds",
+      "rating": 1132,
+      "black": "r2r4/1k2pp1p/p5p1/8/8/8/8/8"
+    },
+    {
+      "id": "rZlUn",
+      "rating": 1322,
+      "black": "6r1/1p6/p1p1k1r1/8/8/8/8/8"
+    },
+    {
+      "id": "lo0N4",
+      "rating": 1634,
+      "black": "4rk1r/pp3p1p/2p5/8/8/8/8/8"
+    },
+    {
+      "id": "wFwSc",
+      "rating": 846,
+      "black": "5r2/p3rpkp/1p4p1/8/8/8/8/8"
+    },
+    {
+      "id": "RYb4Y",
+      "rating": 895,
+      "black": "1r4k1/2r2pp1/4p2p/8/8/8/8/8"
+    },
+    {
+      "id": "qKLbM",
+      "rating": 973,
+      "black": "r7/4kp1p/p4p1r/8/8/8/8/8"
+    },
+    {
+      "id": "sJTV0",
+      "rating": 807,
+      "black": "6k1/1p1r1pp1/p5r1/8/8/8/8/8"
+    },
+    {
+      "id": "nSnTl",
+      "rating": 2318,
+      "black": "8/8/ppprrkpp/8/8/8/8/8"
+    },
+    {
+      "id": "GIrUn",
+      "rating": 1293,
+      "black": "1kr5/1p1r1ppp/p7/8/8/8/8/8"
+    },
+    {
+      "id": "AeqpZ",
+      "rating": 1499,
+      "black": "2r5/6p1/2rk1p1p/8/8/8/8/8"
+    },
+    {
+      "id": "Bed8f",
+      "rating": 1081,
+      "black": "6k1/1r5p/1p2r1p1/8/8/8/8/8"
+    },
+    {
+      "id": "7gqoM",
+      "rating": 580,
+      "black": "6k1/3r1p1p/r4pp1/8/8/8/8/8"
+    },
+    {
+      "id": "AyQ74",
+      "rating": 604,
+      "black": "2r5/1p3p1k/p1r3p1/8/8/8/8/8"
+    },
+    {
+      "id": "Ght8l",
+      "rating": 420,
+      "black": "1k5r/ppp4p/2r3p1/8/8/8/8/8"
+    },
+    {
+      "id": "vIhtt",
+      "rating": 1122,
+      "black": "6k1/3r2pp/p2r4/8/8/8/8/8"
+    },
+    {
+      "id": "lvRp7",
+      "rating": 1287,
+      "black": "3rr1k1/5p1p/6p1/8/8/8/8/8"
+    },
+    {
+      "id": "hBAHY",
+      "rating": 1338,
+      "black": "8/3r1k1p/rp3pp1/8/8/8/8/8"
+    },
+    {
+      "id": "cGxtu",
+      "rating": 936,
+      "black": "8/7p/p3rkpr/8/8/8/8/8"
+    },
+    {
+      "id": "rvCpA",
+      "rating": 1486,
+      "black": "1r6/5kp1/ppr2p1p/8/8/8/8/8"
+    },
+    {
+      "id": "hWj1J",
+      "rating": 1271,
+      "black": "8/2pk1r1p/2p1r3/8/8/8/8/8"
+    },
+    {
+      "id": "lmb9t",
+      "rating": 1578,
+      "black": "2k5/1pr3p1/p4pr1/8/8/8/8/8"
+    },
+    {
+      "id": "QbTPb",
+      "rating": 1011,
+      "black": "8/r2kr1p1/5p1p/8/8/8/8/8"
+    },
+    {
+      "id": "StkrU",
+      "rating": 1502,
+      "black": "3r2k1/2r2ppp/p7/8/8/8/8/8"
+    },
+    {
+      "id": "h0kRn",
+      "rating": 1096,
+      "black": "4r1k1/pp2p3/3r2p1/8/8/8/8/8"
+    },
+    {
+      "id": "NfUDN",
+      "rating": 1305,
+      "black": "8/1pkr1p2/p5rp/8/8/8/8/8"
+    },
+    {
+      "id": "HVLQe",
+      "rating": 421,
+      "black": "6k1/2p2ppp/1rp2r2/8/8/8/8/8"
+    },
+    {
+      "id": "PzLf2",
+      "rating": 830,
+      "black": "3r2k1/1p2rp1p/p5p1/8/8/8/8/8"
+    },
+    {
+      "id": "Nq1mw",
+      "rating": 1093,
+      "black": "8/p1r3k1/1p4rp/8/8/8/8/8"
+    },
+    {
+      "id": "7L3eT",
+      "rating": 898,
+      "black": "3r1k2/2r2pp1/p6p/8/8/8/8/8"
+    },
+    {
+      "id": "ipQ6m",
+      "rating": 400,
+      "black": "6k1/p3rppp/1pr5/8/8/8/8/8"
+    },
+    {
+      "id": "K8lxX",
+      "rating": 1600,
+      "black": "6k1/p4pp1/r2r3p/8/8/8/8/8"
+    },
+    {
+      "id": "NgWeo",
+      "rating": 1177,
+      "black": "3rk3/p1p2prp/1p6/8/8/8/8/8"
+    },
+    {
+      "id": "hk4Dj",
+      "rating": 568,
+      "black": "5k2/p4pp1/2r2r2/8/8/8/8/8"
+    },
+    {
+      "id": "1eXmK",
+      "rating": 1252,
+      "black": "8/p2r2pk/1p1r3p/8/8/8/8/8"
+    },
+    {
+      "id": "manvI",
+      "rating": 2568,
+      "black": "1k6/p1p1r1pp/1p5r/8/8/8/8/8"
+    },
+    {
+      "id": "3RYKl",
+      "rating": 919,
+      "black": "4r2k/ppr3p1/5p1p/8/8/8/8/8"
+    },
+    {
+      "id": "6IKaO",
+      "rating": 431,
+      "black": "7k/pp4pp/3r1r2/8/8/8/8/8"
+    },
+    {
+      "id": "j8ogb",
+      "rating": 898,
+      "black": "1r4k1/r4pp1/3p4/8/8/8/8/8"
+    },
+    {
+      "id": "wybqv",
+      "rating": 1414,
+      "black": "4rk2/p2r1p1p/1p4p1/8/8/8/8/8"
+    }
+  ]
+}

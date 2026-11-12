@@ -2,15 +2,15 @@ id: tpl-act2-fortress
 title: Fortress
 act: 2
 tier: normal
-mateIn: [3, 4]
+mateIn: [4, 4]
 enemyArmy:
   pawn: [5, 6]
   knight: [1, 1]
   bishop: [1, 1]
 enemyZone: [6, 7, 8]
 spawnedPawns:
-  count: [1, 2]
-  ranks: [3, 4]
+  count: [2, 3]
+  ranks: [5]
 focusPool: 3
 enemyPolicy:
   type: best_move
@@ -24,7 +24,19 @@ preconditions:
   - enemy_value_in_band
   - spawned_pawns_placed
 designNote: >-
-  Enemy value 11-12, mate in 3-4. The slack from Act I is gone: there is no
+  Enemy value 11-12, mate in 4. The slack from Act I is gone: there is no
   slow win to fall back on, so the player must summon the right pieces in
   the Deployment phase to reach a mate within the par. Tests whether the deck was
-  built or only survived.
+  built or only survived. The pawns spawn on rank 5, against the enemy's
+  pawn front.
+  Tuned on gen:report evidence (M3 Task 18; mid deck, seeds
+  report-tpl-act2-fortress-0..23, default solver; proven / median mating turn
+  vs par / bonus pawn / wall p95). Before: 1-2 pawns on ranks 3-4, mate in
+  3-4: 85% / 3.0 vs 3.5 / 15% / 14.2 s (20 seeds). 2 pawns on ranks 3-4: 88%
+  / 3 vs 4 / 13% / 19.4 s. Mate in 4: 88% / 4 vs 4 / 13% / 24.4 s. 2 pawns on
+  ranks 4-5: 75% / 3 vs 4 / 25% / 23.3 s. 2-3 pawns on rank 5: 92% / 3 vs 4 /
+  8% / 16.0 s. 3 pawns on rank 5: 92% / 3 vs 4 / 8% / 15.9 s. Pawn 5-6 + rook
+  in [7, 8] with 2-3 pawns on rank 6: 100% but a median mate on turn 2
+  against a par of 4, too loose. After, 2-3 pawns on rank 5 and mate in 4:
+  100% / 3 vs 4 / 0% / 15.0 s; gen:report, 200 stages: 95.5% / 3 vs 4 / 4.5%
+  / 21.5 s with 7 workers on 8 threads, 7.2 s with one worker (40 stages).

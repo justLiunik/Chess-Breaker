@@ -4,13 +4,12 @@ act: 1
 tier: boss
 mateIn: [4, 4]
 enemyArmy:
-  pawn: [3, 4]
-  knight: [1, 1]
-  bishop: [1, 1]
-enemyZone: [6, 7, 8]
+  pawn: [4, 6]
+  rook: [1, 1]
+enemyZone: [7, 8]
 spawnedPawns:
-  count: [1, 2]
-  ranks: [3, 4]
+  count: [4, 5]
+  ranks: [6]
 focusPool: 3
 enemyPolicy:
   type: best_move
@@ -24,7 +23,22 @@ preconditions:
   - enemy_value_in_band
   - spawned_pawns_placed
 designNote: >-
-  Act I boss. Enemy value 9-10 (the Act I band x1.25), mate in 4,
-  depth-4 policy. Teaches mating to a par: a thicker defence and a par no
-  looser than the rest of Act I, so the player must find the mating net
-  early instead of trading down and paying overtime.
+  Act I boss. Enemy value 9-11 (the Act I band x1.25 is 8.75-11.25), mate in
+  4, depth-4 policy. Teaches mating to a par: a rook behind a full pawn wall
+  and a par no looser than the rest of Act I, so the player must break the
+  wall with the pawns spawned under it and find the mating net early instead
+  of trading down and paying overtime.
+  Tuned on gen:report evidence (M3 Task 18; starter deck, seeds
+  report-tpl-act1-boss-gatehouse-0..11, default solver; proven / median mating
+  turn vs par / bonus pawn / wall median, p95). Before: pawn 3-4 + knight +
+  bishop in [6, 8], 1-2 pawns on ranks 3-4: 0% / - vs 4.0 / 100% / 38 s, 48 s
+  (20 seeds). 2 pawns on rank 5: 8% / 4 vs 4 / 92% / 39 s, 54 s. Every
+  deployment candidate searched deep (kingSquares 8, deep.candidates 64): 0%
+  in 6 seeds, 164 s a stage. Pawn 4-6 + rook in [7, 8] (the Lichess pool's
+  most common Act I boss compositions in that zone), 3-4 pawns on ranks 5-6:
+  25% / 4 vs 4 / 75% / 32 s, 37 s; on rank 6: 75% / 3 vs 4 / 25% / 25 s,
+  43 s; with mate in 5: 75% / 3 vs 5 / 25% / 24 s, 45 s. After, 4-5 pawns on
+  rank 6: 83% / 3 vs 4 / 17% / 14 s, 36 s (gen:report, 200 stages: 77% / 3
+  vs 4 / 23% / 12.6 s, 36.5 s). The depth-4 enemy costs about 10
+  ms a reply, so an unproven board alone takes 10 s: not yet at the 95%
+  acceptance rate nor the 15 s p95.

@@ -13,10 +13,10 @@
     ],
     "enemyArmy": {
       "pawn": [
-        5,
-        6
+        2,
+        4
       ],
-      "knight": [
+      "rook": [
         1,
         1
       ]
@@ -29,9 +29,254 @@
   },
   "formations": [
     {
-      "id": "vWhwL",
-      "rating": 2282,
-      "black": "4nk2/pp3ppp/8/8/8/8/8/8"
+      "id": "wPOkc",
+      "rating": 842,
+      "black": "8/1r3ppk/8/8/8/8/8/8"
+    },
+    {
+      "id": "bNDvx",
+      "rating": 409,
+      "black": "6k1/1r3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "yrbyW",
+      "rating": 615,
+      "black": "8/pppk1r2/8/8/8/8/8/8"
+    },
+    {
+      "id": "dfzpJ",
+      "rating": 2295,
+      "black": "8/r4kpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "H82ja",
+      "rating": 890,
+      "black": "8/pk3r1p/8/8/8/8/8/8"
+    },
+    {
+      "id": "dtEuq",
+      "rating": 1636,
+      "black": "8/1r3pkp/8/8/8/8/8/8"
+    },
+    {
+      "id": "hB2Ja",
+      "rating": 581,
+      "black": "7k/p1r3pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "Gbyn5",
+      "rating": 399,
+      "black": "1k6/pppr3p/8/8/8/8/8/8"
+    },
+    {
+      "id": "MHSSm",
+      "rating": 1376,
+      "black": "4r3/1p1k1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "6nDO5",
+      "rating": 1339,
+      "black": "8/2rk2pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "GWMFo",
+      "rating": 2303,
+      "black": "4r3/p4kp1/8/8/8/8/8/8"
+    },
+    {
+      "id": "obeGh",
+      "rating": 2622,
+      "black": "6k1/p1p1r1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "cMBdr",
+      "rating": 658,
+      "black": "6k1/p2r1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "4nqXE",
+      "rating": 696,
+      "black": "1r3k2/5ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "5A08K",
+      "rating": 1161,
+      "black": "5r2/3k2pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "KwWG5",
+      "rating": 1807,
+      "black": "6k1/3r1pp1/8/8/8/8/8/8"
+    },
+    {
+      "id": "pnCF6",
+      "rating": 865,
+      "black": "6r1/p1pk4/8/8/8/8/8/8"
+    },
+    {
+      "id": "TqEcC",
+      "rating": 803,
+      "black": "8/r3kppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "yWQR4",
+      "rating": 1336,
+      "black": "8/p4rpk/8/8/8/8/8/8"
+    },
+    {
+      "id": "brcad",
+      "rating": 2175,
+      "black": "8/2r1kpp1/8/8/8/8/8/8"
+    },
+    {
+      "id": "Gc8d0",
+      "rating": 909,
+      "black": "8/3rkppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "wl5Is",
+      "rating": 1962,
+      "black": "5rk1/6pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "u6sLU",
+      "rating": 963,
+      "black": "3r4/4k1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "f9A0E",
+      "rating": 1107,
+      "black": "7k/pp5r/8/8/8/8/8/8"
+    },
+    {
+      "id": "cKoXW",
+      "rating": 2323,
+      "black": "8/rk3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "k96Kp",
+      "rating": 1019,
+      "black": "4r1k1/5ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "UeTdf",
+      "rating": 1996,
+      "black": "5k2/pp1r4/8/8/8/8/8/8"
+    },
+    {
+      "id": "HwXyf",
+      "rating": 1926,
+      "black": "3r3k/p5p1/8/8/8/8/8/8"
+    },
+    {
+      "id": "UxsKA",
+      "rating": 1571,
+      "black": "3r1k2/6pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "jpA0c",
+      "rating": 1002,
+      "black": "4r2k/pp3p1p/8/8/8/8/8/8"
+    },
+    {
+      "id": "vVQQw",
+      "rating": 1041,
+      "black": "8/r1k2ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "UCetp",
+      "rating": 765,
+      "black": "7k/p4rpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "zSmSK",
+      "rating": 625,
+      "black": "3r2k1/p4ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "SKKEG",
+      "rating": 731,
+      "black": "8/1r3kpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "qkxFk",
+      "rating": 1626,
+      "black": "1r6/4kppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "K2kZS",
+      "rating": 491,
+      "black": "7k/pp1r2pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "oX9O4",
+      "rating": 628,
+      "black": "6k1/3r1ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "mRS2j",
+      "rating": 1948,
+      "black": "5k2/rp4p1/8/8/8/8/8/8"
+    },
+    {
+      "id": "8bAbL",
+      "rating": 690,
+      "black": "2k5/pppr4/8/8/8/8/8/8"
+    },
+    {
+      "id": "cujHa",
+      "rating": 891,
+      "black": "8/pp1rk2p/8/8/8/8/8/8"
+    },
+    {
+      "id": "MSF6X",
+      "rating": 911,
+      "black": "3k4/p4rpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "gOCIt",
+      "rating": 464,
+      "black": "3r2k1/5ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "9FGvO",
+      "rating": 482,
+      "black": "7k/pp3rpp/8/8/8/8/8/8"
+    },
+    {
+      "id": "ajPrH",
+      "rating": 399,
+      "black": "6k1/r4ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "84jsv",
+      "rating": 2213,
+      "black": "8/p1r1k1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "0WUGu",
+      "rating": 570,
+      "black": "6k1/pr3ppp/8/8/8/8/8/8"
+    },
+    {
+      "id": "dy4IX",
+      "rating": 2166,
+      "black": "2r1k3/5p1p/8/8/8/8/8/8"
+    },
+    {
+      "id": "zL5Lw",
+      "rating": 947,
+      "black": "8/3rkpp1/8/8/8/8/8/8"
+    },
+    {
+      "id": "v3Zle",
+      "rating": 600,
+      "black": "7k/pp2r1pp/8/8/8/8/8/8"
+    },
+    {
+      "id": "Jn4hC",
+      "rating": 1738,
+      "black": "2r5/p2k2pp/8/8/8/8/8/8"
     }
   ]
 }

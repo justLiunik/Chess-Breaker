@@ -1,0 +1,43 @@
+id: tpl-act3-last-line
+title: The Last Line
+act: 3
+tier: normal
+mateIn: [2, 3]
+enemyArmy:
+  pawn: [4, 5]
+  bishop: [1, 1]
+  rook: [1, 1]
+  queen: [1, 1]
+enemyZone: [6, 7, 8]
+spawnedPawns:
+  count: [1, 2]
+  ranks: [4, 5]
+focusPool: 3
+enemyPolicy:
+  type: best_move
+  depth: 3
+preconditions:
+  - enemy_king_on_board
+  - safe_king_square
+  - no_first_turn_mate
+  - enemy_has_moves
+  - deployment_squares_available
+  - enemy_value_in_band
+  - spawned_pawns_placed
+designNote: >-
+  Act III normal. Enemy value 21-22 (Act III band 14-22), mate in 2-3,
+  depth-3 policy. A queen, a rook and a bishop behind the pawns: every enemy
+  piece can punish a loose summon, and the par leaves no turn to repair one.
+  Army from the Lichess pool (M3 Task 18 compositions report, zone [6, 8],
+  band 14-22): pawn 4 + rook + queen and pawn 5 + rook + queen are the two
+  most common compositions, pawn 5 and pawn 4 with a bishop added the
+  third and fifth. Measured with gen:report's strong deck, seeds
+  report-tpl-act3-last-line-0..23, default solver (proven / median mating
+  turn vs par / bonus pawn / validationFailed / wall p95): pawn 4-5 + rook +
+  queen 54% / 2 vs 3 / 0% / 11 of 24 / 9.4 s, nearly every board having a
+  turn-1 mate for the strong deck; in zone [7, 8] 4%, the back rank mates in
+  one; spawnPoints 12: 67% / 5 of 24; pawn 5-6 + rook + queen 75% / 6 of 24;
+  pawn 6-7 + rook + queen 83% / 3 of 24. Adding the bishop, pawn 4-5 + bishop
+  + rook + queen: 96% / 2 vs 3 / 0% / 1 of 24 / 24.3 s, and 100% / 3 vs 3 /
+  15.0 s on seeds 24-47; gen:report, 200 stages: 97.5% / 2 vs 3 / 1.5% / 2
+  of 200 / 10.8 s.

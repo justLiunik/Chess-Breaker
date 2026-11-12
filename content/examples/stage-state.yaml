@@ -66,7 +66,7 @@ board:
     stageId: s02
 
 turnsUsed: 2
-mateIn: 4
+mateIn: 5
 overtimePaid: 0
 focus: 3
 focusPool: 3
