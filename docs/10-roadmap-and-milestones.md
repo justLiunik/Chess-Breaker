@@ -151,7 +151,7 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
       **Not met.** 10,003 stages: 86.6 % proven overall. Per template: First Steps 64.8 %, Open
       Field 92.0 %, Gatehouse 74.9 %, Fortress 95.5 %, Citadel 96.7 %, Last Line 97.1 %, Redoubt
       85.1 %. Accepted gaps (user decision 2026-11-12): the Act I proven rates and the Redoubt (its
-      proven rate and its 150 `validationFailed` stages). Not met, pending the user's decision:
+      proven rate and its 150 `validationFailed` stages). Accepted gap (user decision 2026-11-13):
       Last Line's 29 `validationFailed` stages (2 %). In every `validationFailed` stage the last of
       the 20 boards fails `no_first_turn_mate` (the strong deck mates on turn 1); the report
       records only that board. Acts I and II have none. The bonus pawn (§3) keeps every unproven
@@ -166,8 +166,8 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
       Citadel 0.5 s and 4.8 s; Last Line 1.7 s and 7.2 s; Redoubt 0.9 s and 4.5 s. Another process
       was using the machine, so the First Steps and Gatehouse figures (Task 18 measured p95 13.9 s
       and 15.8 s) need re-measuring on an idle machine. The cause is the unproven boards, which run
-      the solver three times; it is not a separate gap from the proven rate above. Pending the
-      user's decision.
+      the solver three times; it is not a separate gap from the proven rate above. **Accepted gap
+      (user decision 2026-11-13)**; re-measured in the browser's generation Web Worker in M5.
 - [x] Every template reports a median solver mating turn within one turn of its par (10,003 stages:
       First Steps 4 vs 4, Open Field 4 vs 5, Gatehouse 3 vs 4, Fortress 3 vs 4, Citadel 3 vs 4, Last
       Line 2 vs 3, Redoubt 2 vs 2).
@@ -267,6 +267,9 @@ sacrifice features before fidelity — reduce animation, not information.
 M3 carry-over: `@checkbreaker/gen` imports `solverSettingsFor`, `valueBandFor` and `enemyArmyValue`
 from `@checkbreaker/content`, whose module chain imports `node:fs`/`node:url` at top level; the
 generation Web Worker needs a Node-free entry for these pure helpers.
+M3 carry-over: measure generation wall time (median and p95 per template) inside the generation Web
+Worker in a browser. M3's one-worker Node figures missed the median ≤ 3 s / p95 ≤ 15 s target for
+First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-13; see M3 above).
 
 ---
 

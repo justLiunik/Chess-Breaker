@@ -324,8 +324,9 @@ read.
 
 The Act I proven rates (First Steps, Open Field, Gatehouse) and the Redoubt (its proven rate and its
 `validationFailed` stages) are accepted gaps (user decision 2026-11-12). The wall-time gap and Last
-Line's 29 `validationFailed` stages are not met and await the user's decision. All are recorded in
-[10](10-roadmap-and-milestones.md#m3--stage-generation--solver).
+Line's 29 `validationFailed` stages are accepted gaps too (user decision 2026-11-13); wall time is
+re-measured in the browser's generation Web Worker in M5, where generation actually runs. All are
+recorded in [10](10-roadmap-and-milestones.md#m3--stage-generation--solver).
 
 ## 6. Difficulty curve
 
