@@ -15,6 +15,7 @@ function searchMove(
 ): EnemyPick {
   // Rarity abilities enlarge the tree: while any player piece has a tier, the depth is capped.
   const capped = hasTiers(t) ? Math.min(depth, config.enemyAI.search.maxDepthWithRarity) : depth;
+  // The MAX_CLOCK clamp keeps the transposition table on (its tables hold clocks up to MAX_CLOCK).
   const scored = scoreRootMoves(b, Math.min(clock, MAX_CLOCK), capped, config, frozen, t);
   let best = -Infinity;
   for (const r of scored) if (r.score > best) best = r.score;
@@ -26,7 +27,8 @@ function searchMove(
 /**
  * The enemy's move for this stage. Never mutates `stage`; returns the updated policy: a scripted
  * line advances `cursor`, and a line that cannot be played falls back to search for good. Pieces
- * under a live `suppress_piece` modifier do not move; `clock` is the player's turns left (`enemyClock`); a scripted move by one is unplayable (Ruling R7).
+ * under a live `suppress_piece` modifier do not move, and a scripted move by one is unplayable (Ruling R7).
+ * `clock` is the player's turns left (`enemyClock`).
  */
 export function enemyMove(stage: StageState, seed: number, clock: number, config: EngineConfig): EnemyPick {
   const policy = stage.enemyPolicy;

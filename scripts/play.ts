@@ -49,7 +49,8 @@ function buildStage(): StageState {
     focus: tpl.focusPool,
     focusPool: tpl.focusPool,
     moveCredits: 1,
-    spawnPoints: tpl.spawnPoints ?? 6,
+    // Same lookup as the generator (packages/gen/src/stage.ts): the template's budget, capped by the act's.
+    spawnPoints: Math.min(tpl.spawnPoints ?? config.rules.spawnPoints.act1.normal, config.rules.spawnPoints.act1.normal),
     modifiers: [],
     skillLog: [],
     enemyPolicy: { type: 'scripted', line: tpl.enemyPolicy.line, fallbackDepth: tpl.enemyPolicy.fallbackDepth ?? 2 },
@@ -57,7 +58,7 @@ function buildStage(): StageState {
   };
 }
 
-// The King and two starter minors (3 + 3 spawn points = the template's budget of 6).
+// The King and two starter minors (3 + 3 spawn points, within the act's budget).
 const DECK: PieceInstance[] = [
   { instanceId: 'p_king_01', pieceType: 'king', rarity: null, durability: null, durabilityMax: null, origin: 'starter', acquiredAtStage: 0, status: 'in_deck' },
   { instanceId: 'p_knight_02', pieceType: 'knight', rarity: 'normal', durability: 2, durabilityMax: 2, origin: 'starter', acquiredAtStage: 0, status: 'in_deck' },

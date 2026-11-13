@@ -75,6 +75,16 @@ describe('replayLine', () => {
     expect(replayLine(f.run, tight, { ...win, mateTurn: 2 }, configOf(f))).toBe(false);
   }, TIMEOUT);
 
+  it('rejects a valid line whose mateTurn is below minSolveTurns (a mate that early is never a proof)', () => {
+    const f = fixture('mate2');
+    const cfg = configOf(f);
+    const win = winOf('mate2');
+    expect(win.mateTurn).toBe(2);
+    const strict: GenConfig = { ...cfg, gen: { ...cfg.gen, solver: { ...cfg.gen.solver, minSolveTurns: 3 } } };
+    expect(replayLine(f.run, f.stage, win, cfg)).toBe(true);
+    expect(replayLine(f.run, f.stage, win, strict)).toBe(false);
+  }, TIMEOUT);
+
   it('a line found with coins = 0 replays with coins = 0 and with coins = 999 (the shop cannot spoil the proof)', () => {
     const f = fixture('mate2');
     const cfg = configOf(f);

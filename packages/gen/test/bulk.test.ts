@@ -29,11 +29,11 @@ for (const t of templates) {
 }
 pairs.sort((a, b) => a.actIndex - b.actIndex || a.stageIndex - b.stageIndex);
 
-const ACT3_STAGES = 40; // Act III stages in the run
+const ACT3_STAGES = 40; // Act III stages in the run (333 slots, capped); Acts I-II take the rest
 // validationFailed stages allowed per act, as measured: none in Acts I-II; in Act III one of the 40
 // (BULK-34, tpl-act3-last-line), whose 20 boards all have a turn-1 mate for the strong deck.
 const MAX_VALIDATION_FAILED = [0, 0, 1];
-const TIMEOUT_MS = 110_000; // ~2x the measured 50 s
+const TIMEOUT_MS = 125_000; // ~2x the measured 63 s for 1,000 stages
 
 describe('1,000-stage CI run', () => {
   it('covers all nine (act, stage) pairs', () => {
@@ -43,10 +43,13 @@ describe('1,000-stage CI run', () => {
   it('every stage is a valid, deterministic Deployment-phase stage', { timeout: TIMEOUT_MS }, () => {
     let act3 = 0;
     const failedByAct = [0, 0, 0];
-    for (let i = 0; i < 1000; i++) {
+    let generated = 0;
+    // i walks the (act, stage) pairs round-robin; Act III is the slow one (strong Legendary deck), so past
+    // its cap its slots are skipped and Acts I-II take them, until exactly 1,000 stages are generated.
+    for (let i = 0; generated < 1000; i++) {
       const { actIndex, stageIndex } = pairs[i % pairs.length]!;
-      // Act III is the slow one (strong Legendary deck): cap its share, Acts I-II run as before.
       if (actIndex === 2 && act3 >= ACT3_STAGES) continue;
+      generated++;
       if (actIndex === 2) act3++;
       const deck = actIndex === 0 ? 'starter' : actIndex === 1 ? 'mid' : 'strong';
       const run = { ...deckRun(deck, actIndex, stageIndex), seed: `BULK-${i}` };
@@ -78,6 +81,7 @@ describe('1,000-stage CI run', () => {
         JSON.stringify({ stage, provenance }),
       );
     }
+    expect(generated, 'stages generated').toBe(1000);
     expect(act3, 'Act III stages run').toBe(ACT3_STAGES);
     failedByAct.forEach((n, a) => {
       expect(n, `act ${a + 1} validationFailed stages`).toBeLessThanOrEqual(MAX_VALIDATION_FAILED[a]!);

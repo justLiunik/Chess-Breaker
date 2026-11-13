@@ -6,7 +6,7 @@ import type { SolveResult } from '../types';
 /**
  * §9.4: plays `win` through the engine's own `startStage` and `commitQueue`. True only when every
  * queue is accepted, the stage stays active until the last queue, and the last queue ends it in a
- * checkmate win on turn `win.mateTurn`, no later than `stage.mateIn`. Replay stops at `mateIn`
+ * checkmate win on turn `win.mateTurn`, no later than `stage.mateIn` and not before `minSolveTurns`. Replay stops at `mateIn`
  * and the enemy clock does not read the wallet inside the par (spec §7.3), so a line that
  * replays here holds for any `run.coins`.
  */
@@ -17,6 +17,7 @@ export function replayLine(
   config: GenConfig,
 ): boolean {
   if (win.line.length === 0 || win.line.length !== win.mateTurn || win.mateTurn > stage.mateIn) return false;
+  if (win.mateTurn < config.gen.solver.minSolveTurns) return false; // a mate that early is never a proof
   const started = startStage(run, stage, win.placements, config);
   if (!started.ok) return false;
   let cur = started.value;

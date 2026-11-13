@@ -61,8 +61,8 @@ describe('scoreRootMoves', () => {
     expect(scoreOf(res, 'd5', 'd4')).toBeLessThan(bestQuiet);
   });
 
-  it('scores every root move as out of turns when the player has none left, mates included', () => {
-    // White's out-of-turns check comes before its no-legal-move check, so even a mate scores 50000.
+  it('scores every root move as out of clock when the player has no clock left, mates included', () => {
+    // White's out-of-clock check comes before its no-legal-move check, so even a mate scores 50000.
     for (const fen of MIDGAME_FENS) {
       const res = scoreRootMoves(fenBoard(fen), 0, 2, config);
       expect(res.length).toBeGreaterThan(0);
@@ -130,7 +130,7 @@ describe('scoreRootMoves', () => {
 });
 
 describe('mateBound', () => {
-  it('is the midpoint of the player-mated and out-of-turns scores', () => {
+  it('is the midpoint of the player-mated and out-of-clock scores', () => {
     expect(mateBound(config)).toBe(75000);
   });
 

@@ -96,10 +96,9 @@ Boundary rules:
 - `content` may import `engine` types, never the reverse.
 - `gen` imports `engine` + `content`, and the engine's `./internal` entry (`src/internal.ts`:
   `fromBoard`, `tiersOf`, `legalMoves`, `inCheck`, `evaluate`, `makeMoveTiered`, `abilityAttacked`,
-  `applyPlayerMove` and the like), which exists for the solver and is not public API. The **web app
-  must never import `gen`** — the solver must not
-  ship to the client at MVP (it is a generation-time and CI tool). If genres later need runtime
-  generation, that is a deliberate bundle-size decision.
+  `applyPlayerMove` and the like), which exists for the solver and is not public API. The **main
+  thread never imports `gen`**: generation runs at runtime, over the results screen and the shop,
+  so only the generation Web Worker (M5) imports it, and the solver ships inside that worker.
 
 ## 3. Core types
 
@@ -217,7 +216,7 @@ type EnemyPick = {
 }
 enemyClock(run, stage, config): number        // the turns the enemy's search assumes the player has left
 applyEnemyTurn(run, stage, pick: EnemyPick, config): Result<{ run; stage; events }, CommitError>
-MAX_CLOCK                                      // 20: the largest clock the search tables hold; callers clamp to it
+// enemyMove clamps the clock itself to the largest the search tables hold (MAX_CLOCK, internal to the engine, not exported)
 legalPlayerMoves(stage, from, config): Square[]
 hasLegalQueue(run, stage, config): boolean   // credits are read from stage.moveCredits (module legal-queue.ts)
 endStage(run, stage, config): Result<{ run; events; overCapacity: number }, CommitError>
@@ -363,7 +362,7 @@ generateWith(input, content, config, solve: SolveFn)   // the same, with an inje
 type SolveFn = (run: RunState, stage: StageState, config: GenConfig) => SolveResult
 
 solveStage(run, stage, config: GenConfig): SolveResult
-replayLine(run, stage, win, config): boolean           // plays a found line through startStage and commitQueue
+// replayLine(run, stage, win, config): boolean is internal to the solver (reached through solveStage): it plays a found line through startStage and commitQueue
 
 type Provenance = {
   templateId: string; seed: string;                    // seed = the stageSeed, XXXX-XXXX
@@ -414,7 +413,7 @@ Rulings the generator and solver depend on:
 | `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups; the lifeline (whether a capture is saved, the durability it returns with) | Be consulted by name in `engine/rules` |
 | `engine/enemy` | `enemyMove(stage, seed, clock, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
-| `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app; use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
+| `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app's main thread (only the generation Web Worker imports it); use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
 
 **The single most important architectural rule:** *no rule may live in the UI.* If a designer wants a
@@ -474,10 +473,10 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 ## 10. Performance notes
 
 - Board is 64 squares; move generation and queue simulation are trivially fast (microseconds).
-- The only performance-sensitive component is the **generation-time solver**, which is a CI and
-  authoring tool, not client code ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)).
-- Target bundle: engine + app under 250 KB gzipped. No chess library, no solver, no schema validator
-  in the shipped bundle.
+- The only performance-sensitive component is the **generation-time solver**. It runs at runtime in
+  the generation Web Worker, off the main thread ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)).
+- Target bundle: engine + app under 250 KB gzipped, the worker (with the solver) counted separately.
+  No chess library and no schema validator in the shipped bundle.
 
 ## 11. Repository scripts
 

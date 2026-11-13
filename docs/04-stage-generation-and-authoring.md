@@ -370,8 +370,9 @@ Act I should be cleared on a first run by a player who understands the rules; Ac
 1. **Pick the lesson.** What should this template teach or test? (e.g., "don't leave the rook
    hanging while chasing the par.")
 2. **Draft the template** in `content/templates/`. Keep it ~15 lines.
-3. **Run the validator** (M3) which generates 200 seeded instances and reports:
-   solver success rate within the par, distribution of turns-to-win, and the failure-reason histogram.
+3. **Run `npm run gen:report`** (M3), which generates seeded instances per template and reports the
+   proven rate within the par, the median mating turn against the par, and, for each `validationFailed`
+   stage, the failing precondition of the emitted board.
 4. **Tune** the four numbers that matter: `mateIn`, `enemyArmy`, `spawnPoints`, and
    `spawnedPawns`.
 5. **Acceptance for a template:** ≥95% of generated instances solvable (a mate exists within the

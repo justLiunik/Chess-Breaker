@@ -220,7 +220,7 @@ for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
   if (problems === 0) ok(`skills.yaml: ${skills.length} skills (${mvp} mvp, ${skills.length - mvp} future) use allowed primitives`);
 }
 
-// 2a. Templates: act value band and turn-limit shape. (Checkmate is the only
+// 2a. Templates: act value band and par (mateIn) shape. (Checkmate is the only
 // win, so there is no material threshold to check — docs/02 §7.)
 const bossMultiplier = economy.stages?.enemyArmyValueBand?.bossMultiplier ?? 1.25;
 
@@ -524,7 +524,7 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     problems += 1;
   }
   // The search stores scores beyond this bound node-relative (ply-adjusted); mates must clear it and
-  // out-of-turns scores must not (src/enemy/search.ts mateBound).
+  // out-of-clock scores must not (src/enemy/search.ts mateBound).
   const mateBound = (term.playerMated + term.playerOutOfClock) / 2;
   if (!(term.playerOutOfClock + 40 < mateBound && mateBound < term.playerMated - 40)) {
     fail(`economy.yaml: enemyAI.terminal mate bound ${mateBound} must lie within (playerOutOfClock + 40, playerMated - 40)`);

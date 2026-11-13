@@ -27,8 +27,8 @@ type Entry = { depth: number; score: number; bound: Bound; best: Move | null };
 
 /**
  * Scores at or beyond this magnitude depend on the ply and are stored node-relative in the TT. It is
- * the midpoint of the player-mated and out-of-turns scores, so mates (which sit within a few dozen
- * plies of playerMated) are ply-adjusted and out-of-turns scores are not.
+ * the midpoint of the player-mated and out-of-clock scores, so mates (which sit within a few dozen
+ * plies of playerMated) are ply-adjusted and out-of-clock scores are not.
  */
 export function mateBound(config: EngineConfig): number {
   const t = config.enemyAI.terminal;
@@ -180,7 +180,7 @@ function orderMoves(ctx: Ctx, moves: Move[], blackToMove: boolean, first: Move |
 
 /**
  * Terminal score of a node whose side to move has (`hasMove`) or lacks a legal move, or null if the
- * game goes on. White's out-of-turns check is made by the caller before any move is generated.
+ * game goes on. White's out-of-clock check is made by the caller before any move is generated.
  */
 function terminal(ctx: Ctx, blackToMove: boolean, hasMove: boolean, ply: number, turns: number): number | null {
   if (!hasMove) {

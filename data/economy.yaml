@@ -38,7 +38,7 @@ rules:
 # ---------------------------------------------------------------------------
 economy:
   # Stage clear (checkmate is the only win):
-  #   coins = max(0, baseReward(act, tier) - overtimePaid) + parBonus(act, tier) if turnsUsed <= mateIn + salvage
+  #   coins = max(0, baseReward(act, tier) - overtimePaid) + (parBonus(act, tier) if turnsUsed <= mateIn) + salvage
   #   Every turn past the par (mateIn) costs overtimeCost(act): from the pending base reward first,
   #   then from the wallet; a turn neither can pay loses the stage (out_of_coins). docs/05 §2.
   baseReward:                   # paid in full for every cleared stage
@@ -264,7 +264,7 @@ generation:
 # ---------------------------------------------------------------------------
 # Enemy AI — see docs/02 §8.1
 #
-# One pure function, enemyMove(stage, seed), shared by the engine, the solver
+# One pure function, enemyMove(stage, seed, clock, config), shared by the engine, the solver
 # and replay. Scores are from the ENEMY's point of view (higher = better for it).
 # ---------------------------------------------------------------------------
 enemyAI:

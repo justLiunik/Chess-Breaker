@@ -159,8 +159,9 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
 - [x] Same seed and deck twice → byte-identical `StageState` (`generate-solved.test.ts`, and the
       1,000-stage `bulk.test.ts`, which generates every stage twice).
 - [ ] Generation (solver included) takes a median ≤ 3 s and a p95 ≤ 15 s on a laptop; it runs in the
-      background over the results screen and the shop. **Not met for three templates (First Steps and the Gatehouse on median and p95, Open Field on p95), measured with
-      one worker** (`gen:report --workers 1 --stages 40`, 2026-11-12/13): First Steps median 12.1 s,
+      background over the results screen and the shop. **Not met for three templates (First Steps
+      and the Gatehouse on median and p95, Open Field on p95), measured with one worker**
+      (`gen:report --workers 1 --stages 40`, 2026-11-12/13): First Steps median 12.1 s,
       p95 29.0 s; Gatehouse 9.5 s and 20.1 s; Open Field 1.8 s and 15.4 s; Fortress 1.6 s and 6.6 s;
       Citadel 0.5 s and 4.8 s; Last Line 1.7 s and 7.2 s; Redoubt 0.9 s and 4.5 s. Another process
       was using the machine, so the First Steps and Gatehouse figures (Task 18 measured p95 13.9 s
@@ -175,7 +176,7 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
       (`par-economy.test.ts`).
 - [x] Three unproven boards always end in a stage (first board + one spawned pawn); `validationFailed`
       is emitted only when 20 boards fail the preconditions in every template (`generate.test.ts`).
-      The 179 `validationFailed` stages above are exactly that path, so the mechanism holds even
+      The 179 (150 + 29) `validationFailed` stages above are exactly that path, so the mechanism holds even
       though the rate does not meet the first box.
 - [x] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
       results never exceed the act ceiling (I14) (`bulk.test.ts`, 1,000 stages).
@@ -232,6 +233,9 @@ pool for narrow enemy zones. Mitigations: tune the candidate and beam parameters
 
 **Risks:** economy is untunable without telemetry, and there is no telemetry by design. Mitigation:
 the headless bot in M4 doubles as the tuning harness (see M6).
+M3 carry-over: `generateWith` passes `run` to the solver, and `solveStage` picks the `byAct` layer
+from `run.actIndex`, not from `GenInput.actIndex`; when M4 wires `generateStage`, pass
+`{ ...run, actIndex, stageIndex }` to `solve` (inert today: no `byAct` is shipped).
 
 ---
 
@@ -260,6 +264,9 @@ One complete run playable start to finish in a browser.
 
 **Risks:** the queue builder is the whole game's usability. If the preview is not instantly readable,
 sacrifice features before fidelity — reduce animation, not information.
+M3 carry-over: `@checkbreaker/gen` imports `solverSettingsFor`, `valueBandFor` and `enemyArmyValue`
+from `@checkbreaker/content`, whose module chain imports `node:fs`/`node:url` at top level; the
+generation Web Worker needs a Node-free entry for these pure helpers.
 
 ---
 
