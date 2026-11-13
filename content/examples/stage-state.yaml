@@ -4,7 +4,8 @@
 # (docs/02) consumes. Note:
 #   - Player pieces carry instanceId (they belong to the deck, so they can die).
 #   - Enemy pieces do not (there is no enemy deck), and are always Normal.
-#   - The e6 pawn is a spawned pawn (Open Field spawns 3-4 pawns on rank 6, under the enemy's pawn line): free and stage-only, with no instanceId.
+#   - The e6 pawn is a spawned pawn (Open Field spawns 3-4 pawns on rank 6, under
+#     the enemy's pawn line): free and stage-only, with no instanceId.
 #     It is Rare, and its promotion result was rolled at generation and is shown
 #     to the player: a Rare knight. A Rare pawn would usually promote one tier up,
 #     but Act I caps everything at Rare (docs/02 §2.2).

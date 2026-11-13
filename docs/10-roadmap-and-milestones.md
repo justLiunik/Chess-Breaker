@@ -148,22 +148,25 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
 - [ ] 10,000 generated stages (`gen:report`): ≥95% proven mateable within the par, 100% pass the
       enemy-king, safe-King-square, enemy-has-moves, enemy-value and deployment preconditions
       ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
-      **Not met; accepted gap (user decision 2026-11-12).** 10,003 stages: 86.6 % proven overall.
-      Per template: First Steps 64.8 %, Open Field 92.0 %, Gatehouse 74.9 %, Fortress 95.5 %,
-      Citadel 96.7 %, Last Line 97.1 %, Redoubt 85.1 %. Act I and the Redoubt are below 95 %. 179
-      stages (150 Redoubt, 29 Last Line) are `validationFailed`: the strong deck mates on turn 1 on
-      all 20 boards (`no_first_turn_mate`). Acts I and II have none. The bonus pawn (§3) keeps every
-      unproven stage playable.
+      **Not met.** 10,003 stages: 86.6 % proven overall. Per template: First Steps 64.8 %, Open
+      Field 92.0 %, Gatehouse 74.9 %, Fortress 95.5 %, Citadel 96.7 %, Last Line 97.1 %, Redoubt
+      85.1 %. Accepted gaps (user decision 2026-11-12): the Act I proven rates and the Redoubt (its
+      proven rate and its 150 `validationFailed` stages). Not met, pending the user's decision:
+      Last Line's 29 `validationFailed` stages (2 %). In every `validationFailed` stage the last of
+      the 20 boards fails `no_first_turn_mate` (the strong deck mates on turn 1); the report
+      records only that board. Acts I and II have none. The bonus pawn (§3) keeps every unproven
+      stage playable.
 - [x] Same seed and deck twice → byte-identical `StageState` (`generate-solved.test.ts`, and the
       1,000-stage `bulk.test.ts`, which generates every stage twice).
 - [ ] Generation (solver included) takes a median ≤ 3 s and a p95 ≤ 15 s on a laptop; it runs in the
-      background over the results screen and the shop. **Not met for two templates, measured with
+      background over the results screen and the shop. **Not met for three templates (First Steps and the Gatehouse on median and p95, Open Field on p95), measured with
       one worker** (`gen:report --workers 1 --stages 40`, 2026-11-12/13): First Steps median 12.1 s,
       p95 29.0 s; Gatehouse 9.5 s and 20.1 s; Open Field 1.8 s and 15.4 s; Fortress 1.6 s and 6.6 s;
       Citadel 0.5 s and 4.8 s; Last Line 1.7 s and 7.2 s; Redoubt 0.9 s and 4.5 s. Another process
       was using the machine, so the First Steps and Gatehouse figures (Task 18 measured p95 13.9 s
       and 15.8 s) need re-measuring on an idle machine. The cause is the unproven boards, which run
-      the solver three times; it is not a separate gap from the proven rate above.
+      the solver three times; it is not a separate gap from the proven rate above. Pending the
+      user's decision.
 - [x] Every template reports a median solver mating turn within one turn of its par (10,003 stages:
       First Steps 4 vs 4, Open Field 4 vs 5, Gatehouse 3 vs 4, Fortress 3 vs 4, Citadel 3 vs 4, Last
       Line 2 vs 3, Redoubt 2 vs 2).

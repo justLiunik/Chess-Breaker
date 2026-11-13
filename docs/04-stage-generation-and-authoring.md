@@ -297,9 +297,9 @@ count; wall times do (see the next table).
 | The Redoubt (Act III boss) | 2 | 85.1 % (1,216) | 2 vs 2 | 4.4 % | 150 | 0 | 180 |
 | **All** | | **86.6 %** (8,660 of 10,003) | within 1 of the par in every template | | 179 | 0 | |
 
-The Act III `validationFailed` stages all fail `no_first_turn_mate`: the strong deck mates on turn 1
-on every one of 20 boards (150 of 1,429 Redoubt stages, 29 of 1,429 Last Line stages). Acts I and II
-have none.
+The Act III `validationFailed` stages (150 of 1,429 Redoubt stages, 29 of 1,429 Last Line stages) each
+end with the last of their 20 boards failing `no_first_turn_mate` (the strong deck mates on turn 1);
+the report records only that last board's failing precondition. Acts I and II have none.
 
 Wall time, one worker (the game generates in one Web Worker), 40 stages a template, one template at a
 time on a laptop (`npm run gen:report -- --workers 1 --stages 40 --template <id>`):
@@ -322,7 +322,9 @@ machine during this run, so treat them as an upper bound and re-measure before t
 10,003-stage run's own wall times (7 workers on 8 threads) are larger still and are not the figure to
 read.
 
-The proven-rate, `validationFailed` and wall-time gaps are recorded as accepted gaps in
+The Act I proven rates (First Steps, Open Field, Gatehouse) and the Redoubt (its proven rate and its
+`validationFailed` stages) are accepted gaps (user decision 2026-11-12). The wall-time gap and Last
+Line's 29 `validationFailed` stages are not met and await the user's decision. All are recorded in
 [10](10-roadmap-and-milestones.md#m3--stage-generation--solver).
 
 ## 6. Difficulty curve
@@ -339,9 +341,10 @@ a boss affords one more. The player's summoned value therefore tracks the enemy 
 the spawned pawns, the first move and the skills as the player's edge.
 
 The par ranges were tuned at the end of M3 against `gen:report` (Act II is all Mate in 4, Open Field
-Mate in 5; each template's `designNote` records the before and after). Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only
-that spawn ranks stay out of `enemyZone` (§2). Rarity comes from the act's
-pool ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
+Mate in 5; each template's `designNote` records the before and after). Spawned-pawn counts and ranks
+are the values the example templates use; the hard rule is only that spawn ranks stay out of
+`enemyZone` (§2). Rarity comes from the act's pool
+([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
 
 Three independent difficulty dials, applied in this order:
 
