@@ -4,11 +4,11 @@
 # (docs/02) consumes. Note:
 #   - Player pieces carry instanceId (they belong to the deck, so they can die).
 #   - Enemy pieces do not (there is no enemy deck), and are always Normal.
-#   - The c4 pawn is a spawned pawn: free and stage-only, with no instanceId.
+#   - The e6 pawn is a spawned pawn (Open Field spawns 3-4 pawns on rank 6, under the enemy's pawn line): free and stage-only, with no instanceId.
 #     It is Rare, and its promotion result was rolled at generation and is shown
 #     to the player: a Rare knight. A Rare pawn would usually promote one tier up,
 #     but Act I caps everything at Rare (docs/02 §2.2).
-#   - An enemy knight has already been captured (salvage paid); checkmate is the
+#   - An enemy pawn has already been captured (salvage paid); checkmate is the
 #     only way to clear the stage (docs/02 §7).
 #   - A Lockdown modifier is live against the b7 pawn, expiring at the end of the
 #     enemy's next turn.
@@ -27,7 +27,7 @@ board:
     pieceType: king
     color: white
     instanceId: p_king_01
-  c4:
+  e6:
     pieceType: pawn
     color: white
     stageId: s01
@@ -36,10 +36,6 @@ board:
     promotesTo:
       pieceType: knight
       rarity: rare
-  a7:
-    pieceType: pawn
-    color: black
-    stageId: s03
   b7:
     pieceType: pawn
     color: black
@@ -60,8 +56,8 @@ board:
     pieceType: king
     color: black
     stageId: s08
-  f6:
-    pieceType: knight
+  a8:
+    pieceType: rook
     color: black
     stageId: s02
 

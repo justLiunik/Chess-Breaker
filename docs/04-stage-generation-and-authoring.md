@@ -34,23 +34,21 @@ id: tpl-act1-open-field
 title: Open Field
 act: 1
 tier: normal          # normal | boss
-mateIn: [4, 5]        # the par "Mate in X": the generator picks X in this range; there is no turn limit
+mateIn: [5, 5]        # the par "Mate in X": the generator picks X in this range; there is no turn limit
 # spawnPoints: 6     # optional: lowers the act's budget (data/economy.yaml), never raises it
 
 enemyArmy:            # ranges are inclusive [min, max]
-  pawn:   [2, 4]
-  knight: [0, 1]
-  bishop: [0, 1]
-  rook:   [0, 1]
+  pawn: [2, 4]
+  rook: [1, 1]
 enemyZone: [7, 8]     # enemy occupies these ranks; ranks 5-8 only (Black side)
 
 spawnedPawns:         # free, stage-only pawns for the player (docs/02 §2.1)
-  count: [2, 2]
-  ranks: [3, 4]
+  count: [3, 4]
+  ranks: [6]
 
 focusPool: 3          # no deploymentRanks: the player always deploys on ranks 1-4
 
-enemyPolicy: { type: best_move, depth: 3 }
+enemyPolicy: { type: best_move, depth: 2 }
 
 preconditions:
   - enemy_king_on_board
@@ -264,7 +262,7 @@ the line and is counted as a solver bug in `gen:report`.
 | `generation.solver.screen` | `width` 4, `turns` 3 | Stage 1 |
 | `generation.solver.deep` | `candidates` 8, `width` 32 | Stage 2 |
 | `generation.solver.expansion` | 3 | Queues given an enemy reply per beam slot |
-| `generation.solver.byAct`, `generation.solver.byTemplate` | `byAct` absent; `byTemplate` for `tpl-act1-first-steps` and `tpl-act1-open-field`: `nodeBudget` 5500, `deployment.kingSquares` 8, `screen.width` 1, `deep.candidates` 48 | Overrides deep-merged in the order global, `byAct[act]`, `byTemplate[templateId]` (`solverSettingsFor`); absent means none. Overridable keys: `nodeBudget`, `deployment.{maxSubsets,kingSquares,squaresPerPiece,maxCandidates}`, `screen.{width,turns}`, `deep.{candidates,width}`, `expansion`. `minSolveTurns`, `memoizeEnemyReplies`, `deployment.score` and `advanceRanks` are rejected, as is any unknown key or a `byTemplate` key that is not a template id; every merged block must pass the global rules. Enabled for First Steps (search-limited: its mating deployments rank 16th-23rd of 64 in screening) and Open Field: 30 % to 64 % and 82 % to 92.5 % proven (200 stages), single-worker p95 13.9 s and 13.5 s (40 stages). The Gatehouse boss stays on the global solver: the same override took its single-worker p95 from 15.8 s to 67 s (depth-4 enemy, about 6 ms a node) |
+| `generation.solver.byAct`, `generation.solver.byTemplate` | `byAct` absent; `byTemplate` for `tpl-act1-first-steps` and `tpl-act1-open-field`: `nodeBudget` 5500, `deployment.kingSquares` 8, `screen.width` 1, `deep.candidates` 48 | Overrides deep-merged in the order global, `byAct[act]`, `byTemplate[templateId]` (`solverSettingsFor`); absent means none. Overridable keys: `nodeBudget`, `deployment.{maxSubsets,kingSquares,squaresPerPiece,maxCandidates}`, `screen.{width,turns}`, `deep.{candidates,width}`, `expansion`. `minSolveTurns`, `memoizeEnemyReplies`, `deployment.score` and `advanceRanks` are rejected, as is any unknown key or a `byTemplate` key that is not a template id; every merged block must pass the global rules. Enabled for First Steps (search-limited: its mating deployments rank 16th-23rd of 64 in screening) and Open Field: 30 % to 64.8 % and 82 % to 92.0 % proven (the global solver, then the override; 10,003-stage run for the override). The Gatehouse boss stays on the global solver: the same override took its single-worker p95 from 15.8 s to 67 s (depth-4 enemy, about 5 ms a node: a single-worker median of 9.5 s over a median 1,858 nodes) |
 | Acceptance | A deployment and line that mate within `mateIn`, on turn 2 or later, and replay | The first found wins |
 | Rejection | `nodeBudget` exhausted with no mate | Next board (G6); after `maxBoards`, the bonus pawn (G7) |
 
@@ -281,21 +279,67 @@ budgets (tracked in [10](10-roadmap-and-milestones.md)):
    identical on every device.
 3. Shorten the Act I par range, which shrinks the search depth.
 
+### Measured numbers (M3 acceptance run)
+
+`npm run gen:report -- --stages 1429 --json .cache/report-10k.json`: 1,429 stages per template, 10,003
+in all, run seeds `report-<templateId>-<i>`; decks: Act I starter, Act II mid, Act III strong. It took
+13,806 s on 7 workers. The proven rates, mating turns and node counts do not depend on the worker
+count; wall times do (see the next table).
+
+| Template | Par | Proven | Median mating turn | Bonus pawn | `validationFailed` | Replay failures | Median nodes (screen + deep) |
+|---|---|---|---|---|---|---|---|
+| First Steps (Act I) | 4-5 | 64.8 % (926) | 4 vs 4 | 35.2 % | 0 | 0 | 8,763 |
+| Open Field (Act I) | 5 | 92.0 % (1,314) | 4 vs 5 | 8.0 % | 0 | 0 | 3,594 |
+| The Gatehouse (Act I boss) | 4 | 74.9 % (1,071) | 3 vs 4 | 25.1 % | 0 | 0 | 1,112 |
+| Fortress (Act II) | 4 | 95.5 % (1,364) | 3 vs 4 | 4.5 % | 0 | 0 | 864 |
+| The Citadel (Act II boss) | 4 | 96.7 % (1,382) | 3 vs 4 | 3.3 % | 0 | 0 | 336 |
+| The Last Line (Act III) | 2-3 | 97.1 % (1,387) | 2 vs 3 | 0.9 % | 29 | 0 | 216 |
+| The Redoubt (Act III boss) | 2 | 85.1 % (1,216) | 2 vs 2 | 4.4 % | 150 | 0 | 180 |
+| **All** | | **86.6 %** (8,660 of 10,003) | within 1 of the par in every template | | 179 | 0 | |
+
+The Act III `validationFailed` stages all fail `no_first_turn_mate`: the strong deck mates on turn 1
+on every one of 20 boards (150 of 1,429 Redoubt stages, 29 of 1,429 Last Line stages). Acts I and II
+have none.
+
+Wall time, one worker (the game generates in one Web Worker), 40 stages a template, one template at a
+time on a laptop (`npm run gen:report -- --workers 1 --stages 40 --template <id>`):
+
+| Template | Proven (40) | Median | p95 |
+|---|---|---|---|
+| First Steps | 55.0 % | 12.1 s | 29.0 s |
+| Open Field | 92.5 % | 1.8 s | 15.4 s |
+| The Gatehouse | 67.5 % | 9.5 s | 20.1 s |
+| Fortress | 97.5 % | 1.6 s | 6.6 s |
+| The Citadel | 100 % | 0.5 s | 4.8 s |
+| The Last Line | 97.5 % | 1.7 s | 7.2 s |
+| The Redoubt | 87.5 % | 0.9 s | 4.5 s |
+
+The targets are a median of 3 s and a p95 of 15 s. Fortress, Citadel, Last Line and Redoubt meet
+them; Open Field is 0.4 s over on p95; First Steps and the Gatehouse are over on both, which is where
+the unproven boards pay the full three solver calls. These First Steps and Gatehouse numbers are
+slower than the single-worker runs of Task 18 (p95 13.9 s and 15.8 s); another process was using the
+machine during this run, so treat them as an upper bound and re-measure before tuning on them. The
+10,003-stage run's own wall times (7 workers on 8 threads) are larger still and are not the figure to
+read.
+
+The proven-rate, `validationFailed` and wall-time gaps are recorded as accepted gaps in
+[10](10-roadmap-and-milestones.md#m3--stage-generation--solver).
+
 ## 6. Difficulty curve
 
 | Act | Par (`mateIn`) | Enemy army value | Spawn points | Spawned pawns (ranks) | Spawned-pawn rarity | Enemy policy depth |
 |---|---|---|---|---|---|---|
-| **I** | 4–5 | 7–9 | 9 | 2 (3–4) | Normal–Rare | 2 |
-| **II** | 3–4 | 10–14 | 12 | 1–2 (3–4) | up to Unique | 3 |
-| **III** | 2–3 | 14–22 | 15 | 1–2 (3–5) | up to Legendary | 3 |
-| **Boss** | its act's shorter end (4 / 3 / 2) | its act's band ×1.25 | its act's + 3 (12 / 15 / 18) | 1–2 | as its act | 4 or `scripted` |
+| **I** | 4–5 (Open Field 5, First Steps 4–5) | 7–9 | 9 | 3–4 on rank 6 (First Steps: 4 on rank 5) | Normal–Rare | 2 |
+| **II** | 4 (Fortress 4, Citadel 4) | 10–14 | 12 | 1–3 (Fortress 2–3 on rank 5, Citadel 1–2 on ranks 3–4) | up to Unique | 3 |
+| **III** | 2–3 (Last Line 2–3) | 14–22 | 15 | 1–2 (ranks 4–5) | up to Legendary | 3 |
+| **Boss** | Gatehouse 4, Citadel 4, Redoubt 2 | its act's band ×1.25 | its act's + 3 (12 / 15 / 18) | Gatehouse 4–5 on rank 6, Citadel 1–2, Redoubt 1–2 | as its act | 4 or `scripted` |
 
 A normal stage's spawn points are three times the number of minors it can field (3 / 4 / 5 by act);
 a boss affords one more. The player's summoned value therefore tracks the enemy army value band, with
 the spawned pawns, the first move and the skills as the player's edge.
 
-The par ranges are starting values, tuned at the end of M3 once `gen:report` measures the real
-solver. Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only
+The par ranges were tuned at the end of M3 against `gen:report` (Act II is all Mate in 4, Open Field
+Mate in 5; each template's `designNote` records the before and after). Spawned-pawn counts and ranks are the values the example templates use; the hard rule is only
 that spawn ranks stay out of `enemyZone` (§2). Rarity comes from the act's
 pool ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)).
 

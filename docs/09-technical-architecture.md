@@ -70,23 +70,34 @@ schemas/
 content/
   examples/                 Validated example content (this milestone)
   templates/                Stage templates (M3)
+  formations/               Enemy formations per template, extracted from Lichess puzzles (M3)
 packages/
-  engine/                   Pure TS: board, moves, queue resolution, evaluation
-  content/                  Loads + validates data, exports typed definitions
-                            (M1: `loadEngineConfig()` for data/economy.yaml only)
-  gen/                      Stage generation + solver (M3)
+  engine/                   Pure TS: board, moves, queue resolution, evaluation. Two entries: `.` (the
+                            public API) and `./internal` (re-exports for `gen` only)
+  content/                  Loads + validates data, exports typed definitions: `loadEngineConfig`,
+                            `loadGenConfig`, `loadTemplates`, `loadFormations`, `solverSettingsFor`,
+                            `valueBandFor`, `enemyArmyValue`
+  gen/                      Stage generation + solver (M3), `@checkbreaker/gen`
 apps/
   web/                      React UI
 scripts/
   validate-content.mjs      ajv validation of content/ against schemas/
+  check-links.mjs           Broken-link check over the Markdown (`npm run check:links`)
   play.ts                   Terminal playground over the engine (`npm run play`, M1)
+  gen-report.ts             Template health report (`npm run gen:report`, M3); its worker threads
+                            run `gen-report-worker.ts`
+tools/
+  formations/extract.ts     Offline formation extractor (`npm run formations:extract`, M3)
 docs/                       Design documents 00–11
 ```
 
 Boundary rules:
 - `engine` imports nothing but its own source.
 - `content` may import `engine` types, never the reverse.
-- `gen` imports `engine` + `content`; the **web app must never import `gen`** — the solver must not
+- `gen` imports `engine` + `content`, and the engine's `./internal` entry (`src/internal.ts`:
+  `fromBoard`, `tiersOf`, `legalMoves`, `inCheck`, `evaluate`, `makeMoveTiered`, `abilityAttacked`,
+  `applyPlayerMove` and the like), which exists for the solver and is not public API. The **web app
+  must never import `gen`** — the solver must not
   ship to the client at MVP (it is a generation-time and CI tool). If genres later need runtime
   generation, that is a deliberate bundle-size decision.
 
@@ -157,6 +168,7 @@ interface StageState {
   enemyPolicy: EnemyPolicy;
   status: 'active' | 'won' | 'lost';   // 'won' always means checkmate (docs/02 §7)
   endReason?: 'checkmate' | 'enemy_stalemated' | 'out_of_coins' | 'player_mated' | 'player_stalemated';
+  provenance?: { templateId?: string; seed?: string; attempts?: number; validationFailed?: boolean };  // set by `gen` (G8)
 }
 ```
 
@@ -198,10 +210,14 @@ no tuning number lives in engine code. M1 also exports:
 
 ```ts
 simulate(run, stage, queue, config)        // same Result as commitQueue, without the enemy reply
-enemyMove(stage, seed: number, config): {
+enemyMove(stage, seed: number, clock: number, config): EnemyPick
+type EnemyPick = {
   move: { from: Square; to: Square } | null,   // null when Black has no legal move
   policy: EnemyPolicy,                         // scripted cursor / fellBack advanced
 }
+enemyClock(run, stage, config): number        // the turns the enemy's search assumes the player has left
+applyEnemyTurn(run, stage, pick: EnemyPick, config): Result<{ run; stage; events }, CommitError>
+MAX_CLOCK                                      // 20: the largest clock the search tables hold; callers clamp to it
 legalPlayerMoves(stage, from, config): Square[]
 hasLegalQueue(run, stage, config): boolean   // credits are read from stage.moveCredits (module legal-queue.ts)
 endStage(run, stage, config): Result<{ run; events; overCapacity: number }, CommitError>
@@ -210,6 +226,14 @@ TIERS: readonly Rarity[]                          // rarities in tier order: a t
 spawnCostOf(type, rarity, config): number
 durabilityMaxOf(type, rarity, config): number | null
 ```
+
+`enemyClock` is the clock for `enemyMove`: within the par it is `mateIn - turnsUsed` and never reads
+the wallet, so a stage proven before the shop stays proven whatever the player buys; past the par it
+is the overtime turns the pending base reward plus the wallet still pay for (at least 1, via
+`stageEconomy`). `commitQueue` computes the seed as `hash(stageSeed, turnsUsed)` and the clock, then
+calls `enemyMove` and `applyEnemyTurn`. `applyEnemyTurn` is the enemy's half of the turn (R5, modifier
+expiry, the next turn, White's check, the no-legal-queue loss and the overtime charge) and takes the
+pick as an argument so the solver can reuse memoized replies.
 
 `hasLegalQueue` searches skills first, then moves (see [03 §3](03-skill-framework.md#3-effect-primitives)).
 It tries each set of skills once, in loadout order, and never tries a skill whose primitives cannot
@@ -286,6 +310,7 @@ is produced for a skill whose cost exceeds the Focus left at its step.
 | `lifeline_saved { instanceId }` | a Unique+ queen captured for the first time |
 | `piece_returned { instanceId, durability: number \| null }` | `endStage`, per piece back in the deck (`null` for the King) |
 | `piece_removed { instanceId, reason: 'spent' }` | `endStage`, per spent piece |
+| `overtime_paid { turn, fromReward, fromWallet }` | `applyEnemyTurn`, when a turn past the par is charged: `fromReward` comes out of the pending base reward, `fromWallet` out of the wallet (docs/02 §7). A turn neither can pay ends the stage with `out_of_coins` |
 
 `capture` and `pawn_promoted` carry the ids of the pieces involved (`instanceId` / `stageId`).
 `enemy_fell_back` is emitted **before** `enemy_move`.
@@ -300,13 +325,22 @@ stock. Those all take randomness from an explicit cursor over a seed string:
 
 ```ts
 function rng(seed: string, cursor: number): { value: number; next: number }
+function mix32(h: number): number                          // murmur3 finalizer: spreads a 32-bit hash's bits
+function draw(seed: string, ...parts: (string | number)[]): number   // mix32(hash(seed, ...parts)) / 2^32, in [0, 1)
 ```
+
+`hash` is FNV-1a, whose top bits are skewed on short inputs, so `draw` runs it through `mix32`. Every
+random choice in generation reads its own named stream, `draw(stageSeed, <stream>, ...)`, so adding a
+choice to one step never shifts another (the stream list is in
+[04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)). `rng(seed, cursor)` stays for
+cursor-based consumers (today the enemy search's transposition-table keys).
 
 - No mutable PRNG object is stored in game state; the cursor is a plain number, so state stays
   serializable and replay is exact.
 - Seed derivation:
   - `runSeed            = player seed or generated`
-  - `stageSeed          = hash(runSeed, actIndex, stageIndex)`
+  - `stageSeed          = hash(runSeed, actIndex, stageIndex)`, formatted as upper-case hex `XXXX-XXXX`:
+    the format `stage.schema.json` requires and the player-visible seed code uses
   - `enemySeed          = hash(stageSeed, turnsUsed)`, where `turnsUsed` is the value after R4's increment
   - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)` — covers piece
     type *and* rarity rolls, including rerolls
@@ -315,6 +349,55 @@ function rng(seed: string, cursor: number): { value: number; next: number }
 
 Because every random decision is a pure function of `(seed, cursor)`, a run is fully reproducible
 from a short string — which powers bug reports, QA replay, and (later) seed sharing.
+
+## 5b. The generation API (`@checkbreaker/gen`)
+
+```ts
+generateStage(
+  input: GenInput,                 // { run: RunState; actIndex; stageIndex; previousTemplateId? }
+  content: GenContent,             // { templates: Template[]; formations: Record<templateId, Formation[]> }
+  config: GenConfig,               // EngineConfig & { gen } (loadGenConfig)
+): { stage: StageState; provenance: Provenance }
+
+generateWith(input, content, config, solve: SolveFn)   // the same, with an injected solver (tests, gen:report)
+type SolveFn = (run: RunState, stage: StageState, config: GenConfig) => SolveResult
+
+solveStage(run, stage, config: GenConfig): SolveResult
+replayLine(run, stage, win, config): boolean           // plays a found line through startStage and commitQueue
+
+type Provenance = {
+  templateId: string; seed: string;                    // seed = the stageSeed, XXXX-XXXX
+  formationId: string | null; mirrored: boolean;
+  attempts: number;                                    // G5 attempts used
+  proven: boolean;                                     // false on a bonus-pawn or validationFailed stage
+  bonusPawn: boolean;
+  solverNodes: number;
+  validationFailed?: true;                             // every template exhausted maxRegenerations
+}
+type SolveResult = {
+  win: { placements: Placement[]; line: Action[][]; mateTurn: number } | null;
+  stats: { screenNodes; deepNodes; deployments; enemyCalls; memoHits; replayFailures: number };
+}
+```
+
+`generateStage` is G0-G8 of [04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline). The
+`StageState` it returns carries only `{templateId, seed, attempts, validationFailed?}` as
+`provenance`; the full `Provenance` (formation, mirroring, proof, bonus pawn, nodes) goes beside it
+for `gen:report`, and the player never sees it. Generation is a pure function of the run seed, the
+act and stage index, and the deck, so the same input twice gives a byte-identical `StageState`.
+`solveStage` merges the act's and the template's solver overrides over the global block with
+`solverSettingsFor(actIndex, templateId, config)` (`@checkbreaker/content`); a found line is
+replayed before it counts, and a replay mismatch is counted in `stats.replayFailures` and treated as
+not found.
+
+Rulings the generator and solver depend on:
+- `stageSeed` is the G0 hash formatted as upper-case hex `XXXX-XXXX`, matching the stage schema
+  pattern and the player-visible seed code.
+- A Legendary knight's free second move counts as part of the same turn: a queue is a `MOVE` plus
+  its bonus `MOVE`, and the solver tries both.
+- Spawned-pawn moves are not tried in `no_first_turn_mate`: the precondition summons deck pieces only.
+- The solver's King deployment squares alternate ranks 1 and 2, spread across files (e, d, f, c, g, b, h, a).
+- A node is one enemy reply needed, from the memo or computed, so node counts are the same on every device.
 
 ## 6. Module responsibilities
 
@@ -329,9 +412,9 @@ from a short string — which powers bug reports, QA replay, and (later) seed sh
 | `engine/rules` | `simulate` and `commitQueue` (R3–R5): stage end evaluation (checkmate, stalemate, turns, no legal queue) and the enemy reply | Render or animate |
 | `engine/skills` (`skills/check.ts`, `skills/registry.ts`) | `check.ts`: the ordered `ACTIVATE_SKILL` checks; `registry.ts`: primitive interpretation, modifier stack (an `instant` effect is never stored), expiry, which primitives are queue-neutral | Add per-skill special cases |
 | `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups; the lifeline (whether a capture is saved, the durability it returns with) | Be consulted by name in `engine/rules` |
-| `engine/enemy` | `enemyMove(stage, seed, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
+| `engine/enemy` | `enemyMove(stage, seed, clock, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
-| `gen` | Templates, generation pipeline, solver | Be imported by the web app |
+| `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app; use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
 
 **The single most important architectural rule:** *no rule may live in the UI.* If a designer wants a
@@ -407,4 +490,6 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | `npm run play` | Terminal playground: place the King and two minors (Deployment phase, `startStage`), then play one Act I stage against the enemy | **M1**, M2 |
 | `npm run dev` | Vite dev server for `apps/web` | M5 |
 | `npm run build` | Production build | M5 |
-| `npm run gen:report` | Template health report from the solver | M3 |
+| `npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]` | Template health report: proven rate, mating turn vs par, bonus pawns, `validationFailed`, replay failures, solver nodes and wall time per template, on a fixed deck per act. Numbers are identical whatever `--workers` is; only the wall times differ, so measure them with `--workers 1` (the game generates in one Web Worker) | M3 |
+| `npm run formations:extract` | Rebuild `content/formations/<templateId>.json` from the cached Lichess puzzle file in `.cache/lichess/` (git-ignored, CC0). Offline: it never downloads | M3 |
+| `npm run check:links` | Fail on a broken relative link or heading anchor in the Markdown | M3 |

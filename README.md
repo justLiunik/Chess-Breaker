@@ -16,8 +16,9 @@ turn, turn a bishop into a queen, freeze an enemy piece. They are scarce and the
 
 Checkbreaker is a **personal, non-commercial project**.
 
-**Milestone M0 — Design Foundation.** This repository currently contains design documents, JSON
-Schemas, tuning data, and example content. There is no engine or UI code yet; see
+**Milestones M0–M3 are built.** The repository holds the design documents, JSON Schemas, tuning
+data, the rules engine (`packages/engine`), the content loaders (`packages/content`) and the stage
+generator and solver (`packages/gen`). There is no UI yet; see
 [`docs/10-roadmap-and-milestones.md`](docs/10-roadmap-and-milestones.md) for what comes next.
 
 ## Read this in order
@@ -55,7 +56,12 @@ schemas/                       JSON Schemas (draft 2020-12): run, stage, templat
 data/economy.yaml              EVERY tuning constant, in one place
 content/examples/              Validated example content used as schema fixtures
 content/formations/            Enemy formations per template, extracted from the Lichess puzzle database
-scripts/validate-content.mjs   Validates examples against schemas
+content/templates/             Stage templates (M3)
+packages/engine, content, gen  Rules engine, content loaders, stage generation and solver
+scripts/validate-content.mjs   Validates content against schemas
+scripts/gen-report.ts          Template health report (npm run gen:report)
+scripts/check-links.mjs        Broken-link check over the Markdown (npm run check:links)
+tools/formations/extract.ts    Offline formation extractor (npm run formations:extract)
 ```
 
 ## Validate the content
@@ -67,6 +73,17 @@ npm run validate
 
 The validator checks every file in `content/examples/` against the relevant schema and reports
 each failure with its JSON pointer path.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `npm test` | Unit and property tests (Vitest) |
+| `npm run typecheck` | `tsc` over packages and scripts |
+| `npm run bench` | Enemy-search timing benchmark; run it on an idle machine |
+| `npm run check:links` | Fail on a broken link or anchor in the Markdown |
+| `npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]` | Template health report: how many generated stages the solver proves mateable within the par, the median mating turn against the par, bonus-pawn and `validationFailed` counts, solver nodes and wall time per template. The numbers do not depend on `--workers`; for wall times use `--workers 1`, as the game generates in one worker |
+| `npm run formations:extract` | Rebuild `content/formations/` from the Lichess puzzle file cached in `.cache/lichess/` (git-ignored). It reads the cache and never downloads anything |
 
 ## Glossary
 

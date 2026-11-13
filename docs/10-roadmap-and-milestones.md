@@ -148,21 +148,41 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
 - [ ] 10,000 generated stages (`gen:report`): ≥95% proven mateable within the par, 100% pass the
       enemy-king, safe-King-square, enemy-has-moves, enemy-value and deployment preconditions
       ([04 §9](04-stage-generation-and-authoring.md#9-test-plan-for-generation-m3-acceptance)).
-- [ ] Same seed and deck twice → byte-identical `StageState`.
+      **Not met; accepted gap (user decision 2026-11-12).** 10,003 stages: 86.6 % proven overall.
+      Per template: First Steps 64.8 %, Open Field 92.0 %, Gatehouse 74.9 %, Fortress 95.5 %,
+      Citadel 96.7 %, Last Line 97.1 %, Redoubt 85.1 %. Act I and the Redoubt are below 95 %. 179
+      stages (150 Redoubt, 29 Last Line) are `validationFailed`: the strong deck mates on turn 1 on
+      all 20 boards (`no_first_turn_mate`). Acts I and II have none. The bonus pawn (§3) keeps every
+      unproven stage playable.
+- [x] Same seed and deck twice → byte-identical `StageState` (`generate-solved.test.ts`, and the
+      1,000-stage `bulk.test.ts`, which generates every stage twice).
 - [ ] Generation (solver included) takes a median ≤ 3 s and a p95 ≤ 15 s on a laptop; it runs in the
-      background over the results screen and the shop.
-- [ ] Every template reports a median solver mating turn within one turn of its par.
-- [ ] A turn past the par charges `overtimeCost` from the pending reward, then the wallet; a turn
-      neither can pay ends the run with `out_of_coins`; a mate within the par pays `parBonus`.
-- [ ] Three unproven boards always end in a stage (first board + one spawned pawn); `validationFailed`
-      is emitted only when 20 boards fail the preconditions in every template.
-- [ ] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
-      results never exceed the act ceiling (I14).
-- [ ] Solver models rarity abilities and promotion; measured node counts reported per tier mix.
-- [ ] Solver searches the deployment ply (bounded candidates, sound but incomplete) and prunes
-      stalemate leaves; node counts reported separately for the deployment ply.
-- [ ] Every solver line is replayed through `startStage` and `commitQueue` before a stage counts as
-      proven.
+      background over the results screen and the shop. **Not met for two templates, measured with
+      one worker** (`gen:report --workers 1 --stages 40`, 2026-11-12/13): First Steps median 12.1 s,
+      p95 29.0 s; Gatehouse 9.5 s and 20.1 s; Open Field 1.8 s and 15.4 s; Fortress 1.6 s and 6.6 s;
+      Citadel 0.5 s and 4.8 s; Last Line 1.7 s and 7.2 s; Redoubt 0.9 s and 4.5 s. Another process
+      was using the machine, so the First Steps and Gatehouse figures (Task 18 measured p95 13.9 s
+      and 15.8 s) need re-measuring on an idle machine. The cause is the unproven boards, which run
+      the solver three times; it is not a separate gap from the proven rate above.
+- [x] Every template reports a median solver mating turn within one turn of its par (10,003 stages:
+      First Steps 4 vs 4, Open Field 4 vs 5, Gatehouse 3 vs 4, Fortress 3 vs 4, Citadel 3 vs 4, Last
+      Line 2 vs 3, Redoubt 2 vs 2).
+- [x] A turn past the par charges `overtimeCost` from the pending reward, then the wallet; a turn
+      neither can pay ends the run with `out_of_coins`; a mate within the par pays `parBonus`
+      (`par-economy.test.ts`).
+- [x] Three unproven boards always end in a stage (first board + one spawned pawn); `validationFailed`
+      is emitted only when 20 boards fail the preconditions in every template (`generate.test.ts`).
+      The 179 `validationFailed` stages above are exactly that path, so the mechanism holds even
+      though the rate does not meet the first box.
+- [x] 100% of generated enemy pieces are Normal rarity (I13); spawned pawns and their promotion
+      results never exceed the act ceiling (I14) (`bulk.test.ts`, 1,000 stages).
+- [x] Solver models rarity abilities and promotion; measured node counts reported per tier mix
+      (`gen:report` prints them; Act II decks mix normal, rare and unique, Act III adds legendary).
+- [x] Solver searches the deployment ply (bounded candidates, sound but incomplete) and prunes
+      stalemate leaves; node counts reported separately for the deployment ply (`gen:report`:
+      screen nodes and deep nodes).
+- [x] Every solver line is replayed through `startStage` and `commitQueue` before a stage counts as
+      proven (0 replay failures in 10,003 stages).
 
 **Risks:** solver cost, above all the deployment ply (the 2026-11-10 spike solved Act II–III in
 0.2–7 s but needed 200 deployment candidates and 13 s for a hard Act I board), and a thin formation
