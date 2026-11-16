@@ -18,7 +18,7 @@ const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'p
 const tierName = (i: PieceInstance): string => (i.rarity ? RARITY_NAME[i.rarity] : 'King');
 
 export function Deployment() {
-  const { session, dispatch, error } = useRun();
+  const { session, dispatch, error, dev } = useRun();
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -208,6 +208,12 @@ export function Deployment() {
           >
             START
           </button>
+          {dev && (
+            <>
+              {' '}
+              <button type="button" onClick={() => { setMessage(null); setLatest('run'); dispatch({ type: 'skip' }); }}>Skip stage (dev)</button>
+            </>
+          )}
         </aside>
       </div>
     </main>

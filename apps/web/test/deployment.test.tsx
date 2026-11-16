@@ -1,10 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { spawnCostOf } from '@checkbreaker/engine';
+import { pendingBase, spawnCostOf } from '@checkbreaker/engine';
 import { memoryStorage, newRun, serializeSave } from '@checkbreaker/run';
 import { engineConfig, runConfig } from '../src/config';
 import { dropRefusalText } from '../src/messages';
+import { DEV_KEY } from '../src/storage';
 import { Deployment } from '../src/screens/Deployment';
 import { RunProvider, useRun } from '../src/state/store';
 import type { StageSource } from '../src/state/stageSource';
@@ -40,6 +41,24 @@ const trayPiece = (id: string) => within(tray()).getByTestId(`tray-${id}`);
 afterEach(() => { cleanup(); localStorage.clear(); });
 
 describe('Deployment screen', () => {
+  it('offers Skip stage (dev) only with the dev toggle on (I3)', async () => {
+    await setup();
+    expect(screen.queryByRole('button', { name: /^Skip stage/ })).toBeNull();
+  });
+
+  it('Skip stage (dev) reaches the shop paying the base reward, with no durability change (I3)', async () => {
+    localStorage.setItem(DEV_KEY, '1');
+    await setup();
+    const before = api.session!;
+    const base = pendingBase(before.run, before.stage!, engineConfig);
+    await user().click(screen.getByRole('button', { name: /^Skip stage/ }));
+    const after = api.session!;
+    expect(after.phase).toBe('shop');
+    expect(after.debug).toBe(true);
+    expect(after.run.coins).toBe(before.run.coins + base);
+    expect(after.run.deck).toEqual(before.run.deck);
+  });
+
   it('tray shows durability pips and rarity names', async () => {
     await setup();
     const bishop = api.session!.run.deck.find((i) => i.instanceId === 'p_bishop_04')!;
