@@ -8,6 +8,57 @@ import type {
 
 const refuse = (error: CommitError): Result<never, CommitError> => ({ ok: false, error });
 
+/** A deck instance with the square it is to be placed on. */
+export type Placed = { instance: PieceInstance; to: Square };
+
+/**
+ * One placement's own checks, in `startStage`'s order: not_in_deck, duplicate, durability,
+ * outside_zone, occupied. `taken` (squares in use) and `seen` (instances placed) are the state so
+ * far; a placement that passes is added to both. Shared with `deploymentStatus` (view.ts) so the
+ * preview and START cannot disagree.
+ */
+export function checkPlacement(
+  run: RunState, taken: Set<Square>, seen: Set<string>, instanceId: string, to: Square, config: EngineConfig,
+): Result<PieceInstance, CommitError> {
+  const instance = run.deck.find((p) => p.instanceId === instanceId);
+  if (!instance || instance.status !== 'in_deck') {
+    return refuse({ kind: 'invalid_deployment', to, reason: 'not_in_deck' });
+  }
+  if (seen.has(instanceId)) return refuse({ kind: 'invalid_deployment', to, reason: 'duplicate' });
+  seen.add(instanceId);
+  if (instance.pieceType !== 'king' && (instance.durability ?? 0) < 1) {
+    return refuse({ kind: 'durability_unavailable', instanceId });
+  }
+  if (!isSquare(to) || !config.rules.deploymentRanks.includes(Number(to[1]))) {
+    return refuse({ kind: 'invalid_deployment', to, reason: 'outside_zone' });
+  }
+  if (taken.has(to)) return refuse({ kind: 'invalid_deployment', to, reason: 'occupied' });
+  taken.add(to);
+  return { ok: true, value: instance };
+}
+
+/** The spawn points `placed` costs: the King is free. */
+export function spawnCostOfPlaced(placed: Placed[], config: EngineConfig): number {
+  let cost = 0;
+  for (const { instance } of placed) {
+    if (instance.pieceType !== 'king') {
+      cost += spawnCostOf(instance.pieceType, instance.rarity ?? 'normal', config);
+    }
+  }
+  return cost;
+}
+
+/** The stage board with `placed` summoned onto it. */
+export function boardWith(stage: StageState, placed: Placed[]): Record<Square, BoardPiece> {
+  const board: Record<Square, BoardPiece> = { ...stage.board };
+  for (const { instance, to } of placed) {
+    board[to] = instance.pieceType === 'king'
+      ? { pieceType: 'king', color: 'white', instanceId: instance.instanceId }
+      : { pieceType: instance.pieceType, color: 'white', instanceId: instance.instanceId, rarity: instance.rarity ?? 'normal' };
+  }
+  return board;
+}
+
 /**
  * The Deployment phase: place Hero Pieces from the deck, pay their durability, start the Action phase.
  * Every check runs before any change, so a refusal spends nothing (spec §7.2). The loadout is left
@@ -24,23 +75,11 @@ export function startStage(
 
   const taken = new Set<Square>(Object.keys(stage.board));
   const seen = new Set<string>();
-  const placed: { instance: PieceInstance; to: Square }[] = [];
+  const placed: Placed[] = [];
   for (const { instanceId, to } of placements) {
-    const instance = run.deck.find((p) => p.instanceId === instanceId);
-    if (!instance || instance.status !== 'in_deck') {
-      return refuse({ kind: 'invalid_deployment', to, reason: 'not_in_deck' });
-    }
-    if (seen.has(instanceId)) return refuse({ kind: 'invalid_deployment', to, reason: 'duplicate' });
-    seen.add(instanceId);
-    if (instance.pieceType !== 'king' && (instance.durability ?? 0) < 1) {
-      return refuse({ kind: 'durability_unavailable', instanceId });
-    }
-    if (!isSquare(to) || !config.rules.deploymentRanks.includes(Number(to[1]))) {
-      return refuse({ kind: 'invalid_deployment', to, reason: 'outside_zone' });
-    }
-    if (taken.has(to)) return refuse({ kind: 'invalid_deployment', to, reason: 'occupied' });
-    taken.add(to);
-    placed.push({ instance, to });
+    const checked = checkPlacement(run, taken, seen, instanceId, to, config);
+    if (!checked.ok) return refuse(checked.error);
+    placed.push({ instance: checked.value, to });
   }
 
   const kings = placed.filter((p) => p.instance.pieceType === 'king');
@@ -49,22 +88,12 @@ export function startStage(
     return refuse({ kind: 'invalid_deployment', to: placements[0]?.to ?? '', reason: 'king_missing' });
   }
 
-  let cost = 0;
-  for (const { instance } of placed) {
-    if (instance.pieceType !== 'king') {
-      cost += spawnCostOf(instance.pieceType, instance.rarity ?? 'normal', config);
-    }
-  }
+  const cost = spawnCostOfPlaced(placed, config);
   if (cost > stage.spawnPoints) {
     return refuse({ kind: 'spawn_points_exceeded', budget: stage.spawnPoints, cost });
   }
 
-  const board: Record<Square, BoardPiece> = { ...stage.board };
-  for (const { instance, to } of placed) {
-    board[to] = instance.pieceType === 'king'
-      ? { pieceType: 'king', color: 'white', instanceId: instance.instanceId }
-      : { pieceType: instance.pieceType, color: 'white', instanceId: instance.instanceId, rarity: instance.rarity ?? 'normal' };
-  }
+  const board = boardWith(stage, placed);
   if (inCheck(fromBoard(board), 'white')) {
     return refuse({ kind: 'invalid_deployment', to: kings[0]!.to, reason: 'king_in_check' });
   }
