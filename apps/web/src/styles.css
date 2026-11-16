@@ -1,0 +1,49 @@
+:root {
+  --bg: #f4f1ea;
+  --ink: #1d1d1f;
+  --light-sq: #ecdfc2;
+  --dark-sq: #a98b62;
+  --white-piece: #fffdf5;
+  --black-piece: #1b1b1d;
+  --outline: #1d1d1f;
+  --threat: #b3261e;
+  --highlight: #2563eb;
+  --hatch: rgba(29, 29, 31, 0.28);
+  --error: #8c1d18;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; margin: 0; }
+.hud { display: flex; gap: 1.5rem; padding: 0.5rem 1rem; align-items: baseline; border-bottom: 2px solid var(--ink); }
+.deployment-body { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 1rem; }
+.side { min-width: 16rem; max-width: 24rem; }
+
+.board { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); width: min(90vw, 36rem); aspect-ratio: 1; border: 2px solid var(--outline); }
+.square { position: relative; padding: 0; border: 0; cursor: pointer; background: var(--light-sq); }
+.square.dark { background: var(--dark-sq); }
+.square.highlight { outline: 3px solid var(--highlight); outline-offset: -3px; }
+.square:focus-visible { outline: 3px solid var(--highlight); outline-offset: -3px; }
+.square[data-hatch]::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 8px);
+}
+.piece { width: 90%; height: 90%; }
+.piece-white .glyph { fill: var(--white-piece); stroke: var(--outline); stroke-width: 2; }
+.piece-black .glyph { fill: var(--black-piece); stroke: var(--black-piece); }
+.frame { fill: none; stroke: var(--outline); stroke-width: 4; }
+.frame-rare { stroke-dasharray: none; }
+.frame-unique { stroke-width: 5; }
+.frame-legendary { stroke-width: 6; }
+.threat { position: absolute; top: 2px; right: 2px; width: 28%; height: 28%; }
+.threat path:first-child { fill: var(--threat); stroke: var(--outline); stroke-width: 1.5; }
+.threat path:last-child { fill: none; stroke: #fff; stroke-width: 2; }
+.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.arrow { stroke: var(--threat); stroke-width: 0.08; stroke-dasharray: 0.2 0.12; }
+.mark { fill: var(--highlight); }
+
+.tray { list-style: none; padding: 0; display: grid; gap: 0.4rem; }
+.tray-piece { width: 100%; text-align: left; padding: 0.4rem; border: 2px solid var(--ink); background: #fff; }
+.tray-piece.selected { outline: 3px solid var(--highlight); }
+.tray-piece:disabled { opacity: 0.6; }
+.pip { font-size: 1rem; }
+.error { color: var(--error); font-weight: 600; }
+.start { margin-top: 1rem; padding: 0.6rem 1.4rem; font-weight: 700; }

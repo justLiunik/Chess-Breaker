@@ -1,4 +1,4 @@
-import type { CommitError } from '@checkbreaker/engine';
+import type { CommitError, DropRefusal } from '@checkbreaker/engine';
 import type { RunError, RunPhase, SaveError } from '@checkbreaker/run';
 
 const step = (atStep: number): number => atStep + 1;
@@ -153,6 +153,20 @@ export function saveErrorText(e: SaveError): string {
     default:
       return assertNever(e);
   }
+}
+
+const DROP_REASON: Record<DropRefusal, string> = {
+  occupied: DEPLOY_REASON.occupied,
+  outside_zone: DEPLOY_REASON.outside_zone,
+  king_in_check: DEPLOY_REASON.king_in_check,
+  not_in_deck: DEPLOY_REASON.not_in_deck,
+  duplicate: DEPLOY_REASON.duplicate,
+  spawn_points_exceeded: 'there are not enough spawn points left for that piece',
+};
+
+/** Why `deploymentStatus(...).drop` refused a placement. */
+export function dropRefusalText(reason: DropRefusal): string {
+  return `Cannot place it there: ${DROP_REASON[reason]}.`;
 }
 
 function assertNever(x: never): never {
