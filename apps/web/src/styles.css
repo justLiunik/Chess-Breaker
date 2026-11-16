@@ -55,3 +55,20 @@ body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-se
 .pip { font-size: 1rem; }
 .error { color: var(--error); font-weight: 600; }
 .start { margin-top: 1rem; padding: 0.6rem 1.4rem; font-weight: 700; }
+
+.action-body { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 1rem; }
+.action-hud p { margin: 0.25rem 0; }
+.hud-warn { color: var(--error); }
+.hud-loss { color: var(--error); border: 2px solid var(--error); padding: 0.3rem; }
+.hud-win { font-size: 1.2rem; }
+.hud-muted { opacity: 0.65; }
+.queue { list-style: none; padding: 0; display: grid; gap: 0.3rem; }
+.queue-entry { display: flex; gap: 0.25rem; align-items: stretch; }
+.queue-entry.current .queue-main { outline: 3px solid var(--highlight); }
+.queue-entry.problem .queue-main { border-style: dashed; border-color: var(--error); }
+.queue-main { flex: 1; text-align: left; padding: 0.3rem; border: 2px solid var(--ink); background: #fff; }
+.queue-icon { display: inline-block; width: 1.5rem; height: 1.5rem; vertical-align: middle; }
+.queue-problem { color: var(--error); }
+.confirm { position: fixed; inset: auto 0 20% 0; margin: 0 auto; width: min(90vw, 26rem); padding: 1rem; background: #fff; border: 3px solid var(--error); }
+.commit:disabled { opacity: 0.5; }
+@media (prefers-reduced-motion: no-preference) { .square.ghost .piece { transition: opacity 0.2s; } }
