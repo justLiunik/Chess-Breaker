@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { DragEvent, MouseEvent } from 'react';
 import type { BoardPiece, Square, StageState } from '@checkbreaker/engine';
 import { PlanLayer } from './PlanLayer';
-import { colorFor } from './arrows';
+import { FILES, centre, colorFor } from './arrows';
 import type { Plan, PlanColor } from './arrows';
 import { PIECE_NAME, PieceGlyph } from './pieces';
 
@@ -38,6 +38,8 @@ export interface BoardProps {
   onPlanClear?: () => void;
   /** Pieces fade instead of travelling. */
   reducedMotion?: boolean;
+  /** Every piece is newly shown (the played-out position): animate them all in. */
+  entering?: boolean;
   /** Whether the piece on `square` may be dragged. */
   draggable?: (square: Square) => boolean;
   onDragStart?: (square: Square, event: DragEvent<HTMLButtonElement>) => void;
@@ -46,9 +48,7 @@ export interface BoardProps {
   onDrop?: (square: Square, event: DragEvent<HTMLButtonElement>) => void;
 }
 
-const FILES = 'abcdefgh';
 const squareAt = (col: number, row: number): Square => `${FILES[col]}${8 - row}`;
-const centre = (sq: Square): { x: number; y: number } => ({ x: FILES.indexOf(sq[0]!) + 0.5, y: 8 - Number(sq[1]) + 0.5 });
 
 export function describeOccupant(piece: BoardPiece | undefined): string {
   if (!piece) return 'empty';
@@ -70,7 +70,7 @@ function MarkIcon({ kind }: { kind: string }) {
   );
 }
 
-export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover, onPlanArrow, onPlanMark, onPlanClear, reducedMotion, draggable, onDragStart, onDragEnd, onDrop }: BoardProps) {
+export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover, onPlanArrow, onPlanMark, onPlanClear, reducedMotion, entering, draggable, onDragStart, onDragEnd, onDrop }: BoardProps) {
   const rightFrom = useRef<Square | null>(null);
   useEffect(() => {
     const reset = (): void => { rightFrom.current = null; };
@@ -142,9 +142,9 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
     }
   }
   return (
-    <div className={`board ${reducedMotion ? 'motion-fade' : 'motion-travel'}`} role="group" aria-label="Board">
-      {cells}
+    <div className={`board ${reducedMotion ? 'motion-fade' : 'motion-travel'}${entering ? ' entering' : ''}`} role="group" aria-label="Board">
       {overlays.plan && <PlanLayer plan={overlays.plan} />}
+      {cells}
       <svg className="overlay" viewBox="0 0 8 8" aria-hidden="true" focusable="false">
         {(overlays.arrows ?? []).map((a, i) => {
           const f = centre(a.from);

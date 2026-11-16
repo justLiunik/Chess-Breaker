@@ -71,13 +71,21 @@ body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-se
 .queue-problem { color: var(--error); }
 .confirm { position: fixed; inset: auto 0 20% 0; margin: 0 auto; width: min(90vw, 26rem); padding: 1rem; background: #fff; border: 3px solid var(--error); }
 .commit:disabled { opacity: 0.5; }
-@media (prefers-reduced-motion: no-preference) { .square.ghost .piece { transition: opacity 0.2s; } }
 
-/* Planning arrows and marks (right mouse button): dashed, own palette, under the preview arrows. */
-.plan-overlay { --plan-1: #1f9d55; --plan-2: #c0392b; --plan-3: #2b6cb0; --plan-4: #d69e2e; }
+/* Planning arrows and marks (right mouse button). Own palette (green, amber, purple, teal), kept clear of the
+   engine's threat red and highlight blue; long-short dash, thicker stroke and round caps unlike the preview arrows.
+   Stacking: square backgrounds < plan layer (1) < pieces and icons (2) < preview arrows (3). */
+.plan-overlay { --plan-1: #2e9e45; --plan-2: #d9a400; --plan-3: #8e44ad; --plan-4: #0f9c93; z-index: 1; }
 .plan-1 { --c: var(--plan-1); } .plan-2 { --c: var(--plan-2); } .plan-3 { --c: var(--plan-3); } .plan-4 { --c: var(--plan-4); }
-.plan line { stroke: var(--c); stroke-width: 0.1; stroke-dasharray: 0.22 0.12; opacity: 0.85; }
-.plan polygon { fill: var(--c); opacity: 0.85; }
-circle.plan { fill: none; stroke: var(--c); stroke-width: 0.08; stroke-dasharray: 0.22 0.12; opacity: 0.85; }
-.board.motion-fade .piece { transition: opacity 0.2s; }
-@media (prefers-reduced-motion: no-preference) { .board.motion-travel .piece { transition: transform 0.2s; } }
+.plan line { stroke: var(--c); stroke-width: 0.13; stroke-dasharray: 0.4 0.1 0.08 0.1; stroke-linecap: round; opacity: 0.9; }
+.plan polygon { fill: var(--c); opacity: 0.9; }
+circle.plan { fill: none; stroke: var(--c); stroke-width: 0.11; stroke-dasharray: 0.4 0.1 0.08 0.1; stroke-linecap: round; opacity: 0.9; }
+.board .piece, .board .threat, .board .mark-icon { position: relative; z-index: 2; }
+.board .threat, .board .mark-icon { position: absolute; }
+.board .overlay:not(.plan-overlay) { z-index: 3; }
+
+/* Reduced motion is a class from settings.ts, never the media query: motion slides/scales newly shown pieces in, reduced fades them. */
+@keyframes piece-slide-in { from { transform: translateY(-18%) scale(0.85); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes piece-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.board.motion-travel .square.ghost .piece, .board.motion-travel.entering .piece { animation: piece-slide-in 0.25s ease-out; }
+.board.motion-fade .square.ghost .piece, .board.motion-fade.entering .piece { animation: piece-fade-in 0.25s linear; }

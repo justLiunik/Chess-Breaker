@@ -14,7 +14,7 @@ import type { Shortcuts } from '../input/shortcuts';
 import { commitErrorText } from '../messages';
 import { QueueStrip, skillName } from '../queue/QueueStrip';
 import { useQueue } from '../queue/useQueue';
-import { reducedMotion } from '../settings';
+import { useReducedMotion } from '../settings';
 import { useRun } from '../state/store';
 
 type Phase = 'idle' | 'thinking' | 'playback';
@@ -34,7 +34,7 @@ export function Action() {
   const [resolved, setResolved] = useState<StageState['board'] | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [plan, setPlan] = useState<Plan>(emptyPlan);
-  const motionReduced = useMemo(() => reducedMotion.read(), []);
+  const motionReduced = useReducedMotion();
 
   const latest = useRef<RunSession | null>(session);
   latest.current = session;
@@ -157,7 +157,7 @@ export function Action() {
       <Header session={session} />
       <div className="action-body">
         {playing ? (
-          <Board stage={{ board: resolved }} reducedMotion={motionReduced} />
+          <Board stage={{ board: resolved }} reducedMotion={motionReduced} entering />
         ) : (
           <Board
             stage={stage}

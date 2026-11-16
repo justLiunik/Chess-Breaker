@@ -1,8 +1,5 @@
-import type { Square } from '@checkbreaker/engine';
+import { centre } from './arrows';
 import type { Plan } from './arrows';
-
-const FILES = 'abcdefgh';
-const centre = (sq: Square): { x: number; y: number } => ({ x: FILES.indexOf(sq[0]!) + 0.5, y: 8 - Number(sq[1]) + 0.5 });
 
 /** The player's planning arrows and square marks: dashed, in their own four-colour palette. Purely visual. */
 export function PlanLayer({ plan }: { plan: Plan }) {
