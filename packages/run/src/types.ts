@@ -37,6 +37,7 @@ export type RunError =
   | { kind: 'insufficient_coins'; price: number; coins: number }
   | { kind: 'deck_full' }
   | { kind: 'loadout_full' }
+  | { kind: 'replace_not_needed' }
   | { kind: 'slot_sold'; slot: number }
   | { kind: 'no_such_slot'; slot: number }
   | { kind: 'not_damaged'; instanceId: string }

@@ -392,6 +392,33 @@ describe('loadSave refusals', () => {
   });
 });
 
+describe('loadSave rebuilds the session from checked keys only', () => {
+  it('drops unknown keys at every level', () => {
+    const { sessions } = snapshots();
+    const action = sessions.find(s => s.phase === 'action')!;
+    const shopped = sessions.find(s => s.phase === 'shop' && s.shop!.slots.length > 0)!;
+    const square = Object.keys(action.stage!.board)[0]!;
+    const a = loaded(saveWith(action, x => {
+      x.junk = 1; x.run.junk = 1; x.stage.board[square].junk = 1; x.stage.junk = 1; x.run.deck[0].junk = 1;
+    })) as any;
+    expect(a).toEqual(action);
+    for (const o of [a, a.run, a.stage, a.stage.board[square], a.run.deck[0]]) expect('junk' in o).toBe(false);
+    const sh = loaded(saveWith(shopped, x => { x.shop.slots[0].junk = 1; x.shop.junk = 1; })) as any;
+    expect(sh).toEqual(shopped);
+    expect('junk' in sh.shop.slots[0]).toBe(false);
+    expect('junk' in sh.shop).toBe(false);
+  });
+
+  it('a deeply nested unknown key cannot make serializeSave throw', () => {
+    const deep = '['.repeat(100_000) + '1' + ']'.repeat(100_000);
+    const text = JSON.stringify({ version: SAVE_VERSION, session: newRun(SEED, c) })
+      .replace('"session":{', `"session":{"junk":${deep},`);
+    const r = loadSave(text, c);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(() => serializeSave(r.value)).not.toThrow();
+  });
+});
+
 describe('memoryStorage', () => {
   it('round-trips a save, overwrites, clears, and keeps each store apart', () => {
     const { sessions } = snapshots();

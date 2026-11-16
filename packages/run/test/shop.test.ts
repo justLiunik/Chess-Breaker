@@ -156,6 +156,16 @@ describe('buyOffer', () => {
     expect(r.shop.slots[2]!.sold).toBe(true);
   });
 
+  it('replace with room is refused', () => {
+    const run = runWith(4, 10, '7F3A-2210', [{ skillId: 'twin_step' }]);
+    const before = JSON.stringify(run);
+    expect(error(buyOffer(run, shopOf(stock), 3, { replace: 0 }, c))).toEqual({ kind: 'replace_not_needed' });
+    expect(JSON.stringify(run)).toBe(before);
+    expect(run.coins).toBe(10);
+    const full = runWith(4, 10, '7F3A-2210', [{ skillId: 'twin_step' }, { skillId: 'ascension' }, { skillId: 'twin_step' }]);
+    expect(error(buyOffer(full, shopOf(stock), 3, { replace: 5 }, c))).toEqual({ kind: 'loadout_full' });
+  });
+
   it('a duplicate skill becomes a second entry', () => {
     const run = runWith(4, 10, '7F3A-2210', [{ skillId: 'lockdown' }]);
     const r = value(buyOffer(run, shopOf(stock), 3, {}, c));
