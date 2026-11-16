@@ -3,10 +3,13 @@ import {
   boardWith, checkPlacement, spawnCostOfPlaced, type Placed,
 } from './deployment';
 import { inCheck } from './legality';
+import { interestOf, pendingBase, stageEconomy } from './economy';
+import { beginQueue, resolveStep } from './queue';
+import { simulate } from './rules';
 import { DIAG_R, KING_T, KNIGHT_T, ORTHO_R } from './movegen';
 import { BISHOP, KING, KNIGHT, PAWN, QUEEN, ROOK, fromBoard } from './position';
 import { toSquare } from './square';
-import type { EngineConfig, RunState, Square, StageState } from './types';
+import type { Action, Award, CommitError, EngineConfig, GameEvent, RunState, Square, StageState } from './types';
 
 /**
  * Read-only answers for the UI (M5 §7.3), so that it computes no rules itself. Pure; they never
@@ -122,4 +125,78 @@ export function deploymentStatus(
   };
 
   return { spawnUsed, spawnBudget: stage.spawnPoints, startCost, tray, drop };
+}
+
+/**
+ * The queue entry by entry, for the planner. `steps[i].stage` is the stage after entry `i` (board,
+ * focus, credits, modifiers, skill log), so `legalPlayerMoves` can be asked of it; an entry after
+ * the first refused one is `ok: false` and carries the last good stage. The verdict (`error` for a
+ * refused queue, `result` for an accepted one) is `simulate`'s own, so preview and commit cannot
+ * disagree (I10): a queue can resolve in every step and still be refused at its end (check) or for
+ * lacking a move.
+ */
+export function previewSteps(
+  run: RunState, stage: StageState, queue: Action[], config: EngineConfig,
+): {
+  steps: { stage: StageState; ok: boolean }[];
+  error: CommitError | null;
+  result: { run: RunState; stage: StageState; events: GameEvent[]; award: Award | null } | null;
+} {
+  const steps: { stage: StageState; ok: boolean }[] = [];
+  const begun = beginQueue(run, stage);
+  let r = begun.ok ? begun.value : null;
+  let shown = stage;
+  for (const action of queue) {
+    const next = r === null ? null : resolveStep(r, action, config);
+    if (next !== null && next.ok) {
+      r = next.value;
+      const { ctx } = r;
+      shown = { ...stage, board: ctx.board, focus: ctx.focus, moveCredits: ctx.moveCredits, modifiers: ctx.modifiers, skillLog: ctx.skillLog };
+      steps.push({ stage: shown, ok: true });
+    } else {
+      r = null;
+      steps.push({ stage: shown, ok: false });
+    }
+  }
+  const sim = simulate(run, stage, queue, config);
+  return sim.ok ? { steps, error: null, result: sim.value } : { steps, error: sim.error, result: null };
+}
+
+/**
+ * The HUD's coin figures, from the economy functions `simulate` uses. `freeTurnsLeft` counts the
+ * turns still inside the par, this one included. `*IfMateNow` are for a mate on this turn, with
+ * interest on the current wallet (no salvage from the plan); when the queue mates, show
+ * `previewSteps(...).result.award.coins` instead. `nextTurnPotential` is what a mate on the next
+ * turn would pay: the next turn's overtime bill (reward first, then wallet) is taken off, and 0
+ * when the wallet cannot cover it (the stage would be lost).
+ */
+export function hudEconomy(
+  run: RunState, stage: StageState, config: EngineConfig,
+): {
+  mateIn: number; turn: number; freeTurnsLeft: number; lastParTurn: boolean; overtimeCost: number;
+  pendingBase: number; parBonusIfMateNow: number; interestIfMateNow: number; nextTurnPotential: number;
+} {
+  const { parBonusFull, overtimeCost } = stageEconomy(run, config);
+  const turn = stage.turnsUsed + 1;
+  const pending = pendingBase(run, stage, config);
+  const interest = interestOf(run.coins, config);
+  let nextTurnPotential: number;
+  if (turn + 1 <= stage.mateIn) {
+    nextTurnPotential = pending + parBonusFull + interest;
+  } else {
+    const fromReward = Math.min(overtimeCost, pending);
+    const fromWallet = overtimeCost - fromReward;
+    nextTurnPotential = run.coins < fromWallet ? 0 : pending - fromReward + interestOf(run.coins - fromWallet, config);
+  }
+  return {
+    mateIn: stage.mateIn,
+    turn,
+    freeTurnsLeft: Math.max(0, stage.mateIn - stage.turnsUsed),
+    lastParTurn: turn === stage.mateIn,
+    overtimeCost,
+    pendingBase: pending,
+    parBonusIfMateNow: turn <= stage.mateIn ? parBonusFull : 0,
+    interestIfMateNow: interest,
+    nextTurnPotential,
+  };
 }
