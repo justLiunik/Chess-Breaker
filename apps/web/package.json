@@ -1,0 +1,28 @@
+{
+  "name": "@checkbreaker/web",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@checkbreaker/content": "*",
+    "@checkbreaker/engine": "*",
+    "@checkbreaker/run": "*",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@checkbreaker/gen": "*",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.12",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "6.3.0",
+    "jsdom": "31.0.1",
+    "vite": "8.3.6"
+  }
+}
