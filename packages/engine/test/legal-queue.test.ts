@@ -7,8 +7,7 @@ import type { QueueCtx } from '../src/queue';
 import type { Action, RunState, StageState } from '../src/types';
 import { config, deepFreeze, runOf, stageOf } from './helpers';
 
-const slot = (skillId: string, charges = 1) => ({ skillId, charges, chargesMax: 3 });
-const withSkills = (...ids: string[]): RunState => runOf({ loadout: ids.map((id) => slot(id)) });
+const withSkills = (...ids: string[]): RunState => runOf({ loadout: ids.map((skillId) => ({ skillId })) });
 
 describe('hasLegalQueue with skills', () => {
   it('true with a single legal move (M1 behaviour)', () => {
@@ -30,9 +29,16 @@ describe('hasLegalQueue with skills', () => {
     expect(hasLegalQueue(withSkills('ascension'), stageOf(block), config)).toBe(true);
   });
 
-  it('false when skills have no charges', () => {
-    const run = runOf({ loadout: [slot('twin_step', 0)] });
-    expect(hasLegalQueue(run, stageOf(walk), config)).toBe(false);
+  // Ka1 in check; rooks on ranks 1-3 cover every square within two king steps, a4 is three away.
+  const far = { a1: 'K', h1: 'r', h2: 'r', h3: 'r', h8: 'k' };
+  it('false when a second copy of Twin Step would be needed: once_per_turn holds across copies', () => {
+    expect(hasLegalQueue(withSkills('twin_step', 'twin_step', 'twin_step'), stageOf(far), config)).toBe(false);
+  });
+
+  it('every implemented skill is once_per_turn, which lets hasLegalQueue try each skill id once', () => {
+    const mvp = Object.values(config.skills).filter((s) => s.status === 'mvp');
+    expect(mvp.length).toBeGreaterThan(0);
+    for (const s of mvp) expect(s.restrictions, s.id).toContain('once_per_turn');
   });
 
   it('false when Focus is short', () => {
@@ -116,8 +122,9 @@ describe('hasLegalQueue brute force', () => {
           place(side === 'upper' ? letter.toUpperCase() : letter);
         }
       }
+      // 0, 1 or 2 copies of each launch skill (single use: a copy is one loadout entry).
       const loadout = ['twin_step', 'ascension', 'lockdown']
-        .map((skillId) => ({ skillId, charges: pick(3), chargesMax: 3 }));
+        .flatMap((skillId) => Array.from({ length: pick(3) }, () => ({ skillId })));
       const run = runOf({ loadout });
       const stage = deepFreeze(stageOf(pieces, { focus: pick(4) }));
       const expected = bruteForce(run, stage);

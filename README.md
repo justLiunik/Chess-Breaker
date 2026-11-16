@@ -83,6 +83,7 @@ each failure with its JSON pointer path.
 | `npm run bench` | Enemy-search timing benchmark; run it on an idle machine |
 | `npm run check:links` | Fail on a broken link or anchor in the Markdown |
 | `npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]` | Template health report: how many generated stages the solver proves mateable within the par, the median mating turn against the par, bonus-pawn and `validationFailed` counts, solver nodes and wall time per template. The numbers do not depend on `--workers`; for wall times use `--workers 1`, as the game generates in one worker |
+| `npm run bot -- [--runs N] [--seed S] [--json out.json]` | Headless bot: plays whole runs through the run layer from seeds (generated stages, a fixed shop policy) and exits 1 on any crash, invariant breach or bot failure. Takes minutes |
 | `npm run formations:extract` | Rebuild `content/formations/` from the Lichess puzzle file cached in `.cache/lichess/` (git-ignored). It reads the cache and never downloads anything |
 
 ## Glossary

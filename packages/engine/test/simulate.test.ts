@@ -17,9 +17,9 @@ describe('simulate', () => {
     const v = ok(simulate(runOf({ coins: 10 }), stageOf(mateBoard, { turnsUsed: 1 }), mv('a1', 'a8'), config));
     expect(v.stage.status).toBe('won');
     expect(v.stage.endReason).toBe('checkmate');
-    expect(v.award).toEqual({ coins: 10, base: 4, parBonus: 6 });
-    expect(v.run.coins).toBe(20);
-    expect(v.events).toContainEqual({ type: 'stage_won', award: { coins: 10, base: 4, parBonus: 6 } });
+    expect(v.award).toEqual({ coins: 12, base: 4, parBonus: 6, interest: 2 });
+    expect(v.run.coins).toBe(22);
+    expect(v.events).toContainEqual({ type: 'stage_won', award: { coins: 12, base: 4, parBonus: 6, interest: 2 } });
     expect(v.stage.turnsUsed).toBe(2);
   });
 
@@ -33,12 +33,12 @@ describe('simulate', () => {
 
   it('applies the boss multiplier', () => {
     const v = ok(simulate(runOf({ stageIndex: 2 }), stageOf(mateBoard, { turnsUsed: 1 }), mv('a1', 'a8'), config));
-    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9 });
+    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9, interest: 0 });
   });
 
   it('uses Act II rates', () => {
     const v = ok(simulate(runOf({ actIndex: 1 }), stageOf(mateBoard, { turnsUsed: 0, mateIn: 3 }), mv('a1', 'a8'), config));
-    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9 });
+    expect(v.award).toEqual({ coins: 15, base: 6, parBonus: 9, interest: 0 });
   });
 
   it('loses when White stalemates Black', () => {

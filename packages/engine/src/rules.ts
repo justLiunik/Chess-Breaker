@@ -11,7 +11,7 @@ import { toSquare } from './square';
 import { resolveQueue } from './queue';
 import { frozenMask } from './skills/registry';
 import { lifelineSaves } from './abilities';
-import { enemyClock, pendingBase, stageEconomy } from './economy';
+import { enemyClock, interestOf, pendingBase, stageEconomy } from './economy';
 
 export function simulate(
   run: RunState,
@@ -47,7 +47,8 @@ export function simulate(
     const { parBonusFull } = stageEconomy(run, config);
     const base = pendingBase(run, next, config);
     const parBonus = next.turnsUsed <= next.mateIn ? parBonusFull : 0;
-    award = { coins: base + parBonus, base, parBonus };
+    const interest = interestOf(nextRun.coins, config);
+    award = { coins: base + parBonus + interest, base, parBonus, interest };
     nextRun = { ...nextRun, coins: nextRun.coins + award.coins };
     events.push({ type: 'stage_won', award });
   } else if (next.status === 'lost') {

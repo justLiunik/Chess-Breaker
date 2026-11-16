@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "gen:report": "tsx scripts/gen-report.ts",
     "play": "tsx scripts/play.ts",
+    "bot": "tsx scripts/run-bot.ts",
     "formations:extract": "tsx tools/formations/extract.ts"
   },
   "devDependencies": {

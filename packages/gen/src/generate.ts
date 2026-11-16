@@ -7,7 +7,7 @@ import { selectTemplates } from './select';
 import { solveStage } from './solver';
 import { bonusPawnSquares, drawPar, makeBonusPawn, nextStageNumber, placeSpawnedPawns, stageId } from './spawn';
 import { buildStage } from './stage';
-import type { GenContent, GenInput, Provenance, SolveResult } from './types';
+import type { GenContent, GenInput, Provenance, SolveResult, Solution } from './types';
 
 export type SolveFn = (run: GenInput['run'], stage: StageState, config: GenConfig) => SolveResult;
 
@@ -19,7 +19,7 @@ export function generateWith(
   content: GenContent,
   config: GenConfig,
   solve: SolveFn,
-): { stage: StageState; provenance: Provenance } {
+): { stage: StageState; provenance: Provenance; solution: Solution | null } {
   const { run, actIndex, stageIndex, previousTemplateId } = input;
   // G0. The 32-bit hash as XXXX-XXXX, the seed format schemas/stage.schema.json requires.
   const h = hash(run.seed, actIndex, stageIndex).toString(16).toUpperCase().padStart(8, '0');
@@ -34,7 +34,8 @@ export function generateWith(
   const emit = (
     b: Built,
     extra: { proven: boolean; bonusPawn: boolean; validationFailed?: true },
-  ): { stage: StageState; provenance: Provenance } => {
+    solution: Solution | null,
+  ): { stage: StageState; provenance: Provenance; solution: Solution | null } => {
     const templateId = b.stage.templateId;
     const stage: StageState = {
       ...b.stage,
@@ -51,7 +52,7 @@ export function generateWith(
       solverNodes,
       ...(extra.validationFailed ? { validationFailed: true as const } : {}),
     };
-    return { stage, provenance };
+    return { stage, provenance, solution };
   };
 
   for (const tpl of selectTemplates(content.templates, (actIndex + 1) as 1 | 2 | 3, tier, stageSeed, previousTemplateId)) {
@@ -77,7 +78,7 @@ export function generateWith(
       // G6
       const r = solve(run, b.stage, config);
       solverNodes += r.stats.screenNodes + r.stats.deepNodes;
-      if (r.win) return emit(b, { proven: true, bonusPawn: false });
+      if (r.win) return emit(b, { proven: true, bonusPawn: false }, r.win);
     }
     // G7
     const first = passed[0]!;
@@ -85,19 +86,19 @@ export function generateWith(
       const pawn = { ...makeBonusPawn(sq, act, stageSeed, config), stageId: stageId(nextStageNumber(first.stage.board)) };
       const stage = { ...first.stage, board: { ...first.stage.board, [sq]: pawn } };
       if (checkPreconditions(run, stage, tpl, { extraPawns: 1 }, config) === null) {
-        return emit({ ...first, stage }, { proven: false, bonusPawn: true });
+        return emit({ ...first, stage }, { proven: false, bonusPawn: true }, null);
       }
     }
-    return emit(first, { proven: false, bonusPawn: false });
+    return emit(first, { proven: false, bonusPawn: false }, null);
   }
   if (!last) throw new Error(`no enemy board for act ${actIndex + 1} ${tier}`);
-  return emit(last, { proven: false, bonusPawn: false, validationFailed: true }); // all templates failed G5
+  return emit(last, { proven: false, bonusPawn: false, validationFailed: true }, null); // all templates failed G5
 }
 
 export function generateStage(
   input: GenInput,
   content: GenContent,
   config: GenConfig,
-): { stage: StageState; provenance: Provenance } {
+): { stage: StageState; provenance: Provenance; solution: Solution | null } {
   return generateWith(input, content, config, solveStage);
 }

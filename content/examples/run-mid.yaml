@@ -1,9 +1,9 @@
 # RunState mid-run, at the start of Act II stage 2.
 #
 # Demonstrates the state that actually needs saving: per-instance durability,
-# rarity, skill charges part-spent, and cumulative history. Two starter pieces
-# have been lost to captures (p_knight_02, p_bishop_04) and two survivors are
-# down to a single deployment.
+# rarity, the single-use skills still held, and cumulative history. Two
+# starter pieces have been lost to captures (p_knight_02, p_bishop_04) and two
+# survivors are down to a single deployment.
 # - The shop-bought knight is Rare: the highest tier the Act I pool can offer.
 # - The rook came from promotion in Act II stage 1: a Rare spawned pawn reached
 #   rank 8 and rolled one tier up, to Unique (allowed: the Act II ceiling).
@@ -53,6 +53,7 @@ deck:
     durabilityMax: 2
     origin: shop
     acquiredAtStage: 2
+    pricePaid: 12                 # Rare knight in an Act I shop; it can never sell for more (docs/07 §4)
     status: in_deck
 
   - instanceId: p_rook_09
@@ -64,13 +65,9 @@ deck:
     acquiredAtStage: 4
     status: in_deck
 
-loadout:
+loadout:                          # single use: one entry per copy, consumed on commit (docs/03 §8)
   - skillId: twin_step
-    charges: 1
-    chargesMax: 3
   - skillId: lockdown
-    charges: 3
-    chargesMax: 3
 
 history:
   - stageSeed: 1A20-33C8

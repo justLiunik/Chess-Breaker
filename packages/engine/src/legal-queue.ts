@@ -11,13 +11,15 @@ import { QUEUE_NEUTRAL } from './skills/registry';
  * resolved by the queue's own steps (`resolveStep`) and judged by `queueAccepted`, so "legal" means
  * exactly what commit means; a shared prefix is resolved once. Stops at the first success.
  *
- * Two reductions keep it exact:
- * - A skill made only of `QUEUE_NEUTRAL` primitives is never tried: it only spends Focus and a
- *   charge, so any queue legal with it is legal without it.
+ * Three reductions keep it exact:
+ * - A skill made only of `QUEUE_NEUTRAL` primitives is never tried: it only spends Focus and its
+ *   loadout entry, so any queue legal with it is legal without it.
+ * - Each distinct skill id is tried at most once, however many copies the loadout holds: every
+ *   implemented skill is `once_per_turn`, so a second copy can never act in the same turn.
  * - Each set of skills is tried once, in loadout order, not in every order. With the implemented
- *   primitives a skill's checks (charges, `once_per_turn`, Focus, its target's colour, type and
- *   rarity) do not depend on which other skills came first: no primitive moves a piece, grants Focus
- *   or changes a piece's own type and rarity, and Focus costs add up the same in any order.
+ *   primitives a skill's checks (in the loadout, `once_per_turn`, Focus, its target's colour, type
+ *   and rarity) do not depend on which other skills came first: no primitive moves a piece, grants
+ *   Focus or changes a piece's own type and rarity, and Focus costs add up the same in any order.
  * Skills before moves is complete for them (spec §8.4): a credit must be granted before the move it
  * pays for, and a transform must precede its piece's moves. The brute-force test in
  * `legal-queue.test.ts` checks both claims against every interleaving.
@@ -25,12 +27,10 @@ import { QUEUE_NEUTRAL } from './skills/registry';
 export function hasLegalQueue(run: RunState, stage: StageState, config: EngineConfig): boolean {
   const begun = beginQueue(run, stage);
   if (!begun.ok) return false;
-  const skillIds = [...new Set(run.loadout
-    .filter((l) => {
-      const def = config.skills[l.skillId];
-      return l.charges >= 1 && def?.status === 'mvp' && def.effects.some((e) => !QUEUE_NEUTRAL.has(e.primitive));
-    })
-    .map((l) => l.skillId))];
+  const skillIds = [...new Set(run.loadout.map((l) => l.skillId))].filter((id) => {
+    const def = config.skills[id];
+    return def?.status === 'mvp' && def.effects.some((e) => !QUEUE_NEUTRAL.has(e.primitive));
+  });
   const squares = Object.keys(stage.board);
 
   /** Whether some MOVE after the queue `r`, then perhaps more, ends in a queue commit accepts. */

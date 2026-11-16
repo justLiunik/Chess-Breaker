@@ -35,9 +35,21 @@ Five slots, generated from the run seed **after** the stage's coins are awarded:
 |---|---|---|
 | 1 | **Piece** | One random knight, bishop or rook — or the recovery offer (§3) |
 | 2 | **Piece** | One random piece |
-| 3 | **Piece or Skill** | Random |
-| 4 | **Piece or Skill** | Random |
-| 5 | **Service** | Repair or reroll |
+| 3 | **Piece or Skill** | A skill with probability `shop.skillChance` (20 %), else a piece |
+| 4 | **Piece or Skill** | A skill with probability `shop.skillChance` (20 %), else a piece |
+| 5 | **Service** | Repair — repeatable, always present (disabled when no piece is damaged) |
+
+Piece types are drawn with `shop.pieceTypeWeights` — **Knight 35 · Bishop 35 · Rook 20 · Queen 10**,
+the promotion weights; slot 1 draws from knight, bishop and rook only, with the same weights. A
+skill slot picks uniformly among the `status: mvp` skills not already in this roll's stock; if none
+is left, the slot holds a piece. Pieces are therefore far commoner than skills (decided 2026-11-13).
+Every draw reads its own named stream of the run seed (`draw(runSeed, 'shop', stageNumber, roll,
+slot, field)`, [09 §5](09-technical-architecture.md#5-determinism-and-rng)), so a reload never changes
+the stock.
+
+**Reroll** is a button, never a slot: it redraws slots 1–4 — sold ones included — keeps an unsold
+recovery offer, and never touches slot 5. The first reroll of a visit is free, later ones cost 2,
+and a visit allows at most `services.maxRerollsPerVisit` (3).
 
 Generation rules:
 
@@ -46,10 +58,11 @@ Generation rules:
 - Every piece offer is a **Hero Piece** and carries a rarity tier (see §2.1).
 - The deck is fixed at **8** pieces; the shop never sells capacity. A piece purchase with a full deck
   needs a cut, a sale or a merge first (§4, §4.1).
-- Repair is only offered if at least one piece has durability below its max.
-- Skills already at their loadout cap (3) are still offered, but flagged `replace` — buying one
+- Repair can be bought only while at least one piece has durability below its max; otherwise its card
+  is shown disabled.
+- Skills are still offered when the loadout is full (3), but flagged `replace` — buying one
   prompts a swap.
-- The same skill may appear at most once per visit.
+- The same skill appears at most once in the stock at a time; a reroll may offer it again.
 - An item the player cannot possibly afford is still shown (with a disabled state) so the shop
   teaches future pricing; it is never silently hidden.
 
@@ -112,19 +125,21 @@ Skills have no rarity, so their price is the skill's own `price` with act inflat
 
 ```
 skillPrice = round(price × (1 + 0.20 × (act − 1)))
-upgrade    = round(skillPrice × 0.5)          # +1 charge to an owned skill
 ```
 
-| Skill (Act I) | Price | Act II | Act III | Upgrade (Act I) |
-|---|---|---|---|---|
-| Lockdown · Gallop · Bulwark | 10 | 12 | 14 | 5 |
-| Twin Step · Ascension · Recall | 12 | 14 | 17 | 6 |
-| Phase Step | 14 | 17 | 20 | 7 |
+| Skill (Act I) | Price | Act II | Act III |
+|---|---|---|---|
+| Lockdown · Gallop · Bulwark | 3 | 4 | 4 |
+| Twin Step · Ascension · Recall | 4 | 5 | 6 |
+| Phase Step | 5 | 6 | 7 |
+
+Skills are single-use ([03 §2](03-skill-framework.md#2-skill-anatomy)), so they cost less than a
+knight; there are no upgrades — a second copy is a separate skill in its own slot.
 
 Only `status: mvp` skills are stocked until the engine supports the rest: Twin Step, Ascension and
 Lockdown from M2; Gallop, Phase Step, Recall and Bulwark from M6
-([03 §5](03-skill-framework.md)). Why skills cost more than a knight is in
-[03 §6](03-skill-framework.md).
+([03 §5](03-skill-framework.md)). The pricing rationale is in
+[03 §6](03-skill-framework.md#6-balance-frame).
 
 ## 3. Guarantees
 
@@ -142,18 +157,18 @@ guaranteed **Normal-rarity knight or bishop** at **50% of its normal price**. Me
 than 4 pieces does not trigger it — the offer is insurance against losses, not a merge discount.
 
 This is insurance against one catastrophic stage, not an ongoing subsidy: the offer disappears as
-soon as the deck is back to 4 pieces.
+soon as the deck is back to 4 pieces — also mid-visit, e.g. after buying slot 2, which empties slot 1
+(a later reroll then draws it normally). Selling back below 4 does not bring it back.
 
 ## 4. Purchases
 
 | Category | Item | Notes |
 |---|---|---|
-| **Piece** | Any of knight / bishop / rook / queen, at a rolled rarity (§2.1) — never a pawn | Creates a **new Hero Piece instance** at full durability for its type and rarity; must fit in capacity |
-| **Skill** | One of the skill catalogue, at its price (§2.3) | Occupies a loadout slot (3 max); permanent for the run |
-| **Skill upgrade** | A skill already owned | **+1 charge** at 50% price — deepen a build, don't widen it |
-| **Repair** | +1 durability to one chosen piece | Never above that piece's max; not offered for `spent` pieces |
-| **Reroll** | Reroll slots 1–5 (except a recovery offer) | First reroll each visit free, then 2 coins |
-| **Sell** | One deck piece, not the King and not `spent` | Pays `floor(0.5 × its current price)` — its type × rarity × this act's inflation (§2.2), whatever its durability. The piece leaves the run |
+| **Piece** | Any of knight / bishop / rook / queen, at a rolled rarity (§2.1) — never a pawn | Creates a **new Hero Piece instance** at full durability for its type and rarity, recording `pricePaid`; must fit in capacity |
+| **Skill** | One of the skill catalogue, at its price (§2.3) | Occupies one loadout slot (3 max); **single use**; a duplicate takes another slot |
+| **Repair** | +1 durability to one chosen piece, 4 coins | Repeatable within the visit; never above that piece's max; not for `spent` pieces |
+| **Reroll** | Reroll slots 1–4 (keeping an unsold recovery offer) | First reroll each visit free, then 2 coins; at most 3 per visit |
+| **Sell** | One deck piece, not the King and not `spent` | Pays `min(floor(0.5 × its current price), pricePaid)` — its type × rarity × this act's inflation (§2.2), whatever its durability, never more than it cost. The piece leaves the run |
 
 Selling is available at any time in the shop, any number of times, and in the stage-end chooser
 when a promotion overflows the deck (beside merge and cut). It never restocks or regenerates the
@@ -167,7 +182,8 @@ with a warning.
 | Normal rook, Act I | 10 | 5 |
 | Normal queen, Act I | 16 | 8 |
 | Rare knight, Act II | 14 | 7 |
-| Legendary queen, Act III | 69 | 34 |
+| Legendary queen, Act III | 67 | 33 |
+| Recovery knight bought in Act I, sold in Act III | 4 | 4 (half price would be 5; capped at `pricePaid`) |
 
 Prices inflate per act by 20% and scale with rarity (§2.2,
 [05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)).
@@ -203,6 +219,8 @@ A single button, `Leave shop`, exits without purchasing. Coins carry over with n
 This exists because the Act II price wall is real: a player who clears Act I efficiently may be better
 off banking 25 coins into Act II at ×1.2 prices than buying Act I power they will not need. Skip is a
 genuine strategic option, not a failure state, and the UI should not frame it as "decline."
+Banking also earns **interest**: every won stage pays 1 coin per 5 in the wallet at the mate, up to
+5 ([05 §2](05-run-structure-and-economy.md#interest)).
 
 ## 6. Screen layout
 
@@ -213,7 +231,7 @@ genuine strategic option, not a failure state, and the UI should not frame it as
 │  DECK (4 / 8)                           LOADOUT (2 / 3)              │
 │  ┌────┐┌────┐┌────┐┌────┐               ┌─────────────┐┌────────────┐│
 │  │ N  ││ B  ││ N  ││ R  │               │ ● Twin Step ││ ● Lockdown ││
-│  │ Nrm││ Nrm││ Rar││ Unq│               │ 3 charges   ││ 3 charges  ││
+│  │ Nrm││ Nrm││ Rar││ Unq│               │ single use  ││ single use ││
 │  │●○  ││●○  ││●●  ││●●  │               │             ││            ││
 │  └────┘└────┘└────┘└────┘               └─────────────┘└────────────┘│
 ├──────────────────────────────────────────────────────────────────────┤
@@ -245,8 +263,9 @@ Design notes:
   table from §2.1. The player can always see what the shop *could* have offered.
 - **Next-stage preview** shows the board the next stage will start from, so the player can buy for
   it. It never shows the par: how fast the mate must come is learned only on the Stage screen.
-- The loadout panel shows **remaining charges** (they refresh next stage — the shop should say so on
-  hover, once).
+- The loadout panel shows the **skills held** (up to 3, duplicates as separate cards); each is single
+  use, which the shop says on hover, once.
+- **Interest** is previewed next to the coins ("bank 25 → +5 next win"), so banking is a visible line.
 
 ## 7. Edge cases
 
@@ -255,10 +274,11 @@ Design notes:
 | No items affordable | Leave is the only action; next stage's spawned pawns still arrive for free |
 | Capacity full (8), tries to buy a piece | Blocked with an explicit chooser: sell a piece, cut a piece, or merge three identical pieces if possible; sales and cuts are permanent and confirmed |
 | All non-king pieces spent, deck effectively empty | Recovery offer fires; run continues |
-| Repair target has no damage | Repair not offered in stock generation |
-| Duplicate skill purchase | Becomes a +1 charge upgrade at 50% price |
+| No piece is damaged | The Repair card is shown disabled |
+| Duplicate skill purchase | A separate single-use skill in another loadout slot; no upgrade |
 | Loadout full, buys new skill | Forced swap chooser; the displaced skill is lost |
-| Player has 0 coins | Shop still opens, shows stock, allows leaving (no reroll) |
+| Player has 0 coins | Shop still opens, shows stock, allows the free reroll and leaving |
+| Recovery offer unsold when the deck reaches 4 (e.g. after buying slot 2) | It disappears; slot 1 is empty until a reroll draws it normally |
 | Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
 | Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
 | Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |

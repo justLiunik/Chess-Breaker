@@ -78,6 +78,8 @@ packages/
                             `loadGenConfig`, `loadTemplates`, `loadFormations`, `solverSettingsFor`,
                             `valueBandFor`, `enemyArmyValue`
   gen/                      Stage generation + solver (M3), `@checkbreaker/gen`
+  run/                      Run layer (M4), `@checkbreaker/run`: run state machine, shop, merge/sell/
+                            cut/repair, the stage-end chooser, save serialization
 apps/
   web/                      React UI
 scripts/
@@ -99,6 +101,10 @@ Boundary rules:
   `applyPlayerMove` and the like), which exists for the solver and is not public API. The **main
   thread never imports `gen`**: generation runs at runtime, over the results screen and the shop,
   so only the generation Web Worker (M5) imports it, and the solver ships inside that worker.
+- `run` imports `engine` at runtime and only **types** from `content` (whose loaders need
+  `node:fs`); it takes its config as a parameter and never imports `gen`. When it needs a stage it
+  emits a generation request and is handed the stage (`provideStage`) by the caller — the bot in M4,
+  the generation Web Worker in M5 ([M4 spec](superpowers/specs/2026-11-13-m4-run-loop-design.md) §8).
 
 ## 3. Core types
 
@@ -116,11 +122,12 @@ interface PieceInstance {                // a Hero Piece
   durabilityMax: number | null;  // null = immortal (king); depends on rarity for some types
   origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
+  pricePaid?: number;            // shop purchases only: a sale never pays more (docs/07 §4)
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
   usedOnce?: Array<'lifeline'>;  // once-per-run rarity abilities already used
 }
 
-interface LoadedSkill { skillId: string; charges: number; chargesMax: number; }
+interface LoadedSkill { skillId: string; }   // single use (M4); duplicates are separate entries.
 
 interface RunState {
   version: number;                 // save-format version
@@ -201,7 +208,9 @@ commitQueue(
   CommitError
 >
 
-type Award = { coins: number; base: number; parBonus: number };   // null unless the stage was won; base is net of overtime
+type Award = { coins: number; base: number; parBonus: number; interest: number };
+// null unless the stage was won; base is net of overtime; coins = base + parBonus + interest;
+// interest reads the wallet at R3 of the mating turn, before the award (docs/05 §2)
 ```
 
 Every engine function takes `config: EngineConfig` (from `loadEngineConfig()`) as its last argument;
@@ -268,7 +277,7 @@ type CommitError =
   | { kind: 'empty_queue' }                                   // no MOVE in the queue: there is no pass
   | { kind: 'illegal_move'; atStep: number; from: Square; to: Square; reason: MoveRejection }
   | { kind: 'skill_unavailable'; atStep: number; skillId: string;
-      reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
+      reason: 'not_in_loadout' | 'not_implemented' | 'once_per_turn' }
   | { kind: 'invalid_target'; atStep: number; skillId: string; target?: Square;
       reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
   | { kind: 'stage_not_active' }
@@ -288,7 +297,8 @@ type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece'
 
 `king_in_check_at_end.afterRevert` is true when the King is attacked only on the board R1 reverted.
 `unsupported_action` is gone: an `ACTIVATE_SKILL` is checked like any other step (spec section 8.1
-order: loadout and `mvp` status, charges, `once_per_turn`, Focus, then the target). `focus_exceeded`
+order: loadout and `mvp` status, `once_per_turn`, Focus, then the target; a used skill leaves the
+loadout in the queue's resolved run, so only a kept commit consumes it). `focus_exceeded`
 is produced for a skill whose cost exceeds the Focus left at its step.
 
 ### Events
@@ -341,8 +351,11 @@ cursor-based consumers (today the enemy search's transposition-table keys).
   - `stageSeed          = hash(runSeed, actIndex, stageIndex)`, formatted as upper-case hex `XXXX-XXXX`:
     the format `stage.schema.json` requires and the player-visible seed code uses
   - `enemySeed          = hash(stageSeed, turnsUsed)`, where `turnsUsed` is the value after R4's increment
-  - `shopSeed           = hash(runSeed, actIndex, stageIndex, 'shop', visitIndex)` — covers piece
-    type *and* rarity rolls, including rerolls
+  - shop stock reads named streams `draw(runSeed, 'shop', stageNumber, roll, slot, field)` —
+    `stageNumber = actIndex × 3 + stageIndex` of the stage just cleared, `roll` 0 on entry and +1 per
+    reroll — covering piece type, rarity, retention and skill picks (M4)
+  - shop and merge instance ids: `'p_' + hex(hash(runSeed, 'buy', stageNumber, roll, slot))` and
+    `'p_' + hex(hash(runSeed, 'merge', ...sortedInputIds))` (the input ids sorted first, so the id does not depend on the order), like promotion's ids
   - spawned-pawn rarity and `promotesTo` are drawn from `stageSeed` during generation (G4b), never
     at the moment of promotion — so the engine's rules still consume no randomness
 
@@ -356,7 +369,7 @@ generateStage(
   input: GenInput,                 // { run: RunState; actIndex; stageIndex; previousTemplateId? }
   content: GenContent,             // { templates: Template[]; formations: Record<templateId, Formation[]> }
   config: GenConfig,               // EngineConfig & { gen } (loadGenConfig)
-): { stage: StageState; provenance: Provenance }
+): { stage: StageState; provenance: Provenance; solution: SolveResult['win'] }   // solution: M4, for the bot
 
 generateWith(input, content, config, solve: SolveFn)   // the same, with an injected solver (tests, gen:report)
 type SolveFn = (run: RunState, stage: StageState, config: GenConfig) => SolveResult
@@ -413,6 +426,7 @@ Rulings the generator and solver depend on:
 | `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups; the lifeline (whether a capture is saved, the durability it returns with) | Be consulted by name in `engine/rules` |
 | `engine/enemy` | `enemyMove(stage, seed, clock, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
+| `run` | The run state machine (stage → chooser → shop → stage, run end), shop stock and every shop action, merge/sell/cut/repair, the free onboarding skill, the history record, save serialization and validation | Import `gen` or runtime `content`; read a clock or `Math.random`; contain board rules (those are `engine`'s) |
 | `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app's main thread (only the generation Web Worker imports it); use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
 | `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
 
@@ -434,10 +448,34 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 
 ## 8. Persistence
 
-- Key: `checkbreaker.save.<version>`; value: `{ run: RunState, stage: StageState, savedAt }`.
-- `RunState.version` gates migration; unknown future versions are refused with a clear message rather
+- Key: `checkbreaker.save.<version>`; value: `{ version, savedAt, session: RunSession }` — the run,
+  its phase (`awaiting_stage`, `deployment`, `action`, `chooser`, `shop`, `ended`), the stage being
+  played, the shop (stock, sold slots, rerolls used) and the next stage once generated
+  ([M4 spec](superpowers/specs/2026-11-13-m4-run-loop-design.md) §8.5). `savedAt` comes from the
+  caller; the run layer never reads a clock.
+- The version gates migration; unknown future versions are refused with a clear message rather
   than silently corrupting a run.
-- Autosave points: after every committed turn, after shop exit, after stage generation.
+- Autosave points: after every run-layer action (each commit, START, chooser and shop action) and
+  after stage generation. Everything random derives from the seed, so a reload never changes an
+  outcome. A save taken before generation finished regenerates from the stored request
+  (deterministic).
+- M4 ships `serializeSave`/`loadSave` and a `RunStorage` interface with an in-memory store; the
+  `localStorage` adapter is M5. The save API (`@checkbreaker/run`, `src/save.ts`):
+  - `SAVE_VERSION` (1): the one format version `loadSave` reads.
+  - `serializeSave(session, savedAt?)` returns `JSON.stringify({ version, savedAt?, session })`.
+    `savedAt` is whatever the caller passes and the key is absent without it, so the same session
+    always saves the same text.
+  - `loadSave(text, runConfig)` returns `Result<RunSession, SaveError>` and never throws. `SaveError`
+    kinds: `malformed` (not JSON, not a JSON object, or `savedAt` not a string), `unknown_version`
+    (missing, older or newer version; the message names it, and only primitives are printed because
+    the field is player-editable) and `invalid_session`. It validates the session's shape (every field
+    the run layer and the engine read, typed as in `types.ts`), exactly one King, the non-king deck
+    within `deck.capacity` except in `action`, the chooser, or a run lost mid-stage (promotions join
+    the deck during a stage and only the chooser trims them), the loadout within `run.loadoutSlots`,
+    and that each phase carries the fields it needs.
+  - `RunStorage { read(): string | null; write(text); clear() }` and `memoryStorage()` (each call makes
+    a separate store; used by tests and the bot). The `localStorage` adapter, keyed
+    `checkbreaker.save.<version>`, arrives in M5.
 - **No server.** A lost save is a lost run; the UI says so once and never nags.
 
 ## 9. Testing strategy
@@ -453,7 +491,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
 | Deck lifecycle | `deck-lifecycle.test.ts`, `stage-end.test.ts`: a captured instance leaves `run.deck` at once; `endStage` returns deployed pieces with their durability, removes `spent` ones only then; promotion adds exactly `promotesTo` at full durability; I15 over 500 chained random queues |
 | Skills | `skills.test.ts`, `modifiers.test.ts`: every `ACTIVATE_SKILL` check in spec 8.1 order (earlier wins), effects of Twin Step, Ascension and Lockdown, R1 revert, R3 suppression, R5 root mask, a temporary queen never mates |
-| `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, no charges or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards. `npm run bench` bounds the worst case found so far (a mated board with all three launch skills) at 400 ms |
+| `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, a second copy of a skill (once per turn) or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards, with loadouts holding 0–2 copies of each skill. `npm run bench` bounds the worst case found so far (a mated board with all three launch skills) at 400 ms |
 | Rarity abilities | `abilities*.test.ts`, `enemy-abilities.test.ts`: per-tier tables from `pieces.yaml`, ability-aware attack squares, the Legendary knight bonus move in the queue, abilities suspended while Ascension holds, the enemy search models abilities |
 | Reference differential | `reference.test.ts`: the optimised move generator is checked against a slow, independent reference implementation on the same positions |
 | Lifeline | First capture of a Unique+ queen returns it at stage end with its `returnDurability` (1) and `usedOnce: [lifeline]`, also when it was spent (a Legendary queen); second capture destroys it |
@@ -461,6 +499,10 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
 | Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
+| Run layer | `packages/run/test/`: `session.test.ts` (new run, requests and `provideStage`, commit outcomes, salvage, lost pieces, chooser, free Twin Step at I-3, abandon, phase gating), `session-flow.test.ts` (9 stages from stub stages: acts 1,1,1,2,2,2,3,3 shops, interest, stage 9 → `won`), `boundaries.test.ts` (run imports the engine only, never `gen`, content as types only; no clock or RNG source) |
+| Shop and deck | `prices.test.ts` (piece and skill price tables, sale price and cap), `deck.test.ts` (merge, sell, repair, cut), `shop.test.ts` (stock, recovery offer and withdrawal, purchases, rerolls, 1,000-purchase sale-cap property), `shop-stats.test.ts` (10,000 seeded visits per act: pool, ceilings, weights, skill share; Legendary-queen retention over 100,000 rolls) |
+| Save | `save.test.ts`: every phase round trips deep-equal and plays on to the same end, Review Focus 1 (no second free skill after a reload), unknown versions refused, truncated or mutated saves are typed refusals and never throw |
+| Headless bot | `bot-policy.test.ts` (shop and fallback policy); `npm run bot -- --runs 20` is the acceptance run (0 crashes, 0 invariant breaches, 0 bot failures); the same seed twice gives byte-identical JSON. Kept out of `npm test`: it generates real stages and takes minutes |
 | Reducer purity | Deep-freeze state in tests; any mutation throws |
 | Preview/execution parity | Property test: `simulate`'s events are a prefix of `commitQueue`'s, awards equal, run and `turnsUsed` equal, for random legal-ish queues, skills included |
 | Economy | Property tests: coins ≥ 0, deck ≤ capacity, no piece at 0 durability survives a stage |
@@ -492,3 +534,18 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | `npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]` | Template health report: proven rate, mating turn vs par, bonus pawns, `validationFailed`, replay failures, solver nodes and wall time per template, on a fixed deck per act. Numbers are identical whatever `--workers` is; only the wall times differ, so measure them with `--workers 1` (the game generates in one Web Worker) | M3 |
 | `npm run formations:extract` | Rebuild `content/formations/<templateId>.json` from the cached Lichess puzzle file in `.cache/lichess/` (git-ignored, CC0). Offline: it never downloads | M3 |
 | `npm run check:links` | Fail on a broken relative link or heading anchor in the Markdown | M3 |
+| `npm run bot -- [--runs N] [--seed S] [--json out.json]` | Headless bot: plays whole runs from seeds through the run layer (solver line in stages, a fixed shop policy) and fails on any crash, invariant breach or bot failure | M4 |
+
+`npm run bot` (`scripts/run-bot.ts`, flags `--runs N` default 20, `--seed S` default `7F3A-2210`,
+`--json out.json`) is a test driver, not an AI player. Run 0 plays seed S and run i plays
+`hash(S, i)` as `XXXX-XXXX`. Each stage is generated by `gen` and handed to the session; the bot plays
+the solver's line (placements, then the queue turn by turn) when the stage has one, and the fallback of
+`bot-policy.ts` otherwise or when a shop purchase broke the placements. After every action the session
+goes through `serializeSave` → `loadSave` and must come back deep-equal. A **failure** is a crash, an
+invariant breach (a save that does not round-trip) or a bot failure (the run layer refused an action the
+bot chose, including the solver's placements or queue; the step cap was hit; the solver's line lost the
+stage, or ended with the stage still active; or the fallback found no single MOVE it could have accepted,
+`no_fallback_move`); the exit code is 1 on any of them, otherwise 0. **Valid outcomes**
+are a loss on an unproven stage and an abandon at the 60-turn cap; there is no minimum win count. The
+`--json` file holds `args`, `summary` and per-run logs and depends only on the arguments (wall times go to
+stdout, never to the file), so the same arguments give byte-identical output.

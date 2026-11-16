@@ -197,45 +197,120 @@ pool for narrow enemy zones. Mitigations: tune the candidate and beam parameters
 
 ## M4 — Run Loop, Economy & Shop
 
-**Delivers:** coins, salvage, shop stock and purchases, deck capacity, persistence.
+**Delivers:** coins, interest, salvage, shop stock and purchases, deck capacity, persistence, the
+run layer `@checkbreaker/run`, and a headless bot. Design:
+[M4 spec](superpowers/specs/2026-11-13-m4-run-loop-design.md) (approved 2026-11-13).
 
 **Scope**
-- Run advancement across 9 stages, boss flagging, no shop after the final stage.
-- Stage reward math (base reward less overtime + par bonus) and salvage on capture.
-- Shop stock generation with recovery offer (no pawns are sold).
+- Run advancement across 9 stages, boss flagging, no shop after the final stage; the run layer asks
+  for each stage and is handed it (it never imports `gen`).
+- Stage reward math (base reward less overtime + par bonus + **interest**) and salvage on capture.
+- **Single-use skills** (2026-11-13): no charges, no upgrades, duplicates in separate slots, strictly 3
+  slots, new prices; the engine's charge code goes.
+- Shop stock generation (20 % skill chance in slots 3–4, piece weights N35 B35 R20 Q10) with recovery
+  offer (no pawns are sold).
 - Rarity roll on random piece offers from the act-gated pool and rarity pricing (`docs/07 §2.1–2.2`).
 - Stage-end over-capacity chooser after a promotion (merge, sell or cut), before the shop opens.
-- Purchases: pieces, skills (`status: mvp` only), skill upgrades, repairs, rerolls, bank & skip;
-  selling deck pieces at half their current price (`economy.services.sell`). Merging (3 → 1, free). Fixed
-  8-piece deck — no capacity purchases.
-- `localStorage` save/resume with version gating.
+- Purchases: pieces, skills (`status: mvp` only), repeatable repairs, rerolls (≤ 3 per visit),
+  bank & skip; selling deck pieces at half their current price, never above `pricePaid`
+  (`economy.services.sell`). Merging (3 → 1, free). Fixed 8-piece deck — no capacity purchases.
+- The free onboarding Twin Step at stage I-3.
+- Save/resume with version gating: pure serialization and a storage interface (the `localStorage`
+  adapter is M5).
+- `generateStage` returns the solver's solution beside the stage; the headless bot (`npm run bot`)
+  plays it.
 
-**Acceptance criteria**
-- [ ] Stage reward matches the [05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins) table for
-      every turn/act/tier combination, including the base-only final turn (table-driven test).
-- [ ] Merge: 3 identical pieces → 1 piece one tier up at full durability; refused above the act
-      ceiling and for Legendary inputs; the deck never exceeds 8 outside a stage (tests).
-- [ ] Recovery offer never fires because of a merge or a sale, only after pieces are lost (test).
-- [ ] A sale pays `floor(0.5 × current price)` for every type × tier × act, at any durability; it is
-      refused for the King and for `spent` pieces; the sold instance leaves `RunState.deck` (tests).
-- [ ] Buying any offer, recovery included, and selling it back never gains coins (property test).
-- [ ] Invariant I10 holds: preview equals payout for 1,000 random plans.
-- [ ] A full 9-stage run can be simulated headlessly from a seed by a scripted bot without crashing.
-- [ ] The shop never offers a pawn (test).
-- [ ] Recovery offer fires exactly when non-king deck < 4 and disappears at 4 (test).
-- [ ] Repairs never change a piece's rarity (I12, test).
-- [ ] 10,000 seeded shop visits per act, rerolls included, never offer a tier above that act's
-      ceiling; no Act I visit offers Unique or higher; recovery offers are always Normal (I14).
-- [ ] Prices match `docs/07 §2.2` for every type × tier × act (table-driven test).
-- [ ] Legendary queen retention: over 100,000 seeded rolls the Legendary-queen rate is 20% ± 1% of the
-      un-retained rate, in shop offers and promotion results (test).
-- [ ] Save → reload → resume mid-run preserves coins, deck durability, and loadout charges exactly.
+**Acceptance criteria** (the full list, with the interest, skill and save details, is the
+[M4 spec §10](superpowers/specs/2026-11-13-m4-run-loop-design.md#10-acceptance-criteria-replaces-the-docs10-m4-list));
+each box carries the test file or measured number that backs it (acceptance run 2026-11-16). This list
+carries every §10 criterion, with the §10 sub-criteria as their own boxes below
+- [x] Stage reward matches the [05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins) table for
+      every turn/act/tier combination, including the base-only final turn, with interest for wallets
+      0–30 (table-driven test). *Evidence:* `packages/engine/test/interest.test.ts` (table-driven: every
+      act, boss flag and mate turn, interest included) and `par-economy.test.ts`.
+- [x] Merge: 3 identical pieces → 1 piece one tier up at full durability; refused above the act
+      ceiling and for Legendary inputs; the deck never exceeds 8 outside a stage (tests). *Evidence:*
+      `packages/run/test/deck.test.ts` (`mergePieces`, ceiling, Legendary inputs); the 8-piece cap
+      outside a stage: `session.test.ts` (chooser) and `save.test.ts` (over-capacity decks are invalid
+      outside action, the chooser and a lost run).
+- [x] Recovery offer never fires because of a merge or a sale, only after pieces are lost (test).
+      *Evidence:* `packages/run/test/shop.test.ts` (recovery fires only with a piece lost; selling back
+      below 4 does not restore it) and `session.test.ts` (a shop after a clean win has `recovery: false`).
+- [x] A sale pays `min(floor(0.5 × current price), pricePaid)` for every type × tier × act, at any
+      durability; it is refused for the King and for `spent` pieces; the sold instance leaves
+      `RunState.deck` (tests). *Evidence:* `packages/run/test/prices.test.ts` (`sellPrice`) and
+      `deck.test.ts` (`sellPiece`: King and `spent` refused, instance leaves the deck).
+- [x] Buying any offer, recovery included, and selling it back in any later act never gains coins
+      (property test). *Evidence:* `packages/run/test/shop.test.ts`, "sale cap property": 1,000 seeded
+      purchases, sold in the same or any later act, never pay more than `pricePaid`.
+- [x] Invariant I10 holds: preview equals payout, interest included, for 1,000 random plans.
+      *Evidence:* `packages/engine/test/parity.test.ts`: 1,000 random accepted queues (skills, rarity,
+      R5 deck changes), `simulate` awards equal `commitQueue` awards.
+- [x] `npm run bot -- --runs 20` completes with 0 crashes, 0 invariant breaches and 0 bot failures;
+      losses on unproven stages and abandons at the 60-turn cap are valid outcomes. *Evidence:*
+      `npm run bot -- --runs 20 --seed 7F3A-2210`: exit 0, 0 crashes, 0 invariant breaches, 0 bot
+      failures, 0 abandons. 0 won, 20 lost (all `out_of_coins`, each on an unproven stage played by
+      the fallback); furthest stage reached: I-1 ×2, I-2 ×4, I-3 ×6, II-1 ×7, II-2 ×1; 41 stages won
+      from the solver's line. The same seed twice gives byte-identical JSON. Stages 6–9 and the win
+      are covered by the stub-stage tests in `session-flow.test.ts` (9 stages, stage 9 → `won`). No
+      minimum win count is required (spec §10): the bot is not tuned.
+- [x] The shop never offers a pawn (test). *Evidence:* `packages/run/test/shop-stats.test.ts`
+      (10,000 visits per act: every piece offer is a deck type, never a pawn).
+- [x] Recovery offer fires exactly when non-king deck < 4 and disappears at 4 (test). *Evidence:*
+      `packages/run/test/shop.test.ts` ("recovery fires with a piece lost and fewer than 4 non-king
+      pieces, and only then"; "recovery withdrawal").
+- [x] Repairs never change a piece's rarity (I12, test). *Evidence:* `packages/run/test/deck.test.ts`
+      (`repairPiece`: a Rare knight stays Rare, repeatable; King and `spent` refused).
+- [x] 10,000 seeded shop visits per act, rerolls included, never offer a tier above that act's
+      ceiling; no Act I visit offers Unique or higher; recovery offers are always Normal (I14); skill
+      share of slots 3–4 is 20 % ± 1 %. *Evidence:* `packages/run/test/shop-stats.test.ts`.
+- [x] Prices match `docs/07 §2.2` for every type × tier × act, and skill prices `docs/07 §2.3`
+      (table-driven test). *Evidence:* `packages/run/test/prices.test.ts` (`piecePrice`, `skillPrice`).
+- [x] Legendary queen retention: over 100,000 seeded rolls the Legendary-queen rate is 20% ± 1% of the
+      un-retained rate, in shop offers and promotion results (test). *Evidence:*
+      shop offers: `packages/run/test/shop-stats.test.ts` (retention); promotion results:
+      `packages/gen/test/spawn.test.ts`, "promotion retention statistic" (100,000 `rollPromotion` rolls,
+      |observed/unretained − 0.2| < 0.01); the rule itself: `packages/engine/test/rarity-roll.test.ts`.
+- [x] Skills are consumed on commit only, never by a preview; the loadout never exceeds 3 (tests).
+      *Evidence:* `packages/engine/test/skills.test.ts` ("single use": `simulate` keeps the skill, commit
+      consumes it, duplicates are separate, `once_per_turn`); loadout cap: `shop.test.ts`
+      (`loadout_full`) and `save.test.ts` (a loadout over the slots is invalid).
+- [x] Save → reload → resume in every phase preserves the whole session exactly (coins, deck
+      durability, loadout, shop stock and rerolls); unknown versions are refused. *Evidence:*
+      `packages/run/test/save.test.ts` (every phase, a shop after a purchase and two rerolls,
+      deep-equal and the same end; unknown versions refused); the bot round-trips after every action
+      (0 breaches).
+- [x] Piece types within ±1 % of 35/35/20/10 (slots 2–4) and slot 1 drawing from its three types, over
+      10,000 seeded visits per act. *Evidence:* `packages/run/test/shop-stats.test.ts` (`pieceTypeWeights`
+      and `slot1Types` shares, each within 0.01).
+- [x] Skills are never consumed by a refused commit. *Evidence:* `packages/engine/test/skills.test.ts`,
+      "a refused commit consumes nothing".
+- [x] A full loadout forces a swap. *Evidence:* `packages/run/test/shop.test.ts`, "a skill needs a free
+      loadout slot, or replaces the chosen entry" (`loadout_full` without a replace target).
+- [x] `once_per_turn` blocks two copies in one turn; duplicates occupy separate slots. *Evidence:*
+      `packages/engine/test/skills.test.ts` ("two copies cannot be used in one turn", "duplicates are
+      separate") and `shop.test.ts` ("a duplicate skill becomes a second entry").
+- [x] The free Twin Step arrives at I-3 only, and only with a free slot. *Evidence:*
+      `packages/run/test/session.test.ts`, "the free Twin Step" (granted on entering stage 2 with a free
+      slot, skipped with a full loadout, never granted twice across a reload).
+- [x] Determinism: the same seed played twice by the bot gives byte-identical run logs. *Evidence:*
+      two `npm run bot -- --runs 20 --seed 7F3A-2210` runs, `cmp` identical (sha256 dc38aec7…6e46f5).
+- [x] Every phase of a late run (Act II–III shops, the chooser, stage 9 → `won`) is covered by run-layer
+      tests fed from stub stages. *Evidence:* `packages/run/test/session-flow.test.ts` (nine stages, acts
+      1,1,1,2,2,2,3,3 shops, stage 9 → `won`, chooser after stage 9) and `session.test.ts`.
+- [x] `packages/run` never imports `@checkbreaker/gen`. *Evidence:* `packages/run/test/boundaries.test.ts`,
+      "never imports gen, and imports content as types only".
+- [x] `npm run validate`, `npm run check:links`, `npm run typecheck` and `npm test` pass. *Evidence
+      (2026-11-16):* validate 30 documents, 71 checks, 6 schemas; check:links 186 links, 0 broken;
+      typecheck exit 0; npm test 64 files, 760 tests.
 
 **Risks:** economy is untunable without telemetry, and there is no telemetry by design. Mitigation:
-the headless bot in M4 doubles as the tuning harness (see M6).
-M3 carry-over: `generateWith` passes `run` to the solver, and `solveStage` picks the `byAct` layer
-from `run.actIndex`, not from `GenInput.actIndex`; when M4 wires `generateStage`, pass
-`{ ...run, actIndex, stageIndex }` to `solve` (inert today: no `byAct` is shipped).
+the headless bot in M4 can serve as a tuning harness in M6; whether M6 tunes with the bot, with
+estimates or with human playtests is decided in M6 (user decision 2026-11-13).
+M3 carry-over (resolved in M4): `generateWith` passes `run` to the solver, and `solveStage` picks the
+`byAct` layer from `run.actIndex`, not from `GenInput.actIndex`; M4 passes `{ ...run, actIndex, stageIndex }`
+(`requestFor` in `packages/run/src/session.ts`, asserted in `packages/run/test/session.test.ts`; inert
+until a `byAct` layer ships).
 
 ---
 
@@ -308,12 +383,12 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 
 | Risk | Likelihood | Impact | Mitigation | Milestone |
 |---|---|---|---|---|
-| Skills trivialize stages | High | High | Charge scarcity, spawn-point budget, solver validation, boss skills | M2, M6 |
-| Bulwark makes a checking piece uncapturable and mates too easily | Medium | Medium | Intended edge, but bounded: 2 charges, once per turn, solver measures it; cut to 1 charge before touching cost | M6 |
-| Recall removes the sting of a bad deployment | Medium | Medium | 1 charge per stage, no durability refund, no re-entry (I15) | M6 |
+| Skills trivialize stages | High | High | Single use (2026-11-13), 3 slots, low shop rate, spawn-point budget, solver validation, boss skills | M2, M4, M6 |
+| Bulwark makes a checking piece uncapturable and mates too easily | Medium | Medium | Intended edge, but bounded: single use, once per turn, solver measures it; raise its price before touching its Focus cost | M6 |
+| Recall removes the sting of a bad deployment | Medium | Medium | Single use, no durability refund, no re-entry (I15) | M6 |
 | Death spiral unfun | Medium | High | Spawned pawns, promotion, recovery offer, salvage, bank & skip | M4 |
 | Solver too slow | Medium | Medium | Single-agent search (enemy is deterministic), memoized enemy replies, template narrowing, caching, offline archetypes | M3 |
-| Enemy blind to multi-action turns looks dumb | Medium | Low | Intended (skills stay surprising); if playtests object, add a threat-awareness term for charged skills | M6 |
+| Enemy blind to multi-action turns looks dumb | Medium | Low | Intended (skills stay surprising); if playtests object, add a threat-awareness term for held skills | M6 |
 | Queue builder unusable | Medium | High | Preview-first design, keyboard parity, early playtests | M5 |
 | Economy untunable without telemetry | High | Medium | Headless bot as tuning harness | M4, M6 |
 | Deferred-validation rule "fixed" by a contributor | Medium | Critical | Documented in `docs/02` as core, covered by tests | M1 |

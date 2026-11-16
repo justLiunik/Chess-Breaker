@@ -253,8 +253,9 @@ earlier in the queue.
 - **Legendary knight bonus move.** Once per turn, after a Legendary knight has made a paid `MOVE`, its
   *next* `MOVE` that turn costs 0 credits. The bonus belongs to that knight: it cannot pay for any
   other piece's move, and it does not carry over. With two Legendary knights, each has its own bonus.
-- **Skill charges** are per stage, not per turn (see [03](03-skill-framework.md)). A skill with 2
-  charges may be activated twice in the same stage — including twice in one turn, Focus permitting.
+- **Skills are single-use** (see [03 §2](03-skill-framework.md#2-skill-anatomy)): an activated skill
+  is consumed when the turn is committed. Copies of one skill may be used in the same stage, but
+  never two in one turn (`once_per_turn`).
 
 ## 5. Deployment
 
@@ -370,8 +371,14 @@ rule never springs on the player; it shapes what they plan.
 **Stage reward:**
 
 ```
-coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0) + salvage
+coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0)
+        + interest + salvage
+interest = min(5, floor(walletAtMate / 5))
 ```
+
+**Interest** rewards savings: 1 coin per 5 in the wallet at the mate (after this stage's salvage and
+any overtime paid from the wallet, before the award is added), at most 5
+([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins)).
 
 There is **no turn limit**. A mate within the par pays the base reward plus the par bonus. A mate
 after it pays what is left of the base reward. Salvage for captured enemy pieces is paid as it

@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "id", "name", "category", "ruleBroken", "text",
-    "trigger", "cost", "charges", "price", "target", "effects", "status"
+    "trigger", "cost", "price", "target", "effects", "status"
   ],
   "additionalProperties": false,
   "properties": {
@@ -35,15 +35,10 @@
       "minimum": 0,
       "description": "Focus cost. Focus never buys move credits; only skills do that."
     },
-    "charges": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Activations per STAGE. Refreshes at every stage start."
-    },
     "price": {
       "type": "integer",
       "minimum": 1,
-      "description": "Act I shop price in coins. Later acts apply economy.yaml priceInflationPerAct, as pieces do; a duplicate purchase (+1 charge) costs skills.duplicatePurchase.priceMultiplier of it (docs/07 §2)."
+      "description": "Act I shop price in coins. Later acts apply economy.yaml priceInflationPerAct, as pieces do. A skill is single use: each copy is bought at this price and takes its own loadout slot (docs/03 §8, docs/07 §2)."
     },
     "target": {
       "type": "object",

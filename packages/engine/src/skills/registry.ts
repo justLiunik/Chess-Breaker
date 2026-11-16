@@ -83,7 +83,7 @@ export const PRIMITIVES: Record<ActiveModifier['primitive'], Handler | undefined
 /**
  * The primitives whose effect cannot change Resolve or R2 for any queue: they only record a modifier
  * that R3 and R5 read. A skill whose effects are all of these changes nothing `hasLegalQueue` judges
- * except the Focus and the charge it spends, so it never makes a queue legal.
+ * except the Focus it spends and the loadout entry it consumes, so it never makes a queue legal.
  */
 export const QUEUE_NEUTRAL: ReadonlySet<ActiveModifier['primitive']> = new Set(['suppress_piece']);
 

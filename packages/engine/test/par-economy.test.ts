@@ -33,7 +33,7 @@ describe('stageEconomy', () => {
 describe('the award', () => {
   it('a mate within the par pays base + parBonus', () => {
     const a = win(runOf(), stageOf(mateBoard, { mateIn: 3, turnsUsed: 1 }));
-    expect(a).toEqual({ coins: 10, base: 4, parBonus: 6 });
+    expect(a).toEqual({ coins: 10, base: 4, parBonus: 6, interest: 0 });
   });
 
   it('a mate on the par turn still pays parBonus', () => {
@@ -42,20 +42,20 @@ describe('the award', () => {
 
   it('a mate past the par pays base net of overtime and no parBonus', () => {
     const a = win(runOf(), stageOf(mateBoard, { mateIn: 3, turnsUsed: 3, overtimePaid: 2 }));
-    expect(a).toEqual({ coins: 2, base: 2, parBonus: 0 });
+    expect(a).toEqual({ coins: 2, base: 2, parBonus: 0, interest: 0 });
   });
 
   it('a win after the reward is spent pays 0 base, never negative', () => {
     const v = ok(simulate(runOf({ coins: 7 }), stageOf(mateBoard, { mateIn: 3, turnsUsed: 5, overtimePaid: 6 }), mv('a1', 'a8'), config));
-    expect(v.award).toEqual({ coins: 0, base: 0, parBonus: 0 });
-    expect(v.run.coins).toBe(7);
+    expect(v.award).toEqual({ coins: 1, base: 0, parBonus: 0, interest: 1 });
+    expect(v.run.coins).toBe(8);
   });
 
   it('boss amounts are rounded: act2 boss 9 + 14, act3 boss 12 + 18', () => {
     const a2 = win(runOf({ actIndex: 1, stageIndex: 2 }), stageOf(mateBoard, { mateIn: 3, turnsUsed: 1 }));
-    expect(a2).toEqual({ coins: 23, base: 9, parBonus: 14 });
+    expect(a2).toEqual({ coins: 23, base: 9, parBonus: 14, interest: 0 });
     const a3 = win(runOf({ actIndex: 2, stageIndex: 2 }), stageOf(mateBoard, { mateIn: 3, turnsUsed: 1 }));
-    expect(a3).toEqual({ coins: 30, base: 12, parBonus: 18 });
+    expect(a3).toEqual({ coins: 30, base: 12, parBonus: 18, interest: 0 });
   });
 });
 

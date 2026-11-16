@@ -18,6 +18,12 @@ export function stageEconomy(
   };
 }
 
+/** Interest on savings (docs/05 §2): `coins` per `per` coins in the wallet, capped at `max`. */
+export function interestOf(wallet: number, config: EngineConfig): number {
+  const { per, coins, max } = config.economy.interest;
+  return Math.min(max, Math.floor(wallet / per) * coins);
+}
+
 /** The part of the base reward still unspent by overtime (docs/05 §2). */
 export function pendingBase(run: RunState, stage: StageState, config: EngineConfig): number {
   return Math.max(0, stageEconomy(run, config).baseFull - stage.overtimePaid);

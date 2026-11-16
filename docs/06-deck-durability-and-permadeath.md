@@ -78,8 +78,9 @@ interface PieceInstance {
   rarity: Rarity | null;     // fixed at creation; null for the King only (§4)
   durability: number;        // remaining deployments
   durabilityMax: number;     // from the piece definition, for this rarity
-  origin: 'starter' | 'shop' | 'promotion' | 'reward';
+  origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
+  pricePaid?: number;        // coins paid in the shop; a sale never pays more (07 §4); absent = not bought
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
 }
 ```
@@ -324,7 +325,7 @@ Durability must be readable without opening a panel.
 | Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
 | Captured Rare/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
 | Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must merge, sell or cut pieces until the deck fits (I9) |
-| Selling a piece | Only in the shop or the stage-end chooser; never the King or a `spent` piece; half its current price; it leaves the run like a cut piece ([07 §4](07-shop-phase.md#4-purchases)) |
+| Selling a piece | Only in the shop or the stage-end chooser; never the King or a `spent` piece; half its current price, never more than its `pricePaid`; it leaves the run like a cut piece ([07 §4](07-shop-phase.md#4-purchases)) |
 | Spawned pawn captured | Lost for this stage only; nothing leaves the deck |
 | Spawned pawn survives the stage without promoting | Discarded at stage end; nothing carries over |
 | Promoted piece in the same stage | Joins the deck at once but cannot be summoned — the deck is locked after Start (I15). First summonable next stage |

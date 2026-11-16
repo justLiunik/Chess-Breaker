@@ -34,10 +34,12 @@ Checkmate is the only way to clear a stage ([02 §7](02-rules-framework.md#7-sta
 Every stage has a **par**, "Mate in X" (X = 2–5), that the solver has proved reachable
 ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)). There is **no turn limit**: turns 1 to
 X are free, and every later turn costs **overtime**. A cleared stage pays its **base reward**, less
-any overtime it covered, plus a **par bonus** for a mate within X, plus **salvage** for captures.
+any overtime it covered, plus a **par bonus** for a mate within X, plus **interest** on the wallet,
+plus **salvage** for captures.
 
 ```
-coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0) + salvage
+coins = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed ≤ mateIn ? parBonus(act, tier) : 0)
+        + interest + salvage
 ```
 
 | Act | Base reward (normal / boss ×1.5) | Par bonus (normal / boss ×1.5) | `overtimeCost` per turn past the par |
@@ -69,6 +71,30 @@ player who cannot pay loses the run. **The par is hidden in the shop preview** �
 the deployment from the board alone — and **shown on the HUD once the stage starts**, with the
 overtime bill counting up after it ([08](08-progression-and-ux.md)).
 
+### Interest
+
+Savings earn interest (decided 2026-11-13, M4). A won stage pays **1 coin for every 5 coins in the
+wallet, at most 5**:
+
+```
+interest = min(interest.max, floor(walletAtMate / interest.per) × interest.coins)     # 5, 5, 1
+```
+
+| Wallet at the mate | 0–4 | 5–9 | 10–14 | 15–19 | 20–24 | 25+ |
+|---|---|---|---|---|---|---|
+| Interest | 0 | 1 | 2 | 3 | 4 | **5** |
+
+`walletAtMate` is the wallet when the mate lands, **before** the stage's award is added: it already
+holds the salvage earned in this stage and has already paid any overtime the reward could not cover.
+So a slow mate costs twice — the overtime itself, and the interest on the coins it took from the
+wallet. Interest is the same in every act and on bosses (never boss-scaled), is paid on the final
+stage too, and is part of the coin preview, so preview still equals payout (I10). A lost stage pays
+nothing; the run is over.
+
+Interest is the reward for banking ([§5](#5-failure-spiral-guardrails), [07 §5](07-shop-phase.md#5-bank--skip)):
+skipping a purchase now pays a little every later stage, and a wallet kept at 25 doubles as the
+buffer that pays for overtime.
+
 ### Salvage
 
 Capturing an enemy piece pays `floor(pieceValue / 3)` coins, immediately, during the stage.
@@ -99,7 +125,7 @@ default is on.
 | Queen | 9 | 9 | 16 | 2 | 8.0 |
 
 **Price inflation:** `price(act) = round(basePrice × (1 + 0.20 × (act − 1)))` — Act II ×1.2,
-Act III ×1.44.
+Act III ×1.4 (linear, not compounding).
 
 Durability is flat ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)), so the last
 column now tracks price alone: a knight or bishop is still the cheapest way to buy **summons**, a
@@ -134,16 +160,20 @@ it costs the turns spent pushing the pawn, which the coin preview prices at one 
 
 | Service | Price | Effect |
 |---|---|---|
-| Repair | 4 | +1 durability to one piece (never above its max) |
-| Reroll | 2 | Reroll the shop (first reroll each visit is free) |
-| **Sell** | pays **½** of the piece's current price, rounded down | The piece leaves the run; never the King or a `spent` piece ([07 §4](07-shop-phase.md#4-purchases)) |
+| Repair | 4 | +1 durability to one piece (never above its max); repeatable within a visit |
+| Reroll | 2 | Reroll slots 1–4 (first reroll each visit is free; at most 3 per visit) |
+| **Sell** | pays **½** of the piece's current price, rounded down, **never more than it cost** | The piece leaves the run; never the King or a `spent` piece ([07 §4](07-shop-phase.md#4-purchases)) |
 
 **Selling is a release valve, not a profit.** Buying and selling loses half. Using a piece once and
 selling it nets 4 coins per summon for a Normal knight — exactly the repair rate, so selling never
 beats keeping a piece alive. A promoted piece has no purchase price; selling it converts the turns
 spent promoting into coins at roughly the coin-bonus rate those turns cost. The sell factor may
 never exceed the recovery discount (both 0.5), or buying the discounted recovery piece and selling
-it back would print coins — the validator enforces this.
+it back would print coins — the validator enforces this. Act inflation alone could still do it (a
+recovery knight bought for 4 in Act I would sell for 5 in Act II or III), so a shop-bought
+piece remembers what it cost (`pricePaid`) and **never sells for more**:
+`sell = min(floor(0.5 × current price), pricePaid)`. Starter, promoted and merged pieces cost no
+coins and are not capped.
 
 ### Income vs. expenditure sanity check
 
@@ -162,22 +192,26 @@ game tells you that you are losing before it kills you.
 ## 4. Illustrative run
 
 Assumptions: no losses, one salvage per stage on average, no promotions. Coins earned are base (less
-overtime) + par bonus + salvage. Prices shown at that act's inflation and the item's rarity.
+overtime) + par bonus + salvage + interest (interest on the wallet at the mate, which already holds
+that stage's salvage). Prices shown at that act's inflation and the item's rarity.
 
 | Stage | Par | Mated on | Coins earned | Balance | Purchase / merge | Balance after | Deck |
 |---|---|---|---|---|---|---|---|
-| I-1 | 5 | 4 | 4 + 6 + 1 = 11 | 11 | Knight (8), then merge 3 Knights → Rare Knight | 3 | 3/8 |
-| I-2 | 5 | 5 | 4 + 6 + 1 = 11 | 14 | Rook (10) | 4 | 4/8 |
-| I-3 ★ | 4 | 4 | 6 + 9 + 1 = 16 | 20 | Reroll (free) + Repair (4) + Bishop (8), then merge 3 Bishops → Rare Bishop | 8 | 3/8 |
-| II-1 | 4 | 3 | 6 + 9 + 1 = 16 | 24 | Skill: Twin Step (10) | 14 | 3/8 |
-| II-2 | 3 | 4 | (6 − 3) + 0 + 1 = 4 | 18 | Rare Rook (18) | 0 | 4/8 |
-| II-3 ★ | 3 | 3 | 9 + 14 + 1 = 24 | 24 | Rare Knight (14) | 10 | 5/8 |
-| III-1 | 3 | 3 | 8 + 12 + 1 = 21 | 31 | Repair ×2 (8) | 23 | 5/8 |
-| III-2 | 2 | 2 | 8 + 12 + 1 = 21 | 44 | Rare Queen (35) | 9 | 6/8 |
+| I-1 | 5 | 4 | 4 + 6 + 1 + 0 = 11 | 11 | Knight (8), then merge 3 Knights → Rare Knight | 3 | 3/8 |
+| I-2 | 5 | 5 | 4 + 6 + 1 + 0 = 11 | 14 | Rook (10) | 4 | 4/8 |
+| I-3 ★ | 4 | 4 | 6 + 9 + 1 + 1 = 17 | 21 | Reroll (free) + Repair (4) + Bishop (8), then merge 3 Bishops → Rare Bishop | 9 | 3/8 |
+| II-1 | 4 | 3 | 6 + 9 + 1 + 2 = 18 | 27 | Skill: Twin Step (5) | 22 | 3/8 |
+| II-2 | 3 | 4 | (6 − 3) + 0 + 1 + 4 = 8 | 30 | Rare Rook (18) | 12 | 4/8 |
+| II-3 ★ | 3 | 3 | 9 + 14 + 1 + 2 = 26 | 38 | Rare Knight (14) | 24 | 5/8 |
+| III-1 | 3 | 3 | 8 + 12 + 1 + 5 = 26 | 50 | Repair ×2 (8) | 42 | 5/8 |
+| III-2 | 2 | 2 | 8 + 12 + 1 + 5 = 26 | 68 | Rare Queen (34) | 34 | 6/8 |
 | III-3 ★ | 2 | — | — | — | — | — | — |
 
 II-2 shows a missed par: one overtime turn eats 3 of the 6 base coins and the par bonus is lost, so
-the stage pays 4 instead of 16 and the Rare Rook empties the wallet.
+the stage pays 8 instead of 20. Interest (2026-11-13) adds about 2 coins a stage in Act II and the
+full 5 in Act III once the wallet stays above 25, which makes banking a real line; with single-use
+skills at 3–5 coins, Act III wallets run rich here. Re-tuning prices, interest and income together is
+an M6 item.
 
 Read the shape: the player oscillates between rich (can buy power) and broke (must survive on what
 they have), and merges trade deck width for tier — the deck shrinks to 3 twice in Act I to buy two
@@ -200,7 +234,7 @@ levers, in order of precedence:
 | 2 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
 | 3 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
 | 4 | **Recovery offer** | If pieces were lost in the stage just cleared and the non-king deck is now < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage — not a reward for merging down |
-| 5 | **Bank & skip** | Shop may be skipped to accumulate | Early banking enables a mid-run power spike |
+| 5 | **Bank & skip** | Shop may be skipped to accumulate; savings earn interest (§2, up to 5 a stage) | Early banking enables a mid-run power spike, and the wallet buffers overtime |
 | 6 | **Par** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
 | 7 | **Summon choice** | Pieces left in the deck at Deployment spend no durability and cannot be captured ([02 §5](02-rules-framework.md#5-deployment)) | A fragile deck can be protected by bringing less, at the price of a slower mate |
 
@@ -237,6 +271,9 @@ lose. They are only forced to play well.
 | `parBonus.{act}` | 6/9/12 | Makes a mate within the par pay more |
 | `overtimeCost.{act}` | 2/3/4 | Makes every turn past the par cost more; raises the risk of `out_of_coins` |
 | `salvage.divisor` | 3 | Makes contact play more profitable |
+| `interest.{per, coins, max}` | 5 / 1 / 5 | Makes banking pay more (lower `per`, higher `coins` or `max`) |
+| `shop.skillChance` | 0.2 | Makes skills commoner in slots 3–4 |
+| `shop.pieceTypeWeights` | N35 B35 R20 Q10 | Shifts shop pieces toward bigger types |
 | `priceInflationPerAct` | 0.20 | Tightens Act II–III economy |
 | `starterCoins` | 0 | Front-loads build choices before stage 1 |
 | `shop.slots` | 5 | Widens variance and choice |
@@ -250,6 +287,6 @@ lose. They are only forced to play well.
 | `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |
 
 **Tuning order:** `baseReward` and `parBonus` first (together they set income; `parBonus` alone sets
-the reward for speed), then `overtimeCost`, then `priceInflationPerAct`, then prices. Never tune a
+the reward for speed), then `interest`, then `overtimeCost`, then `priceInflationPerAct`, then prices. Never tune a
 template's `mateIn` range and `parBonus` in the same pass — you will not be able to attribute the
 change.

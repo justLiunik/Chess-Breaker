@@ -5,3 +5,5 @@ export { loadTemplates } from './templates';
 export type { EnemyPolicySpec, PreconditionId, Template } from './templates';
 export { loadFormations } from './formations';
 export type { Formation, FormationFile } from './formations';
+export { loadRunConfig } from './loadRunConfig';
+export type { RunConfig, RunSettings } from './loadRunConfig';

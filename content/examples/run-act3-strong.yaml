@@ -79,11 +79,7 @@ deck:
 
 loadout:
   - skillId: twin_step
-    charges: 3
-    chargesMax: 3
   - skillId: lockdown
-    charges: 3
-    chargesMax: 3
 
 history: []
 

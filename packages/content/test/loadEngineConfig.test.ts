@@ -27,6 +27,11 @@ describe('loadEngineConfig', () => {
     expect(config.pieces.queen.durabilityMaxByRarity.legendary).toBe(1);
   });
 
+  it('maps skills without charges: skills are single use (M4)', () => {
+    for (const s of Object.values(config.skills)) expect(Object.keys(s), s.id).not.toContain('charges');
+    expect(config.skills.twin_step).toMatchObject({ cost: 1, price: 4, status: 'mvp' });
+  });
+
   it('throws an error naming a missing skills.yaml', () => {
     expect(() => loadEngineConfig(undefined, undefined, '/nonexistent/skills.yaml')).toThrow(/skills\.yaml/);
   });

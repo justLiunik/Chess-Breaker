@@ -8,4 +8,5 @@ export * from './enemy/policy';
 export { TIERS, compileAbilities, durabilityMaxOf, spawnCostOf } from './abilities';
 export * from './deployment';
 export * from './stage-end';
-export { enemyClock, pendingBase, stageEconomy } from './economy';
+export { pickWeighted, retainTier, rollTier } from './rarity-roll';
+export { enemyClock, interestOf, pendingBase, stageEconomy } from './economy';
