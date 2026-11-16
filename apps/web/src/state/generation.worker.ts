@@ -27,7 +27,7 @@ self.onmessage = (e: MessageEvent<{ id: number; request: GenRequest }>): void =>
     const { config, content } = load();
     const t0 = performance.now();
     const out = generateStage(request, content, config);
-    answer = { id, ok: true, stage: out.stage, ms: performance.now() - t0 };
+    answer = { id, ok: true, stage: out.stage, provenance: out.provenance, ms: performance.now() - t0 };
   } catch (err) {
     answer = { id, ok: false, message: err instanceof Error ? err.message : String(err) };
   }

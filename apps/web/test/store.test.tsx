@@ -1,5 +1,6 @@
 import { act, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { saveErrorText } from '../src/messages';
 import { loadSave, memoryStorage, newRun, serializeSave } from '@checkbreaker/run';
 import type { GenRequest } from '@checkbreaker/run';
 import { runConfig } from '../src/config';
@@ -142,5 +143,47 @@ describe('store', () => {
     expect(localStorage.getItem('checkbreaker.dev')).toBe('1');
     await send({ type: 'set_dev', on: false });
     expect(api.dev).toBe(false);
+  });
+
+  it('a corrupt save shows its error once and new_run clears it', async () => {
+    const storage = memoryStorage();
+    storage.write('not json');
+    mount(testStageSource(), storage);
+    await send({ type: 'continue' });
+    const refused = loadSave('not json', runConfig);
+    expect(refused.ok).toBe(false);
+    expect(api.error).toBe(saveErrorText((refused as { ok: false; error: Parameters<typeof saveErrorText>[0] }).error));
+    expect(api.session).toBeNull();
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await flush();
+    expect(api.error).toBeNull();
+    expect(api.session?.phase).toBe('deployment');
+    const back = loadSave(storage.read()!, runConfig);
+    expect(back.ok && back.value).toEqual(api.session);
+  });
+
+  it('double retry while a request is pending posts exactly once', async () => {
+    let calls = 0;
+    mount({ request: () => { calls++; return new Promise(() => {}); } });
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await send({ type: 'retry' });
+    await send({ type: 'retry' });
+    expect(calls).toBe(1);
+    expect(api.generating).toBe(true);
+  });
+
+  it('a stage with the wrong seed is refused without crashing', async () => {
+    const inner = testStageSource();
+    mount({
+      async request(id, req) {
+        const a = await inner.request(id, req);
+        return a.ok ? { ...a, stage: { ...a.stage, stageSeed: 'FFFF-FFFF' } } : a;
+      },
+    });
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await flush();
+    expect(api.session?.phase).toBe('awaiting_stage');
+    expect(api.error).toBeTruthy();
+    expect(api.generating).toBe(false);
   });
 });
