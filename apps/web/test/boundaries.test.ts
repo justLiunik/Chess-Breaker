@@ -26,12 +26,21 @@ const ALLOWED = new Set([
 const GEN_FILE = 'state/generation.worker.ts';
 const BENCH_FILE = 'screens/Bench.tsx';
 
-const importRe = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?(?:[^'"]*?\sfrom\s+)?['"]([^'"]+)['"]/g;
+const importRe = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?(?:([^'"]*?)\sfrom\s+)?['"]([^'"]+)['"]/g;
 const dynamicRe = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+/** `import type …`, or `import { type A, type B } …` where every member is marked type. */
+function isTypeOnly(typeKeyword: string | undefined, clause: string): boolean {
+  if (typeKeyword !== undefined) return true;
+  const named = /^\s*\{([^}]*)\}\s*$/.exec(clause);
+  if (!named) return false;
+  const members = named[1]!.split(',').map((x) => x.trim()).filter((x) => x.length > 0);
+  return members.length > 0 && members.every((x) => /^type\s/.test(x));
+}
 
 function specifiers(text: string): { spec: string; typeOnly: boolean }[] {
   const out: { spec: string; typeOnly: boolean }[] = [];
-  for (const m of text.matchAll(importRe)) out.push({ spec: m[2]!, typeOnly: m[1] !== undefined });
+  for (const m of text.matchAll(importRe)) out.push({ spec: m[3]!, typeOnly: isTypeOnly(m[1], m[2] ?? '') });
   for (const m of text.matchAll(dynamicRe)) out.push({ spec: m[1]!, typeOnly: false });
   return out;
 }
@@ -65,6 +74,33 @@ describe('apps/web import allowlist', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+
+  it('specifiers() finds every import form', () => {
+    const src = [
+      'import {',
+      '  a,',
+      '  b,',
+      "} from 'multi-line';",
+      "import type { T } from 'type-only';",
+      "import { type X, type Y } from 'inline-type';",
+      "import { type X, z } from 'mixed';",
+      "import 'side-effect';",
+      "export { q } from 're-export';",
+      "export * from 'star-export';",
+      "const m = await import('dynamic');",
+    ].join('\n');
+    const found = Object.fromEntries(specifiers(src).map((s) => [s.spec, s.typeOnly]));
+    expect(found).toEqual({
+      'multi-line': false,
+      'type-only': true,
+      'inline-type': true,
+      mixed: false,
+      'side-effect': false,
+      're-export': false,
+      'star-export': false,
+      dynamic: false,
+    });
   });
 
   it('encodes the rules: engine/internal and gen are fenced, exceptions are per file', () => {

@@ -48,7 +48,30 @@ describe('localStorageRunStorage', () => {
   });
 });
 
+describe('removeItem failures', () => {
+  it('clear() survives a throwing removeItem, reports once, and reads back null', () => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    const onError = vi.fn();
+    const s = localStorageRunStorage(onError);
+    s.write('x');
+    expect(() => s.clear()).not.toThrow();
+    expect(() => s.clear()).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(s.read()).toBeNull();
+  });
+});
+
 describe('devToggle', () => {
+  it('write(false) survives a throwing removeItem', () => {
+    devToggle.write(true);
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    expect(() => devToggle.write(false)).not.toThrow();
+  });
+
   it('is off by default and persists under checkbreaker.dev', () => {
     expect(devToggle.read()).toBe(false);
     devToggle.write(true);
