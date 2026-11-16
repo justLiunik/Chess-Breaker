@@ -149,7 +149,7 @@ describe('Legendary knight bonus move', () => {
 
 describe('Ascension suspends a bishop ability while the piece is a queen', () => {
   const spec = { e1: 'K', h8: 'k', c1: 'B:unique', d2: 'N', a1: 'R' };
-  const ascend = runOf({ loadout: [{ skillId: 'ascension', charges: 2, chargesMax: 2 }] });
+  const ascend = runOf({ loadout: [{ skillId: 'ascension' }] });
 
   it('the Unique bishop leaps its ally d2 to e3 normally', () => {
     expect(resolve(stageWith(spec, { focus: 3 }), [mv('c1', 'e3')]).ok).toBe(true);

@@ -41,6 +41,20 @@ describe('generateWith', () => {
     expect(spawned(r.stage)).toBe(spawned(calls[0]!));
   });
 
+  it('returns the solver win as solution, never inside the stage', () => {
+    const win = { placements: [], line: [], mateTurn: 3 };
+    const r = generateWith(input, content, config, () => ({ win, stats: ZERO }));
+    expect(r.solution).toEqual(win);
+    expect(JSON.stringify(r.stage)).not.toContain('mateTurn');
+    expect(Object.keys(r.stage)).not.toContain('solution');
+  });
+
+  it('returns solution null on the bonus-pawn path', () => {
+    const r = generateWith(input, content, config, () => none);
+    expect(r.solution).toBeNull();
+    expect(r.provenance.bonusPawn).toBe(true);
+  });
+
   it('emits the second board when only it is proven', () => {
     const calls: StageState[] = [];
     const r = generateWith(input, content, config, (_run, s) => (calls.push(s), calls.length === 2 ? proof(2) : none));

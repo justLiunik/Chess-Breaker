@@ -10,7 +10,8 @@ const refuse = (error: CommitError): Result<never, CommitError> => ({ ok: false,
 
 /**
  * The Deployment phase: place Hero Pieces from the deck, pay their durability, start the Action phase.
- * Every check runs before any change, so a refusal spends nothing (spec §7.2).
+ * Every check runs before any change, so a refusal spends nothing (spec §7.2). The loadout is left
+ * as it is: skills are single use, and nothing refills them (M4).
  */
 export function startStage(
   run: RunState,
@@ -81,7 +82,7 @@ export function startStage(
   return {
     ok: true,
     value: {
-      run: { ...run, deck, loadout: run.loadout.map((l) => ({ ...l, charges: l.chargesMax })) },
+      run: { ...run, deck },
       stage: {
         ...stage, board, phase: 'action', moveCredits: config.rules.freeMovesPerTurn,
         focus: stage.focusPool, skillLog: [],

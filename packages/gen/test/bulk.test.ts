@@ -54,7 +54,7 @@ describe('1,000-stage CI run', () => {
       const deck = actIndex === 0 ? 'starter' : actIndex === 1 ? 'mid' : 'strong';
       const run = { ...deckRun(deck, actIndex, stageIndex), seed: `BULK-${i}` };
       const input = { run, actIndex, stageIndex };
-      const { stage, provenance } = generateWith(input, content, config, () => first);
+      const { stage, provenance, solution } = generateWith(input, content, config, () => first);
       const where = `#${i} act${actIndex + 1}/${stageIndex}`;
       const tpl = templates.find((t) => t.id === provenance.templateId)!;
       const ceiling = TIERS.indexOf(config.gen.rarityPool[`act${actIndex + 1}` as ActKey].ceiling);
@@ -78,7 +78,7 @@ describe('1,000-stage CI run', () => {
       }
       expect(validate(stage), `${where} ${JSON.stringify(validate.errors)}`).toBe(true);
       expect(JSON.stringify(generateWith(input, content, config, () => first)), where).toBe(
-        JSON.stringify({ stage, provenance }),
+        JSON.stringify({ stage, provenance, solution }),
       );
     }
     expect(generated, 'stages generated').toBe(1000);

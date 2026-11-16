@@ -80,6 +80,8 @@ export interface PieceInstance {
   durabilityMax: number | null;
   origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
+  /** coins paid in the shop; a sale never pays more (docs/07 §4); absent = not bought */
+  pricePaid?: number;
   usedOnce?: 'lifeline'[];
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
 }
@@ -92,7 +94,8 @@ export interface RunState {
   coins: number;
   deckCapacity: 8;
   deck: PieceInstance[];
-  loadout: { skillId: string; charges: number; chargesMax: number }[];
+  /** Single-use skills (M4): one entry per copy, consumed by a committed turn that uses it. */
+  loadout: { skillId: string }[];
   history: {
     stageSeed: string;
     templateId: string;
@@ -133,7 +136,7 @@ export type CommitError =
       reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate';
     }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
-  | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'no_charges' | 'once_per_turn' }
+  | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'once_per_turn' }
   | { kind: 'invalid_target'; atStep: number; skillId: string; target?: string; reason: 'no_target' | 'wrong_target' | 'excluded' | 'already_targeted' }
   | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3' | 'I15'; detail: string };
 
@@ -141,6 +144,8 @@ export interface Award {
   coins: number;
   base: number;
   parBonus: number;
+  /** Interest on the wallet at the mate (docs/05 §2). */
+  interest: number;
 }
 
 export type GameEvent =
@@ -191,7 +196,6 @@ export interface SkillDef {
   id: string;
   status: 'mvp' | 'future';
   cost: number;
-  charges: number;
   price: number;
   target: {
     kind: 'none' | 'own_piece' | 'enemy_piece' | 'board_square';
@@ -236,6 +240,7 @@ export interface EngineConfig {
     parBonus: { act1: number; act2: number; act3: number };
     overtimeCost: { act1: number; act2: number; act3: number };
     salvage: { enabled: boolean; divisor: number };
+    interest: { per: number; coins: number; max: number };
   };
   enemyAI: {
     search: {

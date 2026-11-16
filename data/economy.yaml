@@ -38,7 +38,8 @@ rules:
 # ---------------------------------------------------------------------------
 economy:
   # Stage clear (checkmate is the only win):
-  #   coins = max(0, baseReward(act, tier) - overtimePaid) + (parBonus(act, tier) if turnsUsed <= mateIn) + salvage
+  #   coins = max(0, baseReward(act, tier) - overtimePaid) + (parBonus(act, tier) if turnsUsed <= mateIn)
+  #           + interest (economy.interest below) + salvage
   #   Every turn past the par (mateIn) costs overtimeCost(act): from the pending base reward first,
   #   then from the wallet; a turn neither can pay loses the stage (out_of_coins). docs/05 §2.
   baseReward:                   # paid in full for every cleared stage
@@ -56,6 +57,11 @@ economy:
     act3: 4
   starterCoins: 0
 
+  interest:                     # savings: a won stage pays min(max, floor(walletAtMate / per) x coins) (docs/05 §2)
+    per: 5                      # walletAtMate = wallet at R3 of the mating turn, before the award:
+    coins: 1                    #   after this stage's salvage and any overtime paid from the wallet
+    max: 5                      # reached at 25 coins; never boss-scaled; paid on the final stage too
+
   salvage:                      # coins for capturing an enemy piece
     enabled: true
     divisor: 3                  # floor(value / divisor): pawn 0, minor 1, rook 1, queen 3
@@ -63,12 +69,13 @@ economy:
   priceInflationPerAct: 0.20    # price(act) = round(base * (1 + 0.20 * (act - 1)))
 
   services:
-    repair: 4                   # +1 durability, never above max, never on spent pieces
-    reroll: 2                   # after the free reroll
+    repair: 4                   # +1 durability, never above max, never on spent pieces; repeatable within a visit (slot 5)
+    reroll: 2                   # after the free reroll; a button, never a slot; redraws slots 1-4
     freeRerollsPerVisit: 1
     maxRerollsPerVisit: 3
     sell:                       # docs/07 §4 — sell a deck piece for coins; it leaves the run
       priceFactor: 0.5          # of the piece's current shop price (rarity × act inflation); never above recoveryDiscount
+      capAtPricePaid: true      # a sale never pays more than the piece's pricePaid (shop purchases only; docs/07 §4)
       rounding: floor
       when: [shop, capacity_cut]  # in the shop, and as a third option beside merge/cut when a promotion overflows the deck
       excludes: [king, spent]
@@ -78,6 +85,9 @@ economy:
     randomSlots: 2              # slots 3–4: piece or skill
     recoveryDeckThreshold: 4    # if non-king deck < 4 → slot 1 is a half-price Normal replacement
     recoveryDiscount: 0.5
+    skillChance: 0.2            # slots 3-4: a skill with this probability each, else a piece (docs/07 §2)
+    pieceTypeWeights: { knight: 35, bishop: 35, rook: 20, queen: 10 }   # every random piece offer
+    slot1Types: [knight, bishop, rook]   # slot 1 never offers a queen
 
 # ---------------------------------------------------------------------------
 # Pieces — mirror of content/examples/pieces.yaml values
@@ -294,9 +304,14 @@ enemyAI:
 # Skills — see docs/03
 # ---------------------------------------------------------------------------
 skills:
-  loadoutSlots: 3
-  chargesRefreshPerStage: true
-  duplicatePurchase:
-    priceMultiplier: 0.5
-    chargeBonus: 1
-  tuningOrder: [charges, cost, duration, targeting, new_primitive]
+  loadoutSlots: 3               # strict: no slot is ever sold (docs/03 §8)
+  consumable: true              # single use, consumed on commit; duplicates take separate slots (2026-11-13)
+  tuningOrder: [price, cost, duration, targeting, new_primitive]
+
+# ---------------------------------------------------------------------------
+# Onboarding — see docs/08 §5
+# ---------------------------------------------------------------------------
+onboarding:
+  freeSkill:                    # granted when this stage's Deployment begins, only if a loadout slot is free
+    stageNumber: 2              # actIndex x 3 + stageIndex: 2 = stage I-3
+    skillId: twin_step

@@ -92,7 +92,6 @@ function loadSkills(skillsPath: string): Record<string, SkillDef> {
       id: s.id,
       status: s.status,
       cost: s.cost,
-      charges: s.charges,
       price: s.price,
       target: s.target,
       effects: s.effects,
@@ -155,6 +154,11 @@ export function loadEngineConfig(
       salvage: {
         enabled: bool(y, 'economy.salvage.enabled'),
         divisor: num(y, 'economy.salvage.divisor'),
+      },
+      interest: {
+        per: num(y, 'economy.interest.per'),
+        coins: num(y, 'economy.interest.coins'),
+        max: num(y, 'economy.interest.max'),
       },
     },
     enemyAI: {

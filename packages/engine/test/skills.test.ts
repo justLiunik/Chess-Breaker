@@ -11,8 +11,7 @@ const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
 const skill = (skillId: string, target?: string): Action => ({
   type: 'ACTIVATE_SKILL', skillId, ...(target !== undefined && { target }),
 });
-const slot = (skillId: string, charges = 2) => ({ skillId, charges, chargesMax: 2 });
-const runWith = (...ids: string[]): RunState => runOf({ loadout: ids.map((id) => slot(id)) });
+const runWith = (...ids: string[]): RunState => runOf({ loadout: ids.map((skillId) => ({ skillId })) });
 
 /** White K e1, bishop c1, rook a1; Black k e8, rook a8, knight g8. */
 const board = { e1: 'K', c1: 'B', a1: 'R', e8: 'k', a8: 'r', g8: 'n' };
@@ -46,14 +45,24 @@ describe('ACTIVATE_SKILL checks (spec 8.1, in order)', () => {
       kind: 'skill_unavailable', atStep: 1, skillId: 'gallop', reason: 'not_implemented',
     });
   });
-  it('no_charges', () => {
-    const run = runOf({ loadout: [slot('twin_step', 0)] });
-    expect(refused(run, stage(), [skill('twin_step'), mv('a1', 'a2')])).toMatchObject({
-      kind: 'skill_unavailable', reason: 'no_charges',
+  it('not_in_loadout once the last copy is gone: later in the same queue, and on the next turn', () => {
+    // The first use consumes the only copy, so the second finds none before once_per_turn is asked.
+    expect(refused(runWith('twin_step'), stage(), [skill('twin_step'), skill('twin_step'), mv('a1', 'a2')])).toEqual({
+      kind: 'skill_unavailable', atStep: 1, skillId: 'twin_step', reason: 'not_in_loadout',
+    });
+    const s = stage();
+    const run = deckFor(runWith('twin_step'), s);
+    const turn1 = commitQueue(run, s, [skill('twin_step'), mv('a1', 'a2'), mv('a2', 'a3')], config);
+    if (!turn1.ok) throw new Error(JSON.stringify(turn1.error));
+    expect(turn1.value.stage.status).toBe('active');
+    expect(turn1.value.run.loadout).toEqual([]);
+    expect(refused(turn1.value.run, turn1.value.stage, [skill('twin_step'), mv('e1', 'd1')])).toEqual({
+      kind: 'skill_unavailable', atStep: 0, skillId: 'twin_step', reason: 'not_in_loadout',
     });
   });
-  it('once_per_turn counts earlier steps of the same queue', () => {
-    expect(refused(runWith('twin_step'), stage(), [skill('twin_step'), skill('twin_step'), mv('a1', 'a2')])).toEqual({
+  it('two copies cannot be used in one turn: once_per_turn counts earlier steps of the same queue', () => {
+    const twice = [skill('twin_step'), skill('twin_step'), mv('a1', 'a2')];
+    expect(refused(runWith('twin_step', 'twin_step'), stage(), twice)).toEqual({
       kind: 'skill_unavailable', atStep: 1, skillId: 'twin_step', reason: 'once_per_turn',
     });
   });
@@ -149,14 +158,14 @@ describe('ACTIVATE_SKILL effects', () => {
       kind: 'credits_exceeded', atStep: 1,
     });
   });
-  it('spends one charge and the cost, and logs the use', () => {
+  it('consumes each used skill, spends the cost, and logs the use', () => {
     const run = deepFreeze(runWith('twin_step', 'lockdown'));
     const s = stage();
     const id = s.board.a8!.stageId!;
     const r = simulate(run, s, [skill('twin_step'), skill('lockdown', 'a8'), mv('a1', 'a2'), mv('a2', 'a3')], config);
     if (!r.ok) throw new Error(JSON.stringify(r.error));
-    expect(r.value.run.loadout.map((l) => l.charges)).toEqual([1, 1]);
-    expect(run.loadout.map((l) => l.charges)).toEqual([2, 2]);
+    expect(r.value.run.loadout).toEqual([]);
+    expect(run.loadout).toEqual([{ skillId: 'twin_step' }, { skillId: 'lockdown' }]);
     expect(r.value.stage.focus).toBe(1);
     expect(s.focus).toBe(3);
     expect(r.value.stage.skillLog).toEqual([
@@ -215,16 +224,61 @@ describe('ACTIVATE_SKILL effects', () => {
   });
 });
 
+describe('single use (M4): a skill is consumed when the turn that uses it is committed', () => {
+  const twinMoves = [skill('twin_step'), mv('a1', 'a2'), mv('a2', 'a3')];
+
+  it('a used skill leaves the loadout on commit', () => {
+    const s = stage();
+    const run = deckFor(runWith('twin_step', 'lockdown'), s);
+    const r = commitQueue(run, s, twinMoves, config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.run.loadout).toEqual([{ skillId: 'lockdown' }]);
+  });
+
+  it('simulate result is a preview: the input run keeps the skill', () => {
+    const run = deepFreeze(runWith('twin_step', 'lockdown'));
+    const r = simulate(run, stage(), twinMoves, config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.run.loadout).toEqual([{ skillId: 'lockdown' }]);
+    expect(run.loadout).toEqual([{ skillId: 'twin_step' }, { skillId: 'lockdown' }]);
+  });
+
+  it('a refused commit consumes nothing', () => {
+    const s = stage();
+    const run = deckFor(runWith('twin_step', 'lockdown'), s); // deep-frozen
+    // c1 -> c5 is a queen's move, illegal for the bishop: the refusal comes after Twin Step resolved.
+    const r = commitQueue(run, s, [skill('twin_step'), mv('a1', 'a2'), mv('c1', 'c5')], config);
+    expect(r.ok ? null : r.error).toMatchObject({ kind: 'illegal_move', atStep: 2 });
+    expect(run.loadout).toEqual([{ skillId: 'twin_step' }, { skillId: 'lockdown' }]);
+  });
+
+  it('duplicates are separate: one of two copies is consumed', () => {
+    const r = simulate(deepFreeze(runWith('twin_step', 'twin_step')), stage(), twinMoves, config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.run.loadout).toEqual([{ skillId: 'twin_step' }]);
+  });
+
+  it('the first copy in loadout order is the one consumed', () => {
+    const r = simulate(deepFreeze(runWith('twin_step', 'lockdown', 'twin_step')), stage(), twinMoves, config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.run.loadout).toEqual([{ skillId: 'lockdown' }, { skillId: 'twin_step' }]);
+  });
+
+  it('an unused skill is untouched by a turn that uses another', () => {
+    const r = simulate(deepFreeze(runWith('ascension', 'lockdown')), stage(), [skill('lockdown', 'a8'), mv('a1', 'a2')], config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.value.run.loadout).toEqual([{ skillId: 'ascension' }]);
+  });
+});
+
 describe('ACTIVATE_SKILL check order (earlier check wins)', () => {
   const twinLogged = { skillId: 'twin_step', turn: 1 };
-  it('not_implemented beats no_charges', () => {
-    const run = runOf({ loadout: [slot('gallop', 0)] });
-    expect(refused(run, stage(), [skill('gallop'), mv('a1', 'a2')])).toMatchObject({ reason: 'not_implemented' });
+  it('not_in_loadout beats not_implemented: a future skill nobody holds', () => {
+    expect(refused(runOf(), stage(), [skill('gallop'), mv('a1', 'a2')])).toMatchObject({ reason: 'not_in_loadout' });
   });
-  it('no_charges beats once_per_turn', () => {
-    const run = runOf({ loadout: [slot('twin_step', 0)] });
-    const s = stage({ skillLog: [twinLogged] });
-    expect(refused(run, s, [skill('twin_step'), mv('a1', 'a2')])).toMatchObject({ reason: 'no_charges' });
+  it('not_implemented beats once_per_turn', () => {
+    const s = stage({ skillLog: [{ skillId: 'gallop', turn: 1 }] });
+    expect(refused(runWith('gallop'), s, [skill('gallop'), mv('a1', 'a2')])).toMatchObject({ reason: 'not_implemented' });
   });
   it('once_per_turn beats focus_exceeded', () => {
     const s = stage({ focus: 0, skillLog: [twinLogged] });
@@ -259,7 +313,7 @@ describe('ACTIVATE_SKILL check order (earlier check wins)', () => {
 
 describe('I12: rarity is fixed at creation', () => {
   it("Ascension never changes a Rare bishop's rarity, and the King's rarity stays null through startStage and endStage", () => {
-    const base = runOf({ loadout: [slot('ascension')] });
+    const base = runWith('ascension');
     const rare = deepFreeze({
       ...base, deck: base.deck.map((p) => (p.instanceId === 'p_bishop_04' ? { ...p, rarity: 'rare' as const } : p)),
     });

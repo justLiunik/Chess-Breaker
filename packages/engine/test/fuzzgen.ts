@@ -139,9 +139,11 @@ export function makeCase(label: string, i: number): Case {
     if (inCheck(b, 'white') || inCheck(b, 'black', tiers) || legalMoves(b, 'black', undefined, tiers).length === 0) continue;
     const queue: Action[] = [];
     const length = 1 + sub(3);
-    // Random loadout of the launch skills, with random charges (0 sometimes).
+    // Random loadout of the launch skills: each one absent, or held once or twice (single use: a
+    // copy is one entry; the engine sets no slot limit, the run layer does). The draws are the same
+    // as when the M2 loadout drew charges, so every case keeps its board and queue.
     const loadout = LAUNCH_SKILLS.filter(() => sub(4) > 0)
-      .map((skillId) => ({ skillId, charges: sub(6) === 0 ? 0 : 1 + sub(2), chargesMax: 3 }));
+      .flatMap((skillId) => Array.from({ length: sub(6) === 0 ? 0 : 1 + sub(2) }, () => ({ skillId })));
     const occupied = Object.keys(stage.board);
     let board: StageState['board'] = stage.board;
     let lastKnight: Square | null = null;

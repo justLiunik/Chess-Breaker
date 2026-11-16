@@ -116,24 +116,28 @@ describe('startStage edge cases', () => {
 });
 
 describe('startStage success', () => {
-  const run0 = runOf({ loadout: [{ skillId: 'x', charges: 0, chargesMax: 3 }] });
+  const run0 = runOf({ loadout: [{ skillId: 'x' }, { skillId: 'x' }] });
   const go = () => {
     const r = startStage(run0, stage(), [K, P('p_knight_02', 'd1'), P('p_knight_03', 'f1')], config);
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     return r.value;
   };
 
-  it('pays durability, marks deployed, refills charges, starts the action phase', () => {
+  it('pays durability, marks deployed, starts the action phase', () => {
     const { run, stage: s } = go();
     const by = (id: string) => run.deck.find((p) => p.instanceId === id)!;
     expect(by('p_knight_02')).toMatchObject({ durability: 1, status: 'deployed' });
     expect(by('p_knight_03')).toMatchObject({ durability: 1, status: 'deployed' });
     expect(by('p_king_01')).toMatchObject({ durability: null, status: 'deployed' });
     expect(by('p_bishop_04').status).toBe('in_deck');
-    expect(run.loadout).toEqual([{ skillId: 'x', charges: 3, chargesMax: 3 }]);
     expect(s).toMatchObject({ phase: 'action', moveCredits: 1, focus: 3, skillLog: [] });
     expect(s.board.e1).toEqual({ pieceType: 'king', color: 'white', instanceId: 'p_king_01' });
     expect(s.board.d1).toEqual({ pieceType: 'knight', color: 'white', instanceId: 'p_knight_02', rarity: 'normal' });
+  });
+  it('startStage leaves the loadout untouched', () => {
+    // Single-use skills (M4): nothing refills, duplicates stay separate entries.
+    expect(go().run.loadout).toBe(run0.loadout);
+    expect(run0.loadout).toEqual([{ skillId: 'x' }, { skillId: 'x' }]);
   });
   it('turns a piece at durability 1 into spent', () => {
     const run = runOf();

@@ -1,4 +1,4 @@
-import { TIERS, draw, fileOf, rankOf, toIndex, toSquare } from '@checkbreaker/engine';
+import { TIERS, draw, fileOf, rankOf, retainTier, rollTier, toIndex, toSquare } from '@checkbreaker/engine';
 import type { BoardPiece, DeckType, Rarity, Square } from '@checkbreaker/engine';
 import type { ActKey, GenConfig, Template } from '@checkbreaker/content';
 
@@ -12,17 +12,7 @@ export function drawPar(tpl: Template, stageSeed: string): number {
 
 /** A cumulative pick over the act's rarity weights in tier order. */
 export function rollRarity(act: ActKey, u: number, config: GenConfig): Rarity {
-  const weights = config.gen.rarityPool[act].weights;
-  const total = TIERS.reduce((s, t) => s + weights[t], 0);
-  let acc = 0;
-  let last: Rarity = TIERS[0]!;
-  for (const t of TIERS) {
-    if (weights[t] <= 0) continue;
-    acc += weights[t];
-    last = t;
-    if (u * total < acc) return t;
-  }
-  return last;
+  return rollTier(config.gen.rarityPool[act].weights, u);
 }
 
 /** What a spawned pawn becomes on reaching rank 8: type, then a tier-up capped at the act ceiling, then retention. */
@@ -47,9 +37,8 @@ export function rollPromotion(
   const ceiling = TIERS.indexOf(config.gen.rarityPool[act].ceiling);
   let idx = TIERS.indexOf(tier);
   if (stream('tierUp') < tierUpChance) idx = Math.min(idx + 1, ceiling);
-  const keep = config.gen.retention[pieceType]?.[TIERS[idx]!];
-  if (keep !== undefined && stream('retention') >= keep) idx = Math.max(idx - 1, 0);
-  return { pieceType, rarity: TIERS[idx]! };
+  const rarity = retainTier(pieceType, TIERS[idx]!, config.gen.retention, stream('retention'));
+  return { pieceType, rarity };
 }
 
 function blackKing(board: Record<Square, BoardPiece>): number | null {

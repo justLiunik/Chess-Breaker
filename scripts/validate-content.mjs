@@ -193,6 +193,10 @@ for (const s of docs['skills.yaml']?.skills ?? []) skillIds.add(s.id);
       problems += 1;
     }
     seen.add(s.id);
+    if (s !== null && typeof s === 'object' && Object.hasOwn(s, 'charges')) {
+      fail(`skills.yaml:${s.id}: has a charges key — skills are single use, consumed on commit, with no charges (docs/03 §2)`);
+      problems += 1;
+    }
     for (const e of s.effects ?? []) {
       if (s.status === 'mvp' && !MVP_PRIMITIVES.has(e.primitive)) {
         fail(`skills.yaml:${s.id}: mvp skill uses ${e.primitive}, which the engine does not implement yet (mark it future)`);
@@ -715,6 +719,63 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   if (problems === 0) ok(`economy.yaml: base rewards rise by act; merge takes ${merge.inputs}, capped at the act ceiling; capacity ${economy.deck.capacity}`);
 }
 
+// 2a-m4. Interest, shop stock odds, single-use skills and onboarding (docs/05 §2,
+// docs/07 §2, docs/03 §8, docs/08 §5; M4 design 2026-11-13).
+{
+  let problems = 0;
+  const bad = (msg) => { fail(`economy.yaml: ${msg}`); problems += 1; };
+  const interest = economy.economy?.interest ?? {};
+  for (const k of ['per', 'coins', 'max']) {
+    if (!(Number.isInteger(interest[k]) && interest[k] > 0)) bad(`economy.interest.${k} must be a positive integer`);
+  }
+  const shop = economy.economy?.shop ?? {};
+  if (!(typeof shop.skillChance === 'number' && shop.skillChance >= 0 && shop.skillChance <= 1)) {
+    bad(`economy.shop.skillChance must be in [0, 1], got ${shop.skillChance}`);
+  }
+  const purchasable = Object.entries(economy.pieces ?? {}).filter(([, p]) => p.purchasable === true).map(([t]) => t);
+  const weights = shop.pieceTypeWeights ?? {};
+  for (const t of Object.keys(weights)) {
+    if (!purchasable.includes(t)) bad(`economy.shop.pieceTypeWeights.${t}: not a purchasable piece (pawns and the King are never sold)`);
+  }
+  for (const t of purchasable) {
+    if (!(Number.isInteger(weights[t]) && weights[t] >= 0)) bad(`economy.shop.pieceTypeWeights.${t} must be a non-negative integer`);
+  }
+  if (purchasable.reduce((s, t) => s + (weights[t] ?? 0), 0) <= 0) bad('economy.shop.pieceTypeWeights must have a positive total');
+  const slot1 = shop.slot1Types ?? [];
+  if (slot1.length === 0) bad('economy.shop.slot1Types must not be empty');
+  for (const t of slot1) {
+    if (!purchasable.includes(t)) bad(`economy.shop.slot1Types: "${t}" is not a purchasable piece`);
+    else if (!(weights[t] > 0)) bad(`economy.shop.slot1Types: "${t}" has weight 0 in pieceTypeWeights`);
+  }
+  if (slot1.includes('queen')) bad('economy.shop.slot1Types must not include queen (docs/07 §2: knight, bishop or rook)');
+  if (economy.economy?.services?.sell?.capAtPricePaid !== true) {
+    bad('economy.services.sell.capAtPricePaid must be true — act inflation would let a recovery piece sell above its cost (docs/05 §3)');
+  }
+  if (economy.skills?.loadoutSlots !== 3) bad(`skills.loadoutSlots must be 3 — the skill limit is strict (docs/03 §8), got ${economy.skills?.loadoutSlots}`);
+  if (economy.skills?.consumable !== true) bad('skills.consumable must be true — skills are single-use (docs/03 §2)');
+  const free = economy.onboarding?.freeSkill;
+  const stageCount = actCount * (economy.stages?.stagesPerAct ?? 3);
+  if (free !== undefined) {
+    if (!(Number.isInteger(free.stageNumber) && free.stageNumber >= 0 && free.stageNumber < stageCount)) {
+      bad(`onboarding.freeSkill.stageNumber must be an integer in 0..${stageCount - 1}`);
+    }
+    const def = (docs['skills.yaml']?.skills ?? []).find((s) => s.id === free.skillId);
+    if (!def) bad(`onboarding.freeSkill.skillId "${free.skillId}" is not in skills.yaml`);
+    else if (def.status !== 'mvp') bad(`onboarding.freeSkill.skillId "${free.skillId}" is not an mvp skill`);
+  }
+  // A single use is worth less than a piece that summons twice (docs/03 §6).
+  const knightCost = economy.pieces?.knight?.cost;
+  for (const s of docs['skills.yaml']?.skills ?? []) {
+    if (typeof knightCost === 'number' && !(s.price < knightCost)) {
+      fail(`skills.yaml:${s.id}: price ${s.price} must be below a Normal knight's ${knightCost} — skills are single-use (docs/03 §6)`);
+      problems += 1;
+    }
+  }
+  if (problems === 0) {
+    ok(`economy.yaml: interest ${interest.coins}/${interest.per} up to ${interest.max}; shop skill chance ${shop.skillChance}; single-use skills in ${economy.skills.loadoutSlots} slots, priced below a knight`);
+  }
+}
+
 // 2a''''. Templates: spawned pawns stay out of the enemy zone.
 for (const t of templates) {
   const sp = t.spawnedPawns;
@@ -911,6 +972,9 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml', 'run-act3-strong.yaml'])
     if (typeof p.durability === 'number' && typeof p.durabilityMax === 'number' && p.durability > p.durabilityMax) {
       fail(`${label}: durability ${p.durability} exceeds max ${p.durabilityMax}`);
     }
+    if (p.pricePaid !== undefined && p.origin !== 'shop') {
+      fail(`${label}: pricePaid is only for shop purchases, but origin is "${p.origin}" (docs/07 §4)`);
+    }
   }
 
   const slots = economy.skills?.loadoutSlots ?? 3;
@@ -919,7 +983,10 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml', 'run-act3-strong.yaml'])
   }
   for (const s of run.loadout ?? []) {
     if (!skillIds.has(s.skillId)) fail(`${file}: loadout references unknown skill "${s.skillId}"`);
-    if (s.charges > s.chargesMax) fail(`${file}: ${s.skillId} charges ${s.charges} exceed max ${s.chargesMax}`);
+    const extra = Object.keys(s).filter((k) => k !== 'skillId');
+    if (extra.length > 0) {
+      fail(`${file}: loadout entry "${s.skillId}" has ${extra.join(', ')} — an entry is only { skillId }: one single-use copy (docs/03 §8)`);
+    }
   }
 
   // History must follow the run shape: entry i is act floor(i / stagesPerAct) + 1,

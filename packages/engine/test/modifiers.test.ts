@@ -17,7 +17,7 @@ const skill = (skillId: string, target?: string): Action => ({
   type: 'ACTIVATE_SKILL', skillId, ...(target !== undefined && { target }),
 });
 const runWith = (...ids: string[]): RunState =>
-  deepFreeze(runOf({ loadout: ids.map((skillId) => ({ skillId, charges: 2, chargesMax: 2 })) }));
+  deepFreeze(runOf({ loadout: ids.map((skillId) => ({ skillId })) }));
 const types = (events: { type: string }[]): string[] => events.map((e) => e.type);
 
 /**
@@ -27,7 +27,7 @@ const types = (events: { type: string }[]): string[] => events.map((e) => e.type
  */
 function withEnemyTransform(id: string, pieceType: PieceType, toType: PieceType): EngineConfig {
   const def: SkillDef = {
-    id, status: 'mvp', cost: 1, charges: 2, price: 0,
+    id, status: 'mvp', cost: 1, price: 0,
     target: { kind: 'enemy_piece', pieceType, must_be_on_board: true },
     effects: [{ primitive: 'set_piece_type', params: { pieceType: toType }, duration: 'this_turn' }],
     restrictions: [],

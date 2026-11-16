@@ -86,7 +86,7 @@ describe('hasLegalQueue speed', () => {
   it(`a mated board with all three launch skills: under ${HLQ_BOUND_MS} ms (median of 5)`, { timeout: 120_000 }, () => {
     const stage = stageOf(MATED);
     const run = runOf({
-      loadout: ['twin_step', 'ascension', 'lockdown'].map((skillId) => ({ skillId, charges: 3, chargesMax: 3 })),
+      loadout: ['twin_step', 'ascension', 'lockdown'].map((skillId) => ({ skillId })),
     });
     expect(hasLegalQueue(run, stage, config)).toBe(false); // warm-up, and the answer
     const times: number[] = [];

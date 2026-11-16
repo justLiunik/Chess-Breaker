@@ -27,7 +27,7 @@ preconditions:
   - spawned_pawns_placed
 designNote: >-
   Boss. Enemy value 25-26, mate in 2, depth-4 policy. There is no line that
-  does not spend charges and durability. The player who banked coins into
+  does not spend skills and durability. The player who banked coins into
   Act III wins here; the player who emptied the deck in Act I does not.
   Enemy skills are reserved for M6 (docs/11 §B).
   Tuned on gen:report evidence (M3 Task 18; strong deck, seeds

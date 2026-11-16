@@ -109,7 +109,14 @@ describe('fuzz: queue invariants', () => {
         expect(moves - free).toBeLessThanOrEqual(credits + granted);
         const spent = used.reduce((n, id) => n + (config.skills[id]?.cost ?? 0), 0);
         expect(spent).toBeLessThanOrEqual(stage.focus); // I6
-        for (const id of used) expect(run.loadout.some((l) => l.skillId === id && l.charges >= 1)).toBe(true);
+        // Single use: each activation removes the first remaining copy of its skill, nothing else.
+        const left = [...run.loadout];
+        for (const id of used) {
+          const at = left.findIndex((l) => l.skillId === id);
+          expect(at).toBeGreaterThanOrEqual(0);
+          left.splice(at, 1);
+        }
+        expect(r.value.run.loadout).toEqual(left);
         expect(end.modifiers.every((m) => m.duration !== 'this_turn')).toBe(true); // R1 expired them
         for (const p of Object.values(end.board)) expect(p.transformed).toBeUndefined();
       } else {

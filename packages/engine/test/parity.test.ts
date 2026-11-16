@@ -28,7 +28,9 @@ describe('parity: simulate is the first half of commitQueue', () => {
     let withSkills = 0;
     let deckChanged = 0;
     for (let i = 0; checked < 1000; i++) {
-      const { run, stage, queue } = makeCase('parity', i);
+      const made = makeCase('parity', i);
+      const { stage, queue } = made;
+      const run = { ...made.run, coins: (i * 7) % 31 }; // wallets 0-30 keep interest non-zero in most cases
       deepFreeze(run);
       deepFreeze(stage);
       const s = simulate(run, stage, queue, config);

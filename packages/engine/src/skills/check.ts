@@ -17,11 +17,10 @@ export function checkSkill(
   const invalid = (reason: Extract<CommitError, { kind: 'invalid_target' }>['reason']): CommitError =>
     ({ kind: 'invalid_target', atStep, skillId, ...(action.target !== undefined && { target: action.target }), reason });
 
-  const slot = ctx.run.loadout.find((l) => l.skillId === skillId);
+  // The loadout of the queue's state at this step: a copy used at an earlier step is already gone.
   const def = config.skills[skillId];
-  if (!slot || !def) return unavailable('not_in_loadout');
+  if (!def || !ctx.run.loadout.some((l) => l.skillId === skillId)) return unavailable('not_in_loadout');
   if (def.status !== 'mvp') return unavailable('not_implemented');
-  if (slot.charges < 1) return unavailable('no_charges');
   if (
     def.restrictions.includes('once_per_turn')
     && ctx.skillLog.some((e) => e.skillId === skillId && e.turn === ctx.turn)
@@ -47,7 +46,11 @@ export function checkSkill(
   return null;
 }
 
-/** Spends Focus and a charge, logs the use and runs the effects. Call only after `checkSkill` passed. */
+/**
+ * Spends Focus, consumes the skill (the first loadout entry with its id: single use, M4), logs the
+ * use and runs the effects. Call only after `checkSkill` passed. The consumption lives in the
+ * queue's resolved run, so only a kept commit spends the skill; a preview or a refusal does not.
+ */
 export function applySkill(
   ctx: QueueCtx,
   action: SkillAction,
@@ -62,10 +65,8 @@ export function applySkill(
   const target = piece !== undefined && square !== undefined && id !== null ? { square, piece, id } : undefined;
 
   ctx.focus -= def.cost;
-  ctx.run = {
-    ...ctx.run,
-    loadout: ctx.run.loadout.map((l) => (l.skillId === action.skillId ? { ...l, charges: l.charges - 1 } : l)),
-  };
+  const used = ctx.run.loadout.findIndex((l) => l.skillId === action.skillId);
+  ctx.run = { ...ctx.run, loadout: ctx.run.loadout.filter((_, i) => i !== used) };
   ctx.skillLog = [...ctx.skillLog, {
     skillId: action.skillId, turn: ctx.turn, ...(target && { targetId: target.id }),
   }];

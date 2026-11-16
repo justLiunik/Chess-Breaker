@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { TIERS, draw, fileOf, rankOf, toIndex } from '@checkbreaker/engine';
+import { TIERS, draw, fileOf, rankOf, retainTier, toIndex } from '@checkbreaker/engine';
 import type { BoardPiece, Rarity } from '@checkbreaker/engine';
 import type { ActKey } from '@checkbreaker/content';
 import { bonusPawnSquares, drawPar, makeBonusPawn, placeSpawnedPawns, rollPromotion, rollRarity } from '../src/spawn';
@@ -70,6 +70,25 @@ describe('rollPromotion', () => {
     }
     expect(unretained).toBeGreaterThan(1000);
     expect(Math.abs(observed / unretained / keep - 1)).toBeLessThan(0.3);
+  });
+});
+
+describe('promotion retention statistic', () => {
+  it('Unique pawn to Legendary queen in Act III runs at 20% +/- 1% of the unretained rate', () => {
+    const keep = config.gen.retention.queen!.legendary!;
+    expect(retainTier('queen', 'legendary', config.gen.retention, 0)).toBe('legendary');
+    const noRetention = { ...config, gen: { ...config.gen, retention: {} } };
+    let observed = 0;
+    let unretained = 0;
+    for (let i = 0; i < 100000; i++) {
+      const stream = (f: string) => draw('ret', i, f);
+      const a = rollPromotion('act3', 'unique', stream, config);
+      const b = rollPromotion('act3', 'unique', stream, noRetention);
+      if (a.pieceType === 'queen' && a.rarity === 'legendary') observed++;
+      if (b.pieceType === 'queen' && b.rarity === 'legendary') unretained++;
+    }
+    expect(unretained).toBeGreaterThan(1000);
+    expect(Math.abs(observed / unretained - keep)).toBeLessThan(0.01);
   });
 });
 

@@ -111,7 +111,7 @@ function eventText(e: GameEvent): string {
     case 'pawn_promoted': return `pawn reaches the last rank at ${e.square}; promotes to ${e.promotesTo.pieceType} (${e.promotesTo.rarity})`;
     case 'enemy_promoted': return `enemy pawn promoted on ${e.square}`;
     case 'check': return `check on the ${e.king} king (${e.square})`;
-    case 'stage_won': return `stage won: ${e.award.coins} coins (base ${e.award.base} + par bonus ${e.award.parBonus})`;
+    case 'stage_won': return `stage won: ${e.award.coins} coins (base ${e.award.base} + par bonus ${e.award.parBonus} + interest ${e.award.interest})`;
     case 'overtime_paid': return `overtime on turn ${e.turn}: ${e.fromReward} from the reward, ${e.fromWallet} from your coins`;
     case 'stage_lost': return `stage lost: ${e.endReason}`;
     case 'enemy_move': return `enemy moves ${e.from}-${e.to}`;
@@ -228,7 +228,7 @@ function main(): void {
     console.log('preview:');
     for (const e of sim.value.events) console.log(`  ${eventText(e)}`);
     if (sim.value.award) {
-      console.log(`  award: ${sim.value.award.coins} coins (base ${sim.value.award.base}, par bonus ${sim.value.award.parBonus})`);
+      console.log(`  award: ${sim.value.award.coins} coins (base ${sim.value.award.base}, par bonus ${sim.value.award.parBonus}, interest ${sim.value.award.interest})`);
     }
     pending = queue;
     prompt();

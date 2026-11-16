@@ -21,3 +21,6 @@ export type SolveResult = {
   win: { placements: Placement[]; line: Action[][]; mateTurn: number } | null;
   stats: { screenNodes: number; deepNodes: number; deployments: number; enemyCalls: number; memoHits: number; replayFailures: number };
 };
+
+/** The solver's winning line, handed to the bot beside the stage; never stored in StageState. */
+export type Solution = NonNullable<SolveResult['win']>;
