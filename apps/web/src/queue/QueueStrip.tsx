@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import type { Action, StageState } from '@checkbreaker/engine';
 import { PieceGlyph } from '../board/pieces';
-import { engineConfig } from '../config';
+import { engineConfig, skillNames } from '../config';
 import type { Preview } from '../hud/Hud';
 
-export const skillName = (id: string): string =>
-  id.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+export const skillName = (id: string): string => skillNames[id] ?? id;
 
 export interface QueueStripProps {
   queue: Action[];

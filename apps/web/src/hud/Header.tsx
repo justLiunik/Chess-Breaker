@@ -6,7 +6,7 @@ export function Header({ session }: { session: RunSession }) {
   return (
     <header className="hud">
       <span className="hud-where">Act {run.actIndex + 1}, stage {run.stageIndex + 1}</span>
-      <span className="hud-coins" aria-label={`${run.coins} coins`}>Coins {run.coins}</span>
+      <span className="hud-coins" data-testid="run-coins" aria-label={`${run.coins} coins`}>Coins {run.coins}</span>
       {stage && <strong className="hud-mate">MATE IN {stage.mateIn}</strong>}
     </header>
   );

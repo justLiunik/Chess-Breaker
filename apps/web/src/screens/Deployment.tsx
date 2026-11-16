@@ -6,6 +6,7 @@ import type { Arrow, Mark } from '../board/Board';
 import { PIECE_NAME, PieceGlyph, RARITY_NAME } from '../board/pieces';
 import { engineConfig } from '../config';
 import { Header } from '../hud/Header';
+import { Pips } from '../hud/Pips';
 import { useShortcuts } from '../input/shortcuts';
 import { dropRefusalText } from '../messages';
 import { useRun } from '../state/store';
@@ -15,18 +16,6 @@ type Placement = { instanceId: string; to: Square };
 const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'placed (click to pick up)' } as const;
 
 const tierName = (i: PieceInstance): string => (i.rarity ? RARITY_NAME[i.rarity] : 'King');
-
-function Pips({ instance }: { instance: PieceInstance }) {
-  if (instance.durabilityMax === null) return null;
-  const filled = instance.durability ?? 0;
-  return (
-    <span className="pips" data-testid={`pips-${instance.instanceId}`} role="img" aria-label={`durability ${filled} of ${instance.durabilityMax}`}>
-      {Array.from({ length: instance.durabilityMax }, (_, i) => (
-        <span key={i} className={i < filled ? 'pip pip-full' : 'pip pip-empty'} data-testid="pip" aria-hidden="true">{i < filled ? '●' : '○'}</span>
-      ))}
-    </span>
-  );
-}
 
 export function Deployment() {
   const { session, dispatch, error } = useRun();
@@ -125,7 +114,7 @@ export function Deployment() {
   const problem = latest === 'local' ? message : error;
 
   return (
-    <main className="screen deployment">
+    <main className="screen deployment" data-testid="deployment-screen">
       <Header session={session} />
       <div className="deployment-body">
         <Board

@@ -508,3 +508,35 @@ export function parseFormations(files: Record<string, string>, templates: Templa
   }
   return out;
 }
+
+/** The player-facing text of one skill (for a UI: names and rule sentences are not rules data). */
+export interface SkillText { id: string; name: string; ruleBroken: string; text: string }
+
+/** Names and sentences of every skill in `skills.yaml`, in file order. */
+export function parseSkillTexts(text: string): SkillText[] {
+  const doc = parse(text) as { skills?: Partial<SkillText>[] };
+  if (!Array.isArray(doc?.skills)) throw new Error('skills.yaml is missing required field: skills');
+  return doc.skills.map((s) => ({
+    id: String(s.id), name: String(s.name ?? s.id), ruleBroken: String(s.ruleBroken ?? ''), text: String(s.text ?? ''),
+  }));
+}
+
+/** What each tier of one deck piece type adds, as the sentences written in `pieces.yaml`. */
+export interface PieceText { pieceType: DeckType; tiers: Partial<Record<'rare' | 'unique' | 'legendary', string[]>> }
+
+/** The rarity-ability sentences of the four deck piece types, in file order. */
+export function parsePieceTexts(text: string): PieceText[] {
+  const doc = parse(text) as { pieces?: { pieceType: string; rarityAbilities?: Record<string, { text?: string }[]> }[] };
+  if (!Array.isArray(doc?.pieces)) throw new Error('pieces.yaml is missing required field: pieces');
+  const out: PieceText[] = [];
+  for (const p of doc.pieces) {
+    if (!DECK_TYPES.includes(p.pieceType as DeckType)) continue;
+    const tiers: PieceText['tiers'] = {};
+    for (const tier of ['rare', 'unique', 'legendary'] as const) {
+      const lines = (p.rarityAbilities?.[tier] ?? []).map((a) => String(a.text ?? '')).filter((t) => t !== '');
+      if (lines.length > 0) tiers[tier] = lines;
+    }
+    out.push({ pieceType: p.pieceType as DeckType, tiers });
+  }
+  return out;
+}

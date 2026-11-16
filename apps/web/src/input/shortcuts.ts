@@ -25,22 +25,28 @@ function typing(t: EventTarget | null): boolean {
  */
 function spaceIsCommit(t: EventTarget | null): boolean {
   if (!(t instanceof HTMLElement)) return true;
-  return t === document.body || t === document.documentElement || t.classList.contains('board') || t.classList.contains('commit');
+  return t === document.body || t === document.documentElement || t.classList.contains('board') || t.classList.contains('commit')
+    || t.classList.contains('square');
 }
+
+const overlayOpen = (): boolean => document.querySelector('[data-overlay]') !== null;
 
 /**
  * Window-level keyboard shortcuts. Ignored while a text field has focus or Ctrl/Meta/Alt is held.
  * Where Space does act, its default is cancelled on keydown and keyup so a focused COMMIT button is not also clicked.
  */
-export function useShortcuts(handlers: Shortcuts): void {
+export function useShortcuts(handlers: Shortcuts, opts: { overlay?: boolean } = {}): void {
   const ref = useRef(handlers);
   ref.current = handlers;
+  const isOverlay = opts.overlay === true;
   useEffect(() => {
     let spaceHandled = false;
     const onDown = (e: KeyboardEvent): void => {
       if (typing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === ' ' && !spaceIsCommit(e.target)) return;
       const name = BY_KEY[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+      // While an overlay is open it owns the keyboard, except C and D (which switch overlays).
+      if (!isOverlay && overlayOpen() && name !== 'codex' && name !== 'deck') return;
       const fn = name ? ref.current[name] : undefined;
       if (!fn) return;
       e.preventDefault();

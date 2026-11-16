@@ -185,7 +185,19 @@ describe('Action shortcuts', () => {
     expect(api.session!.stage!.turnsUsed).toBe(1);
   });
 
-  it('C and D are safe no-ops until the overlays exist', async () => {
+  it('Space on a focused board square commits; Enter selects it (R18)', async () => {
+    await setup();
+    const u = userEvent.setup();
+    await playMove(u, 'a3', 'b4');
+    square('a3').focus();
+    await u.keyboard('{Enter}');
+    expect(api.session!.stage!.turnsUsed).toBe(0);
+    await u.keyboard(' ');
+    await flush();
+    expect(api.session!.stage!.turnsUsed).toBe(1);
+  });
+
+  it('C and D are no-ops where no overlay host is mounted', async () => {
     await setup();
     expect(() => { key('c'); key('d'); }).not.toThrow();
   });

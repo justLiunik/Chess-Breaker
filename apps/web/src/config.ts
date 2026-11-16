@@ -1,4 +1,5 @@
-import { parseEngineConfig, parseRunConfig } from '@checkbreaker/content/parse';
+import { parseEngineConfig, parsePieceTexts, parseRunConfig, parseSkillTexts } from '@checkbreaker/content/parse';
+import type { PieceText, SkillText } from '@checkbreaker/content/parse';
 import type { ConfigTexts } from '@checkbreaker/content/parse';
 import type { EngineConfig } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content/parse';
@@ -24,6 +25,11 @@ const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
 export const engineConfig: EngineConfig = parseEngineConfig(texts);
 export const runConfig: RunConfig = parseRunConfig(texts);
+
+/** UI-only text (names and rule sentences) read from the same YAML; never used for rules. */
+export const skillTexts: SkillText[] = parseSkillTexts(skills);
+export const skillNames: Record<string, string> = Object.fromEntries(skillTexts.map((s) => [s.id, s.name]));
+export const pieceTexts: PieceText[] = parsePieceTexts(pieces);
 
 /** Raw texts handed to the generation worker, which parses them itself (gen config, templates, formations). */
 export const genTexts: {
