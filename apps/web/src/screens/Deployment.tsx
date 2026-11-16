@@ -6,6 +6,7 @@ import type { Arrow, Mark } from '../board/Board';
 import { PIECE_NAME, PieceGlyph, RARITY_NAME } from '../board/pieces';
 import { engineConfig } from '../config';
 import { Header } from '../hud/Header';
+import { useShortcuts } from '../input/shortcuts';
 import { dropRefusalText } from '../messages';
 import { useRun } from '../state/store';
 
@@ -36,6 +37,8 @@ export function Deployment() {
   const [message, setMessage] = useState<string | null>(null);
   // Which problem is the latest: a refused drop here, or the run layer's refusal of START.
   const [latest, setLatest] = useState<'local' | 'run'>('local');
+
+  useShortcuts({ escape: () => setSelected(null) });
 
   const run = session?.run;
   const stage = session?.stage ?? null;

@@ -1,5 +1,9 @@
+import { useEffect, useRef } from 'react';
 import type { DragEvent, MouseEvent } from 'react';
 import type { BoardPiece, Square, StageState } from '@checkbreaker/engine';
+import { PlanLayer } from './PlanLayer';
+import { colorFor } from './arrows';
+import type { Plan, PlanColor } from './arrows';
 import { PIECE_NAME, PieceGlyph } from './pieces';
 
 export type Arrow = { from: Square; to: Square; kind?: string };
@@ -16,6 +20,8 @@ export interface Overlays {
   marks?: Mark[];
   /** Squares drawn with a hatch pattern and tint (the deployment ranks). */
   hatch?: Square[];
+  /** The player's own planning arrows and marks (right mouse button); drawn under the other overlays. */
+  plan?: Plan;
 }
 
 export interface BoardProps {
@@ -24,6 +30,14 @@ export interface BoardProps {
   onSquare?: (square: Square) => void;
   onSquareContext?: (square: Square) => void;
   onHover?: (square: Square | null) => void;
+  /** Right-drag from one square to another. */
+  onPlanArrow?: (from: Square, to: Square, color: PlanColor) => void;
+  /** Right-click on one square. */
+  onPlanMark?: (square: Square, color: PlanColor) => void;
+  /** A left click anywhere on the board. */
+  onPlanClear?: () => void;
+  /** Pieces fade instead of travelling. */
+  reducedMotion?: boolean;
   /** Whether the piece on `square` may be dragged. */
   draggable?: (square: Square) => boolean;
   onDragStart?: (square: Square, event: DragEvent<HTMLButtonElement>) => void;
@@ -56,7 +70,13 @@ function MarkIcon({ kind }: { kind: string }) {
   );
 }
 
-export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover, draggable, onDragStart, onDragEnd, onDrop }: BoardProps) {
+export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover, onPlanArrow, onPlanMark, onPlanClear, reducedMotion, draggable, onDragStart, onDragEnd, onDrop }: BoardProps) {
+  const rightFrom = useRef<Square | null>(null);
+  useEffect(() => {
+    const reset = (): void => { rightFrom.current = null; };
+    window.addEventListener('mouseup', reset);
+    return () => window.removeEventListener('mouseup', reset);
+  }, []);
   const hatch = new Set(overlays.hatch);
   const highlights = new Set(overlays.highlights);
   const marks = new Map<Square, Mark[]>();
@@ -89,7 +109,16 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
           data-vacated={vacated ? '' : undefined}
           data-ghost={isGhost ? '' : undefined}
           draggable={piece !== undefined && !vacated && (draggable?.(sq) ?? false)}
-          onClick={() => onSquare?.(sq)}
+          onClick={() => { onPlanClear?.(); onSquare?.(sq); }}
+          onMouseDown={(e) => { if (e.button === 2 && onPlanArrow) rightFrom.current = sq; }}
+          onMouseUp={(e) => {
+            if (e.button !== 2) return;
+            const from = rightFrom.current;
+            rightFrom.current = null;
+            if (from === null) return;
+            if (from === sq) onPlanMark?.(sq, colorFor(e));
+            else onPlanArrow?.(from, sq, colorFor(e));
+          }}
           onContextMenu={(e: MouseEvent) => { e.preventDefault(); onSquareContext?.(sq); }}
           onMouseEnter={() => onHover?.(sq)}
           onMouseLeave={() => onHover?.(null)}
@@ -113,8 +142,9 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
     }
   }
   return (
-    <div className="board" role="group" aria-label="Board">
+    <div className={`board ${reducedMotion ? 'motion-fade' : 'motion-travel'}`} role="group" aria-label="Board">
       {cells}
+      {overlays.plan && <PlanLayer plan={overlays.plan} />}
       <svg className="overlay" viewBox="0 0 8 8" aria-hidden="true" focusable="false">
         {(overlays.arrows ?? []).map((a, i) => {
           const f = centre(a.from);

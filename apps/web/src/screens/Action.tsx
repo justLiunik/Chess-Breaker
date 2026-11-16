@@ -2,14 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { legalPlayerMoves, previewSteps, threatMap } from '@checkbreaker/engine';
 import type { Square, StageState } from '@checkbreaker/engine';
 import type { RunSession } from '@checkbreaker/run';
+import { clear as clearPlan, empty as emptyPlan, toggleArrow, toggleMark } from '../board/arrows';
+import type { Plan } from '../board/arrows';
 import { Board } from '../board/Board';
 import type { Arrow, Mark } from '../board/Board';
 import { engineConfig } from '../config';
 import { Header } from '../hud/Header';
 import { Hud, lossBanner } from '../hud/Hud';
+import { useShortcuts } from '../input/shortcuts';
+import type { Shortcuts } from '../input/shortcuts';
 import { commitErrorText } from '../messages';
 import { QueueStrip, skillName } from '../queue/QueueStrip';
 import { useQueue } from '../queue/useQueue';
+import { reducedMotion } from '../settings';
 import { useRun } from '../state/store';
 
 type Phase = 'idle' | 'thinking' | 'playback';
@@ -28,6 +33,8 @@ export function Action() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [resolved, setResolved] = useState<StageState['board'] | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [plan, setPlan] = useState<Plan>(emptyPlan);
+  const motionReduced = useMemo(() => reducedMotion.read(), []);
 
   const latest = useRef<RunSession | null>(session);
   latest.current = session;
@@ -67,18 +74,15 @@ export function Action() {
     timer.current = setTimeout(() => { setPhase('idle'); setResolved(null); }, PLAYBACK_MS);
     return clearTimer;
   }, [phase]);
-  useEffect(() => {
-    if (phase !== 'playback') return undefined;
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== ' ') return;
-      e.preventDefault();
-      clearTimer();
-      setPhase('idle');
-      setResolved(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [phase]);
+  // Handlers are assigned below, once the values they need exist; the hook itself must run before the early return.
+  const keys = useRef<Shortcuts>({});
+  useShortcuts({
+    commit: () => keys.current.commit?.(),
+    undo: () => keys.current.undo?.(),
+    stepPrev: () => keys.current.stepPrev?.(),
+    stepNext: () => keys.current.stepNext?.(),
+    escape: () => keys.current.escape?.(),
+  });
 
   if (!session || !run || !stage || !preview || !planStage) return null;
 
@@ -92,6 +96,7 @@ export function Action() {
   const startCommit = (): void => {
     if (!canCommit) return;
     setConfirming(false);
+    setPlan(clearPlan());
     reset();
     setResolved(planStage.board);
     setPhase('thinking');
@@ -103,6 +108,18 @@ export function Action() {
       dispatch({ type: 'commit', queue });
       setPhase('playback');
     }, 0);
+  };
+
+  keys.current = {
+    commit: () => {
+      if (phase === 'playback') { clearTimer(); setPhase('idle'); setResolved(null); }
+      else if (confirming) return;
+      else if (canCommit) { if (loss) setConfirming(true); else startCommit(); }
+    },
+    undo: () => { if (!locked && q.queue.length > 0) { q.undo(); reset(); } },
+    stepPrev: () => { if (!locked && q.stepIndex > 0) q.setStep(q.stepIndex - 1); },
+    stepNext: () => { if (!locked && q.queue.length > 0) q.setStep(q.stepIndex + 1); },
+    escape: () => { if (confirming) setConfirming(false); else reset(); },
   };
 
   const onSquare = (sq: Square): void => {
@@ -140,13 +157,17 @@ export function Action() {
       <Header session={session} />
       <div className="action-body">
         {playing ? (
-          <Board stage={{ board: resolved }} />
+          <Board stage={{ board: resolved }} reducedMotion={motionReduced} />
         ) : (
           <Board
             stage={stage}
-            overlays={{ ghost: shown, threats, highlights: selected ? [selected, ...legal] : [], arrows, marks }}
+            overlays={{ ghost: shown, threats, highlights: selected ? [selected, ...legal] : [], arrows, marks, plan }}
             onSquare={onSquare}
             onHover={setHover}
+            onPlanArrow={(from, to, color) => setPlan((p) => toggleArrow(p, { from, to, color }))}
+            onPlanMark={(square, color) => setPlan((p) => toggleMark(p, { square, color }))}
+            onPlanClear={() => setPlan((p) => (p.arrows.length || p.marks.length ? clearPlan() : p))}
+            reducedMotion={motionReduced}
             draggable={(sq) => !locked && planStage.board[sq]?.color === 'white'}
             onDragStart={(sq, e) => { setSelected(sq); e.dataTransfer?.setData('text/plain', sq); }}
             onDrop={(sq) => onSquare(sq)}
