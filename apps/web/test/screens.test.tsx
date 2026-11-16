@@ -136,6 +136,26 @@ describe('Run Map', () => {
     await u.click(screen.getByRole('button', { name: 'Continue' }));
     expect(screen.getByTestId('deployment-screen')).toBeTruthy();
   });
+
+  it('shows DEBUG RUN for a debug session and not otherwise (I2)', async () => {
+    const s = ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session;
+    await mount(s);
+    expect(within(screen.getByTestId('run-map')).queryByText('DEBUG RUN')).toBeNull();
+    cleanup();
+    await mount({ ...s, debug: true as const });
+    expect(within(screen.getByTestId('run-map')).getByText('DEBUG RUN')).toBeTruthy();
+  });
+
+  it('the in-stage and shop header also marks a debug run (I2)', async () => {
+    await mount({ ...actionSession(), debug: true as const });
+    expect(screen.getByTestId('hud-debug').textContent).toBe('DEBUG RUN');
+    cleanup();
+    await mount({ ...wonSession(), debug: true as const });
+    expect(screen.getByTestId('hud-debug')).toBeTruthy();
+    cleanup();
+    await mount(wonSession());
+    expect(screen.queryByTestId('hud-debug')).toBeNull();
+  });
 });
 
 describe('Building', () => {

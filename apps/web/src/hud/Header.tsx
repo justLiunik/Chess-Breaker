@@ -1,6 +1,6 @@
 import type { RunSession } from '@checkbreaker/run';
 
-/** The top strip: where the run is, the wallet, and the stage's par. */
+/** The top strip: where the run is, the wallet, the stage's par, and DEBUG RUN for a run that used the dev skip. */
 export function Header({ session }: { session: RunSession }) {
   const { run, stage } = session;
   return (
@@ -8,6 +8,7 @@ export function Header({ session }: { session: RunSession }) {
       <span className="hud-where">Act {run.actIndex + 1}, stage {run.stageIndex + 1}</span>
       <span className="hud-coins" data-testid="run-coins" aria-label={`${run.coins} coins`}>Coins {run.coins}</span>
       {stage && <strong className="hud-mate">MATE IN {stage.mateIn}</strong>}
+      {session.debug && <strong className="debug-flag" data-testid="hud-debug">DEBUG RUN</strong>}
     </header>
   );
 }

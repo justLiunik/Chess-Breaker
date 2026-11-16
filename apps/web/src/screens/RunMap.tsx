@@ -26,6 +26,7 @@ export function RunMap({ onContinue }: { onContinue(): void }) {
   return (
     <main className="screen run-map" data-testid="run-map">
       <h1>Run map</h1>
+      {session.debug && <p><strong className="debug-flag">DEBUG RUN</strong></p>}
       <p><strong>Act {run.actIndex + 1} of {acts}</strong></p>
       <ol className="progress" aria-label="Stages">
         {Array.from({ length: acts * stagesPerAct }, (_, i) => {
