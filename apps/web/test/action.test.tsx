@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { hudEconomy, previewSteps } from '@checkbreaker/engine';
+import { hudEconomy, simulate } from '@checkbreaker/engine';
 import type { StageState } from '@checkbreaker/engine';
 import { memoryStorage, newRun, serializeSave } from '@checkbreaker/run';
 import { engineConfig, runConfig } from '../src/config';
@@ -62,7 +62,11 @@ describe('Action screen', () => {
     expect(entry(0).textContent).toContain('a3→b2');
     expect(label('b2')).toBe('b2, white bishop');
     expect(square('b2').getAttribute('data-ghost')).not.toBeNull();
-    const n = previewSteps(before.run, before.stage!, [STARTER_MATE.move], engineConfig).result!.award!.coins;
+    // N from `simulate` itself, independent of the preview the HUD reads.
+    const sim = simulate(before.run, before.stage!, [STARTER_MATE.move], engineConfig);
+    if (!sim.ok) throw new Error('the mate queue must simulate');
+    const n = sim.value.award!.coins;
+    expect(n).toBeGreaterThan(0);
     expect(screen.getByTestId('hud-win').textContent).toBe(`WIN NOW +${n} ◈`);
     await u.click(commitButton());
     await flush();
@@ -213,4 +217,68 @@ describe('Action screen', () => {
     expect(text).toContain(`wallet ${s.run.coins} ◈`);
   });
 
+  it('Undo and Clear shrink the queue and leave the session untouched', async () => {
+    await setup();
+    const u = user();
+    const before = api.session;
+    await playMove(u, 'a3', 'b4');
+    await playMove(u, 'b4', 'c5');
+    await u.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(entry(0).textContent).toContain('a3→b4');
+    expect(screen.queryByTestId('queue-entry-1')).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByTestId('queue-empty')).toBeTruthy();
+    expect(api.session).toBe(before);
+  });
+
+  it('step-through shows the board after the chosen step', async () => {
+    await setup(testStageSource(), ['twin_step']);
+    const u = user();
+    await playMove(u, 'a3', 'b4');
+    await u.click(screen.getByRole('button', { name: /Twin Step/ }));
+    await playMove(u, 'b4', 'c5');
+    expect(label('c5')).toBe('c5, white bishop');
+    await u.click(within(entry(0)).getByRole('button', { name: /^Show position after step 1/ }));
+    expect(label('b4')).toBe('b4, white bishop');
+    expect(label('c5')).toBe('c5, empty');
+    await u.click(within(entry(2)).getByRole('button', { name: /^Show position after step 3/ }));
+    expect(label('c5')).toBe('c5, white bishop');
+  });
+
+  it('a targeted skill waits for a square, then appends ACTIVATE_SKILL with that target', async () => {
+    await setup(testStageSource(), ['ascension']);
+    const u = user();
+    await u.click(screen.getByRole('button', { name: /Ascension/ }));
+    expect(screen.getByTestId('skill-prompt').textContent).toContain('Ascension');
+    expect(screen.queryByTestId('queue-entry-0')).toBeNull();
+    await u.click(square('a3'));
+    expect(entry(0).textContent).toContain('Ascension on a3');
+    expect(entry(0).getAttribute('data-problem')).toBeNull();
+    expect(screen.queryByTestId('skill-prompt')).toBeNull();
+    // Ascension makes the bishop a queen for the turn: the queue previews it as such.
+    await u.click(square('a3'));
+    expect(square('a4').className).toContain('highlight');
+  });
+
+  it('shows the muted next-turn potential from hudEconomy when the queue does not mate', async () => {
+    await setup();
+    const u = user();
+    const eco = () => hudEconomy(api.session!.run, api.session!.stage!, engineConfig);
+    expect(screen.getByTestId('hud-next').textContent).toContain(`+${eco().nextTurnPotential} ◈`);
+    await playMove(u, 'a3', 'b4');
+    expect(screen.queryByTestId('hud-win')).toBeNull();
+    expect(screen.getByTestId('hud-next').textContent).toBe(`Mate next turn: about +${eco().nextTurnPotential} ◈`);
+  });
+
+  it('marks an entry after the first failing step as blocked', async () => {
+    await setup(patched((s) => ({ ...s, focus: 0, focusPool: 0 })), ['twin_step']);
+    const u = user();
+    await playMove(u, 'a3', 'b4');
+    await u.click(screen.getByRole('button', { name: /Twin Step/ }));
+    await playMove(u, 'b4', 'c5');
+    expect(entry(0).getAttribute('data-problem')).toBeNull();
+    expect(entry(1).getAttribute('data-problem')).toBe('unaffordable');
+    expect(entry(2).getAttribute('data-problem')).toBe('blocked');
+    expect(entry(2).textContent).toContain('blocked');
+  });
 });

@@ -19,15 +19,6 @@ export interface QueueStripProps {
   onShow(i: number): void;
 }
 
-/** What entry `i` costs, read off the preview's own steps: Focus spent, else a free move. */
-function costOf(queue: Action[], preview: Preview, stage: StageState, i: number): string {
-  const step = preview.steps[i];
-  if (!step?.ok) return '—';
-  const prev = i === 0 ? stage : preview.steps[i - 1]!.stage;
-  const spent = prev.focus - step.stage.focus;
-  return spent > 0 ? `${spent} Focus` : 'free';
-}
-
 /** Why entry `i` is marked, or null when it resolves. */
 function problemOf(preview: Preview, i: number): 'unaffordable' | 'refused' | 'blocked' | null {
   if (preview.steps[i]?.ok !== false) return null;
@@ -56,7 +47,6 @@ export function QueueStrip({ queue, stage, preview, stepIndex, locked, onRemove,
         const name = a.type === 'MOVE' ? `${a.from}→${a.to}` : `${skillName(a.skillId)}${a.target ? ` on ${a.target}` : ''}`;
         const mover = a.type === 'MOVE' ? prev.board[a.from] : undefined;
         const skillCost = a.type === 'ACTIVATE_SKILL' ? engineConfig.skills[a.skillId]?.cost : undefined;
-        const cost = problem && skillCost !== undefined ? `${skillCost} Focus` : costOf(queue, preview, stage, i);
         return (
           <li
             key={`${i}-${name}`}
@@ -84,7 +74,7 @@ export function QueueStrip({ queue, stage, preview, stepIndex, locked, onRemove,
                 {mover ? <PieceGlyph piece={mover} rarity={mover.color === 'white' ? mover.rarity : undefined} /> : '✦'}
               </span>
               <span className="queue-name">{name}</span>
-              <span className="queue-cost"> ({cost})</span>
+              {skillCost !== undefined && <span className="queue-cost"> ({skillCost} Focus)</span>}
               {problem && <strong className="queue-problem"> {PROBLEM_TEXT[problem]}</strong>}
             </button>
             <button type="button" disabled={locked} aria-label={`Show position after step ${i + 1}`} aria-pressed={i === stepIndex} onClick={() => onShow(i)}>Show</button>
