@@ -57,7 +57,7 @@ pawn with turns. The chain has a leak — pieces get captured — and managing t
 0. **Deploy (once per stage).** Before the first move, read the generated board, place the King and
    summon deck pieces within the stage's spawn points, on ranks 1–4. Start locks the deck for the stage
    ([02 §5](02-rules-framework.md#5-deployment)).
-1. **Read.** Position, enemy threats, turns remaining, Focus, remaining charges.
+1. **Read.** Position, enemy threats, turns remaining, Focus, skills held.
 2. **Plan.** Assemble an ordered action queue: the Free Move, any extra moves, skill activations. A
    queue always holds at least one move — there is no pass.
 3. **Preview.** The engine simulates the queue, including end-of-turn expiry, and shows the
@@ -124,7 +124,7 @@ a real option early in a run when piece prices outrun income.
 | King mated | The run | — |
 | Stalemate (either side) | The run | — |
 | Piece captured | Its remaining durability, permanently | Buy or repair at the shop |
-| Skill charge spent | One charge, refreshed next stage | Wait for next stage |
+| Skill used | The skill, permanently (single use) | Buy another at the shop |
 
 The asymmetry is deliberate: **turns are cheap to lose per-turn and brutal to lose per-run**, while
 **durability is silent until it is fatal**. Players should fear the turn counter in the moment and

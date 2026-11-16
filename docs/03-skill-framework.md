@@ -32,19 +32,21 @@ Everything below exists to enforce those four properties.
 | `text` | Player-facing card text |
 | `trigger` | `activate` (player-initiated), `passive`, `reaction` |
 | `cost` | Focus cost (integer ≥ 0) |
-| `charges` | Activations per **stage**; refreshes each stage |
 | `price` | Act I shop price in coins; later acts add the same inflation as pieces (§8) |
 | `target` | `none`, `own_piece`, `enemy_piece`, `own_piece_bishop`… (filtered selector) |
 | `effects[]` | Ordered list of `{ primitive, params, duration }` |
 | `restrictions[]` | Machine-checkable clauses (`once_per_turn`, `not_adjacent_to_king`…) |
 | `status` | `mvp` or `future` |
 
-Skills are **permanent within a run** and occupy one of 3 loadout slots. Their charges refresh at
-every stage, so a skill is a *strategic identity* (what your deck can do) rather than ammo.
+Skills are **single-use consumables** (decided 2026-11-13, M4). Each skill bought occupies one of the
+**3** loadout slots; using it once consumes it and frees the slot. A second copy of a skill is a
+separate item in its own slot — skills never stack, carry charges or upgrade. A skill is a card you
+spend at the right moment, not a permanent part of the deck.
 
-> **Charges are the scarcity. Focus is the throttle.** Focus limits how much you can do *in one
-> turn*; charges limit how many times per *stage*. Neither alone can be gamed, and together they
-> keep a skill from becoming a permanent engine.
+> **Slots and coins are the scarcity. Focus is the throttle.** Focus limits how much you can do *in
+> one turn*; three slots and the price limit how many skills a run can hold at once. A skill is
+> consumed when the turn that uses it is **committed** — a preview or a refused commit consumes
+> nothing.
 
 ## 3. Effect primitives
 
@@ -93,7 +95,7 @@ piece as tier 0 (rarity abilities suspended); suppression is applied through a f
 (R3 and the root of R5 only, [02 §6](02-rules-framework.md#6-end-of-turn-resolution-order)).
 
 `hasLegalQueue(run, stage, config)` searches **skills first, then moves**: any ordered set of usable
-skills (distinct, within Focus and charges, each with every legal target), followed by up to the
+skills (distinct skill ids in the loadout, within Focus, each with every legal target), followed by up to the
 resulting credits in moves, each legal when made, with I2 holding after R1. It is complete for the
 launch three because a credit must be granted before the move it pays for, a transform must precede
 the moves of its piece, and Lockdown never changes I2; a test brute-forces every interleaving on
@@ -159,8 +161,7 @@ ruleBroken: "You get one move per turn."
 text: "Gain one extra move this turn."
 trigger: activate
 cost: 1
-charges: 3
-price: 12
+price: 4
 target: { kind: none }
 effects:
   - { primitive: grant_move_credit, params: { amount: 1 }, duration: this_turn }
@@ -170,10 +171,10 @@ status: mvp
 
 - Grants one move credit, usable for a `MOVE` (credits pay for nothing else; pieces enter the board only in the Deployment phase).
 - Because costs are sequential, Twin Step must be activated *before* the action it pays for.
-- `once_per_turn` prevents stacking three Twin Steps into a six-action turn; three charges buy three
-  extra actions across the stage, not inside one turn.
-- **Edge cases:** activating it with no credits already spent and no action following is legal but
-  wasted (charges are not refunded). Two Twin Steps in one turn are illegal (`once_per_turn`).
+- `once_per_turn` prevents stacking copies: a player holding three Twin Steps gets three extra
+  actions across three turns, never three inside one turn.
+- **Edge cases:** activating it with no action following is legal but wasted (the skill is consumed
+  and not refunded). Two Twin Steps in one turn are illegal (`once_per_turn`), even as two copies.
 
 ### Ascension — *Transformation*
 
@@ -185,8 +186,7 @@ ruleBroken: "A bishop is a bishop, forever."
 text: "One of your bishops becomes a queen until the end of this turn."
 trigger: activate
 cost: 2
-charges: 2
-price: 12
+price: 4
 target: { kind: own_piece, pieceType: bishop, must_be_on_board: true, excludesRarity: [legendary] }
 effects:
   - { primitive: set_piece_type, params: { pieceType: queen }, duration: this_turn }
@@ -204,7 +204,7 @@ status: mvp
 - **Rarity.** The transform suspends the bishop's rarity abilities until it reverts (§3): a Rare or
   Unique bishop gains straight lines but loses its leap for the turn. A **Legendary bishop cannot be
   targeted** (`excludesRarity: [legendary]`): it already moves like a queen, so Ascension would add
-  no move and only take its leaps away — a wasted charge, not a choice.
+  no move and only take its leaps away — a wasted skill, not a choice.
 - **Edge cases:** the engine checks I2 again after R1 (`king_in_check_at_end { afterRevert: true }`),
   but with this skill the case cannot occur: the bishop's square and what it blocks never change at
   the revert, so the King is no more exposed after it than before. The check is a guard for future
@@ -221,8 +221,7 @@ ruleBroken: "A piece can always move."
 text: "Choose an enemy piece. It cannot move on the enemy's next turn."
 trigger: activate
 cost: 1
-charges: 3
-price: 10
+price: 3
 target: { kind: enemy_piece, must_be_on_board: true, excludes: [king] }
 effects:
   - { primitive: suppress_piece, params: {}, duration: next_enemy_turn }
@@ -236,8 +235,8 @@ status: mvp
   suppressed and the king has no move, the enemy is **stalemated and the player loses**
   ([02 §7](02-rules-framework.md#7-stage-end-evaluation)) — unless the king is in check, which is
   checkmate. The preview shows which, so Lockdown is a mating tool with a visible edge.
-- `distinct_targets` means one Lockdown per enemy piece per stage — preventing "lock the whole army"
-  degenerate play.
+- `distinct_targets` means one Lockdown per enemy piece per stage, across copies — preventing "lock
+  the whole army" degenerate play.
 - The king is excluded: freezing the king would make checkmate trivially deterministic.
 
 ### The next four (M6)
@@ -248,12 +247,12 @@ primitives they need ([10](10-roadmap-and-milestones.md)). Two widen how pieces 
 deck, which is what an unforgiving durability economy most needs
 ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)).
 
-| Skill | Category | Rule broken | Focus | Charges | Price |
-|---|---|---|---|---|---|
-| **Gallop** | Movement override | "A piece moves only the way its type moves." | 1 | 2 | 10 |
-| **Phase Step** | Movement override | "Pieces are blocked by other pieces." | 2 | 2 | 14 |
-| **Recall** | Board manipulation | "A piece on the board can only leave it by being captured." | 1 | 1 | 12 |
-| **Bulwark** | Status | "Any piece can be captured." | 1 | 2 | 10 |
+| Skill | Category | Rule broken | Focus | Price |
+|---|---|---|---|---|
+| **Gallop** | Movement override | "A piece moves only the way its type moves." | 1 | 3 |
+| **Phase Step** | Movement override | "Pieces are blocked by other pieces." | 2 | 5 |
+| **Recall** | Board manipulation | "A piece on the board can only leave it by being captured." | 1 | 4 |
+| **Bulwark** | Status | "Any piece can be captured." | 1 | 3 |
 
 #### Gallop — *Movement override*
 
@@ -299,7 +298,7 @@ deck to return to).
 - The queue still needs a `MOVE` (I5), and the end state is judged as usual: recalling a piece that
   was blocking a check is refused at commit (I2).
 - **Edge cases:** recalling a transformed bishop (Ascension) returns it as a bishop; the modifier
-  ends with its target. One charge per stage keeps it a rescue, not a shuttle.
+  ends with its target. Being single-use keeps it a rescue, not a shuttle.
 
 #### Bulwark — *Status*
 
@@ -318,40 +317,35 @@ anyway, I3).
 
 ## 6. Balance frame
 
-Per stage, with default values (Focus 3/turn, ~8 turns, 3 skills):
+A skill is one use. A full loadout is therefore at most **three uses**, spread over however many
+stages the player chooses to keep them, and each use is roughly **one extra action** (Twin Step), one
+turn of a stronger piece (Ascension) or one turn of a frozen defender (Lockdown).
 
 | Quantity | Value | Notes |
 |---|---|---|
-| Focus available per stage | `3 × turns` ≈ 24 | Soft budget |
-| Focus cost of full skill usage | 3×1 + 2×2 + 3×1 = **10** | ~42% of budget |
-| Extra actions gained from Twin Step | +3 | ~+37% action economy over 8 turns |
-| Action inflation per stage | 8 → 11 | Enough to change a line, not enough to replace one |
+| Skills held at once | ≤ 3 | Strict: no extra slot is ever sold |
+| Uses per skill | 1 | Consumed on commit |
+| Focus per turn | 3 | Any two of the launch three fit in one turn (costs 1, 2, 1) |
+| Same skill twice in one turn | Never | `once_per_turn` applies across copies |
 
-**Note on charges — a deliberate revision.** The initial proposal was Twin Step 2 / Ascension 1 /
-Lockdown 2. Because charges now refresh **per stage** rather than per level, those numbers made a
-skill unusable in most turns of a stage. The values above were raised to 3 / 2 / 3 so each skill can
-appear in roughly a third of a stage's turns. Charges are the primary tuning lever; adjust them
-before touching costs.
+Focus costs stay at 1–2 for every catalogued skill, so any two of the launch three (costs 1, 2, 1) fit in one turn's
+3 Focus; Ascension and Phase Step (2 each) do not pair, and no skill forces an all-in turn. A 3-cost skill is reserved for an effect that deserves a whole turn.
 
-**By act.** Turn limits shrink while Focus per turn stays 3, so the same loadout fills more of the
-budget as the run goes on:
+**Prices.** One use is worth about one extra action, less than a piece that summons twice, so skills
+are priced below a knight's 8: light skills (Lockdown, Gallop, Bulwark) 3, line-changing skills
+(Twin Step, Ascension, Recall) 4, Phase Step 5, with act inflation on top. Skills are also rare in the
+shop (20 % of slots 3–4, [07 §2](07-shop-phase.md#2-stock-generation)), so the price is not what
+limits them — availability and the three slots are. Prices are provisional until the M6 balance
+pass.
 
-| Act | Turns | Focus per stage | Full use of the launch three (10) |
-|---|---|---|---|
-| I | 8 | 24 | 42% |
-| II | 6 | 18 | 56% |
-| III | 5 | 15 | 67% |
-
-Focus costs stay at 1–2 for every catalogued skill, so any two skills fit in one turn's 3 Focus and
-no skill forces an all-in turn. A 3-cost skill is reserved for an effect that deserves a whole turn.
-
-**Prices.** A skill is permanent for the run and its charges refresh every stage, so it is priced
-above a piece that summons twice: light skills 10, line-changing skills 12–14, against a knight's 8.
-Act I income (≈10 coins a stage) buys a skill every one to two stages, in competition with pieces.
+**Why single use (2026-11-13).** Permanent skills with per-stage charges made a skill a standing
+engine: once bought, it shaped every later stage. Single use makes each skill a decision twice —
+when to buy it and which turn deserves it — and keeps the solver's proof (which uses no skills,
+[04 §5](04-stage-generation-and-authoring.md#5-the-solver)) the floor of what a player can do.
 
 ### Tuning levers, in order of preference
 
-1. **Charges** — cheapest to change, clearest to players, no rules interactions.
+1. **Price and shop rate** — cheapest to change, no rules interactions.
 2. **Cost** — changes the turn structure; a 3-cost skill forces an all-in turn.
 3. **Duration** — `this_turn` → `next_enemy_turn` is a large power increase; use sparingly.
 4. **Targeting restriction** — narrowing the target set reduces power without changing feel.
@@ -382,28 +376,30 @@ A skill cannot ship unless it passes all of these.
 
 **Loop safety**
 - [ ] Cannot fund its own cost (no `grant_focus` + cost-0 activations that net positive).
-- [ ] Cannot grant an extra turn, reset the turn counter, or refund a charge mid-stage.
-- [ ] Cannot create an infinite action chain (any credit grant must cost more than it produces, or be
-      charge-limited).
+- [ ] Cannot grant an extra turn, reset the turn counter, or return a used skill to the loadout.
+- [ ] Cannot create an infinite action chain (any credit grant must cost more than it produces; every
+      skill is single-use).
 
 **Anti-patterns — reject on sight**
-- ❌ "Gain 2 Focus" on a 1-cost skill with unlimited charges.
+- ❌ "Gain 2 Focus" on a 1-cost skill (it funds the next skill's cost).
 - ❌ Any `permanent` duration on a movement or type change (it silently rewrites deck value).
 - ❌ King suppression, king removal, king transformation.
-- ❌ Extra turns, turn-counter manipulation, charge refunds.
+- ❌ Extra turns, turn-counter manipulation, skill refunds.
 - ❌ Skills that hide information the player needs to plan (inverse of category 6).
 - ❌ Skills whose power depends on the *number of pieces* in an unbounded way (e.g. "one move per
       piece you control").
 
 ## 8. Acquisition and loadout
 
-- Skills are bought in the **shop** ([07](07-shop-phase.md)) and are permanent for the run.
-- **3 loadout slots** at run start; one additional slot may be purchasable later
-  ([11](11-open-decisions.md)).
-- Charges refresh to full at the start of **every stage**, independent of the shop.
-- A duplicate purchase of an owned skill grants **+1 charge** at a reduced price — the way a player
-  deepens a build rather than widening it.
-- Skills are **not** lost on capture (they are not pieces) and **not** damaged by fatigue.
+- Skills are bought in the **shop** ([07](07-shop-phase.md)); the one exception is the free Twin Step
+  granted when stage I-3 starts, if a slot is free ([08 §5](08-progression-and-ux.md#5-onboarding-ramp)).
+- **3 loadout slots, strictly.** No slot is ever sold. Buying a skill with a full loadout forces a
+  swap: the displaced skill is lost.
+- Every skill occupies one slot. A **duplicate is a separate item** in another slot: no stacking,
+  no charges, no upgrades.
+- A skill is **consumed** when the turn that uses it is committed, and its slot frees at once.
+- Unused skills carry over between stages. Skills are **not** lost on capture (they are not pieces)
+  and cannot be sold.
 
 ## 9. What the MVP must prove about this framework
 

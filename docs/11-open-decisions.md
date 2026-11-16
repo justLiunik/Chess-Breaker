@@ -11,11 +11,11 @@ M1–M5.
 **Question:** what is the full set of skills?
 **Partly decided (M2 design):** seven skills are catalogued with their numbers — the launch three
 (Twin Step, Ascension, Lockdown; built in M2) and Gallop, Phase Step, Recall and Bulwark (`future`,
-built in M6) — with Act I prices of 10–14 coins ([03 §5](03-skill-framework.md),
+built in M6) — single-use since 2026-11-13, with Act I prices of 3–5 coins ([03 §5](03-skill-framework.md),
 [07 §2.3](07-shop-phase.md#23-skill-prices)).
 **Candidates, not catalogued:** *Shove* (push an adjacent enemy one square; `displace_piece`),
 *Foresight* (preview the enemy's reply; needs the planning primitive class), *Surge* (+2 Focus,
-0 cost, 1 charge; the first use of `grant_focus`). Rejected: any post-commit undo, any king freeze.
+0 cost; the first use of `grant_focus`). Rejected: any post-commit undo, any king freeze.
 **Still open:** whether the catalogue grows past seven, and which candidate fills categories 6–7.
 **Trigger:** M6 start. **Blocker for:** nothing.
 **Constraint when it happens:** every skill passes the [03 §7](03-skill-framework.md#7-guardrail-checklist-for-any-new-skill)
@@ -69,8 +69,8 @@ of the puzzle, and removes the mid-stage "add pieces as needed" plan that made d
 Act III 15, bosses +3; knight/bishop 3, Legendary bishop 5, rook 5, queen 9), the deployment ranks
 are always ranks 1–4, and durability is flat at 2 (Legendary queen 1)
 ([06 §1](06-deck-durability-and-permadeath.md#1-the-piece-table)).
-**Still open:** the budgets and the flat durability are provisional, to be tuned with the headless
-bot (M4, M6); `no_first_turn_mate` checks single pieces and pairs only
+**Still open:** the budgets and the flat durability are provisional, to be tuned in the M6 balance pass
+(bot, estimates or playtests: method decided then); `no_first_turn_mate` checks single pieces and pairs only
 ([04 §4](04-stage-generation-and-authoring.md#4-preconditions)).
 
 ---

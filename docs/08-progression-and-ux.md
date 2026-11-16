@@ -16,7 +16,7 @@ Priority order when two elements compete for space or attention:
    structure and must never be hidden behind a tooltip.
 3. **Board threats** — what can capture what. Always visible, never "discoverable."
 4. **Focus and move credits** — what this turn can afford.
-5. **Durability and charges** — what the rest of the run can afford.
+5. **Durability and skills held** — what the rest of the run can afford.
 6. **Everything else** — hints, history, help.
 
 If a screen cannot show 1–4 simultaneously, the screen is wrong.
@@ -40,10 +40,13 @@ No screen has a timer. The game is turn-based; urgency is diegetic (the counter)
 
 ```
 preview = max(0, baseReward(act, tier) − overtimePaid) + (turnsUsed + 1 ≤ mateIn ? parBonus(act, tier) : 0)
+        + interest(wallet after this plan's salvage)
 ```
 
 `turnsUsed + 1` is the turn being played, and `overtimePaid` already includes the overtime paid
-when that turn started. Salvage is shown separately as it is earned.
+when that turn started. Salvage is shown separately as it is earned. Interest is
+`min(5, floor(wallet / 5))` on the wallet at the mate ([05 §2](05-run-structure-and-economy.md#2-income-stage-reward--turns--coins));
+the preview shows it as its own line (`+2 ◈ interest`), and it is part of the payout I10 compares.
 
 The HUD shows a live, per-plan value:
 
@@ -108,7 +111,7 @@ paid until START.
 │                                                                      │
 │  QUEUE: [Twin Step] → [♖ a1→a7] → [♔ d1→e2]          +1 credit       │
 │                                                       pending        │
-│  [ Twin Step ◈1 ●●● ] [ Ascension ◈2 ●● ]        [ COMMIT ]  [UNDO]  │
+│  [ Twin Step ◈1 ] [ Ascension ◈2 ] [ Twin Step ◈1 ]  [ COMMIT ] [UNDO]│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -195,7 +198,7 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 |---|---|---|
 | Run 1, Act I stage 1 | Piece movement, capture, the par counter | Fixed set-piece template (`tpl-act1-first-steps`) with a scripted enemy; tooltip on the coin preview |
 | Run 1, Act I stage 2 | Choosing who to summon, spawn points, and durability | The deck holds more pieces than the spawn points pay for; the first START is prompted with its durability cost |
-| Run 1, Act I stage 3 | The first skill (Twin Step) | Granted free for Act I; card text highlighted once |
+| Run 1, Act I stage 3 | The first skill (Twin Step) | One free, single-use Twin Step granted when the stage starts, if a loadout slot is free (`onboarding.freeSkill`); card text highlighted once |
 | Act I boss | Mating under par pressure | A shorter par than the rest of Act I; the overtime bill is highlighted once |
 | Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
