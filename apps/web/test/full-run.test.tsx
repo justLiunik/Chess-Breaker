@@ -18,8 +18,6 @@ afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unst
 describe('M5 acceptance: a whole run in the browser UI', () => {
   it('plays 9 stages from the title screen to a won run, by clicking only', async () => {
     const errors = vi.spyOn(console, 'error');
-    // The Title offers no seed field, so fix the one random draw the app makes to get seed 7F3A-2210.
-    vi.spyOn(crypto, 'getRandomValues').mockImplementation(((a: Uint32Array) => { a[0] = 0x7f3a2210; return a; }) as typeof crypto.getRandomValues);
 
     const storage = memoryStorage();
     const saved = (): RunSession => {
@@ -31,6 +29,7 @@ describe('M5 acceptance: a whole run in the browser UI', () => {
     const u = userEvent.setup();
 
     await u.click(screen.getByRole('switch', { name: /Developer tools/ }));
+    await u.type(screen.getByRole('textbox', { name: /Seed/ }), '7f3a-2210');
     await u.click(screen.getByRole('button', { name: 'New run' }));
     await flush();
     expect(saved().run.seed).toBe('7F3A-2210');

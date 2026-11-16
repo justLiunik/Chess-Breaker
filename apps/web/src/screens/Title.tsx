@@ -14,12 +14,17 @@ export function Title() {
     return text === null ? null : loadSave(text, runConfig);
   });
   const [asking, setAsking] = useState(false);
+  const [seed, setSeed] = useState('');
+  const [seedBad, setSeedBad] = useState(false);
   const valid = saved?.ok ? saved.value : null;
 
   const startNew = (): void => {
     setAsking(false);
+    const text = seed.trim().toUpperCase();
+    if (text !== '' && !/^[0-9A-F]{4}-[0-9A-F]{4}$/.test(text)) { setSeedBad(true); return; }
+    setSeedBad(false);
     setSaved(null);
-    dispatch({ type: 'new_run' });
+    dispatch(text === '' ? { type: 'new_run' } : { type: 'new_run', seed: text });
   };
 
   return (
@@ -33,6 +38,14 @@ export function Title() {
           {valid.debug && <strong className="debug-flag"> DEBUG RUN</strong>}
         </p>
       )}
+      <p>
+        <label>
+          Seed (optional){' '}
+          <input type="text" value={seed} placeholder="XXXX-XXXX" maxLength={9} autoComplete="off" spellCheck={false}
+            aria-invalid={seedBad} onChange={(e) => { setSeed(e.target.value); setSeedBad(false); }} />
+        </label>
+        {seedBad && <span role="alert" className="error"> A seed looks like 7F3A-2210 (eight hex digits).</span>}
+      </p>
       {saved && !saved.ok && <p role="alert" className="error">{saveErrorText(saved.error)}</p>}
       <p>
         <button type="button" className={valid ? '' : 'start'} onClick={() => (valid ? setAsking(true) : startNew())}>New run</button>

@@ -90,6 +90,25 @@ describe('Title', () => {
     expect(storage.read()).not.toBe(before);
   });
 
+  it('an optional seed is upper-cased and used; an invalid one shows a message and starts nothing', async () => {
+    const storage = memoryStorage();
+    render(<App source={testStageSource()} makeStorage={() => storage} />);
+    const u = userEvent.setup();
+    const box = screen.getByRole('textbox', { name: /Seed/ });
+    await u.type(box, 'cd');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await u.clear(box);
+    await u.type(box, 'nope');
+    await u.click(screen.getByRole('button', { name: 'New run' }));
+    expect(screen.getByRole('alert').textContent).toMatch(/seed looks like/);
+    expect(storage.read()).toBeNull();
+    await u.clear(box);
+    await u.type(box, '7f3a-2210');
+    await u.click(screen.getByRole('button', { name: 'New run' }));
+    await flush();
+    expect(loadSave(storage.read()!, c)).toMatchObject({ ok: true, value: { run: { seed: SEED } } });
+  });
+
   it('the dev switch reflects and writes devToggle', async () => {
     localStorage.setItem(DEV_KEY, '1');
     render(<App source={testStageSource()} makeStorage={() => memoryStorage()} />);
