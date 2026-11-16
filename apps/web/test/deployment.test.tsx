@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnCostOf } from '@checkbreaker/engine';
@@ -131,6 +131,93 @@ describe('Deployment screen', () => {
   it('shows MATE IN X', async () => {
     await setup();
     expect(screen.getByText(/MATE IN 1/)).toBeTruthy();
+  });
+
+  it('tray tiles carry the rarity frame shape', async () => {
+    await setup();
+    expect(trayPiece('p_bishop_04').querySelector('.frame-normal')).not.toBeNull();
+    expect(trayPiece('p_king_01').querySelector('.frame')).toBeNull();
+  });
+
+  it('a stale refusal does not outlive a newer one', async () => {
+    await setup();
+    const u = user();
+    await u.click(trayPiece('p_bishop_04'));
+    await u.click(square('e5'));
+    expect(screen.getByRole('alert')).toBeTruthy();
+    await u.click(square('e2'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  describe('drag and drop', () => {
+    const dt = () => {
+      const data: Record<string, string> = {};
+      return { setData: (k: string, v: string) => { data[k] = v; }, getData: (k: string) => data[k] ?? '', effectAllowed: '', dropEffect: '' };
+    };
+
+    it('tray to square, then square to another square', async () => {
+      await setup();
+      const t = dt();
+      fireEvent.dragStart(trayPiece('p_rook_01'), { dataTransfer: t });
+      fireEvent.drop(square('e1'), { dataTransfer: t });
+      expect(square('e1').getAttribute('aria-label')).toBe('e1, white rook');
+      const cost = spawnCostOf('rook', 'normal', engineConfig);
+      const t2 = dt();
+      fireEvent.dragStart(square('e1'), { dataTransfer: t2 });
+      fireEvent.drop(square('c2'), { dataTransfer: t2 });
+      expect(square('e1').getAttribute('aria-label')).toBe('e1, empty');
+      expect(square('c2').getAttribute('aria-label')).toBe('c2, white rook');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.getByTestId('spawn-counter').textContent).toContain(`${cost} / 9`);
+    });
+
+    it('board to tray unplaces', async () => {
+      await setup();
+      const t = dt();
+      fireEvent.dragStart(trayPiece('p_rook_01'), { dataTransfer: t });
+      fireEvent.drop(square('e1'), { dataTransfer: t });
+      const t2 = dt();
+      fireEvent.dragStart(square('e1'), { dataTransfer: t2 });
+      fireEvent.drop(tray(), { dataTransfer: t2 });
+      expect(square('e1').getAttribute('aria-label')).toBe('e1, empty');
+      expect(screen.getByTestId('spawn-counter').textContent).toContain('0 / 9');
+    });
+  });
+
+  describe('King safety marks', () => {
+    const attacked = (): StageSource => {
+      const inner = testStageSource();
+      return {
+        async request(id, req) {
+          const a = await inner.request(id, req);
+          if (!a.ok) return a;
+          a.stage.board.a8 = { pieceType: 'rook', color: 'black', stageId: 's09' };
+          return a;
+        },
+      };
+    };
+
+    it('marks the squares where the King would start in check while it is selected', async () => {
+      await setup(attacked());
+      const u = user();
+      expect(square('a1').querySelector('[data-mark="king-unsafe"]')).toBeNull();
+      await u.click(trayPiece('p_king_01'));
+      expect(square('a1').querySelector('[data-mark="king-unsafe"]')).not.toBeNull();
+      expect(square('a1').getAttribute('aria-label')).toMatch(/King would start in check/);
+      expect(square('b1').querySelector('[data-mark="king-unsafe"]')).toBeNull();
+      await u.click(trayPiece('p_king_01'));
+      expect(square('a1').querySelector('[data-mark="king-unsafe"]')).toBeNull();
+    });
+
+    it('marks them while the King is dragged', async () => {
+      await setup(attacked());
+      const data: Record<string, string> = {};
+      const t = { setData: (k: string, v: string) => { data[k] = v; }, getData: (k: string) => data[k] ?? '' };
+      fireEvent.dragStart(trayPiece('p_king_01'), { dataTransfer: t });
+      expect(square('a1').querySelector('[data-mark="king-unsafe"]')).not.toBeNull();
+      fireEvent.dragEnd(trayPiece('p_king_01'), { dataTransfer: t });
+      expect(square('a1').querySelector('[data-mark="king-unsafe"]')).toBeNull();
+    });
   });
 
   it('spawned pawns show their promotion result', async () => {

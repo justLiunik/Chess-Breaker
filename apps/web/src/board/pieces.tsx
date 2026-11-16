@@ -20,6 +20,15 @@ const FRAME: Record<Rarity, string> = {
   legendary: 'M32 8H68L92 32V68L68 92H32L8 68V32Z',
 };
 
+/** The frame alone, for places that show a tier without a piece. */
+export function TierFrame({ rarity }: { rarity: Rarity }) {
+  return (
+    <svg className="tier-frame" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <path className={`frame frame-${rarity}`} d={FRAME[rarity]} />
+    </svg>
+  );
+}
+
 export function PieceGlyph({ piece, rarity }: { piece: Pick<BoardPiece, 'pieceType' | 'color'>; rarity?: Rarity | null }) {
   const tier = rarity ?? null;
   return (
