@@ -376,6 +376,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
       return out;
     }),
   };
+  put(session, 'debug', s, 'session', exactly(true as const));
   const { run, phase } = session;
 
   // Invariants (spec section 8.5).

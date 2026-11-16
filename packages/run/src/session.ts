@@ -1,4 +1,4 @@
-import { commitQueue, durabilityMaxOf, endStage, hash, startStage } from '@checkbreaker/engine';
+import { commitQueue, durabilityMaxOf, endStage, hash, pendingBase, startStage } from '@checkbreaker/engine';
 import type { Action, PieceInstance, Result, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
 import type { GenRequest, Offer, RunError, RunEvent, RunPhase, RunResult, RunSession, StageTally } from './types';
@@ -138,7 +138,7 @@ export function commit(s: RunSession, queue: Action[], c: RunConfig): RunResult 
   if (!r.ok) return fail({ kind: 'engine', error: r.error });
   const { stage, award } = r.value;
   let run = r.value.run;
-  let events: RunEvent[] = r.value.events;
+  const events: RunEvent[] = r.value.events;
 
   const prior = s.tally ?? { startCoins: s.run.coins, salvage: 0, piecesLost: 0 };
   let salvage = prior.salvage;
@@ -161,18 +161,46 @@ export function commit(s: RunSession, queue: Action[], c: RunConfig): RunResult 
     return endRun(s, run, events, 'lost', stage.endReason);
   }
 
+  return finishWin(s, run, stage, award?.coins ?? 0, tally, events, c);
+}
+
+/**
+ * The shared post-win path (a mate in `commit`, or `devSkipStage`): `endStage` returns deployed pieces and
+ * removes spent ones, the history record is written (`coinsEarned` = `awardCoins` + salvage; the wallet
+ * already holds the award), then the chooser opens if the deck overflows, else `proceed`.
+ */
+function finishWin(
+  s: RunSession, run: RunState, stage: StageState, awardCoins: number, tally: StageTally, events: RunEvent[], c: RunConfig,
+): RunResult {
   const ended = endStage(run, stage, c);
   if (!ended.ok) return fail({ kind: 'engine', error: ended.error });
   const removed = ended.value.events.filter(e => e.type === 'piece_removed').length;
-  const win = record('win', (award?.coins ?? 0) + tally.salvage, tally.piecesLost + removed);
-  run = { ...ended.value.run, history: [...ended.value.run.history, win] };
-  events = [...events, ...ended.value.events];
-  const cleared: RunSession = { ...s, run, stage: null, entryStage: null, tally: null };
+  const win: History = {
+    stageSeed: stage.stageSeed, templateId: stage.templateId, outcome: 'win', turnsUsed: stage.turnsUsed,
+    coinsEarned: awardCoins + tally.salvage, piecesLost: tally.piecesLost + removed,
+  };
+  const next: RunState = { ...ended.value.run, history: [...ended.value.run.history, win] };
+  const all = [...events, ...ended.value.events];
+  const cleared: RunSession = { ...s, run: next, stage: null, entryStage: null, tally: null };
   const over = ended.value.overCapacity;
   if (over > 0) {
-    return done({ ...cleared, phase: 'chooser', chooser: { overCapacity: over } }, [...events, { type: 'chooser_opened', overCapacity: over }]);
+    return done({ ...cleared, phase: 'chooser', chooser: { overCapacity: over } }, [...all, { type: 'chooser_opened', overCapacity: over }]);
   }
-  return proceed(cleared, events, c);
+  return proceed(cleared, all, c);
+}
+
+/**
+ * Development tool (spec section 6.2), Deployment or Action: counts the stage as won through the same
+ * post-win path as a mate. Pays only the stage's pending base reward (no par bonus, no interest); START costs
+ * already paid stay paid. The session is flagged `debug: true` for good.
+ */
+export function devSkipStage(s: RunSession, c: RunConfig): RunResult {
+  if (s.phase !== 'deployment' && s.phase !== 'action') return wrongPhase(['deployment', 'action']);
+  if (!s.stage) return fail({ kind: 'not_ready' });
+  const coins = pendingBase(s.run, s.stage, c);
+  const run: RunState = { ...s.run, coins: s.run.coins + coins };
+  const tally = s.tally ?? { startCoins: s.run.coins, salvage: 0, piecesLost: 0 };
+  return finishWin({ ...s, debug: true }, run, { ...s.stage, status: 'won' }, coins, tally, [{ type: 'stage_skipped', coins }], c);
 }
 
 /** After a won stage whose deck fits: stage 9 ends the run won, any other opens the shop and requests the next stage. */

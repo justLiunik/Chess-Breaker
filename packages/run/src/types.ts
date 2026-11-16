@@ -32,6 +32,8 @@ export interface RunSession {
   shop: ShopState | null;
   next: { request: GenRequest; stage: StageState | null } | null;
   outcome: { result: 'won' | 'lost'; endReason?: EndReason | 'abandoned' } | null;
+  /** Set by `devSkipStage` and never cleared: the run used a development tool. Absent otherwise. */
+  debug?: true;
 }
 
 export type RunError =
@@ -58,6 +60,7 @@ export type RunEvent =
   | GameEvent
   | { type: 'stage_entered'; stageNumber: number }
   | { type: 'stage_restarted' }
+  | { type: 'stage_skipped'; coins: number }
   | { type: 'skill_granted'; skillId: string }
   | { type: 'chooser_opened'; overCapacity: number }
   | { type: 'shop_opened'; act: number; recovery: boolean }
