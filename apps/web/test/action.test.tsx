@@ -245,6 +245,19 @@ describe('Action screen', () => {
     expect(label('c5')).toBe('c5, white bishop');
   });
 
+  it('a second copy of a once_per_turn skill is disabled once the queue holds the first, as the engine rules (I5)', async () => {
+    await setup(testStageSource(), ['twin_step', 'twin_step']);
+    const u = user();
+    const btn = () => within(screen.getByTestId('skills')).getByRole('button', { name: /Twin Step/ }) as HTMLButtonElement;
+    expect(btn().disabled).toBe(false);
+    await u.click(btn());
+    expect(entry(0).textContent).toContain('Twin Step');
+    expect(btn().disabled).toBe(true);
+    expect(btn().textContent).toMatch(/used this turn/);
+    await u.click(within(entry(0)).getByRole('button', { name: /^Remove/ }));
+    expect(btn().disabled).toBe(false);
+  });
+
   it('a targeted skill waits for a square, then appends ACTIVATE_SKILL with that target', async () => {
     await setup(testStageSource(), ['ascension']);
     const u = user();

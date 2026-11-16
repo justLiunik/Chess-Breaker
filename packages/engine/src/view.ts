@@ -162,6 +162,32 @@ export function previewSteps(
   return sim.ok ? { steps, error: null, result: sim.value } : { steps, error: sim.error, result: null };
 }
 
+/** Why a skill cannot be activated at all at a point of the queue (the engine's `skill_unavailable` reasons). */
+export type SkillUnavailable = Extract<CommitError, { kind: 'skill_unavailable' }>['reason'];
+
+/**
+ * Why `skillId` could not be appended to `queue` as its next entry, or null when it could. The answer
+ * is the engine's own: the queue's steps are resolved by `resolveStep`, then the activation is tried
+ * the same way, and only a `skill_unavailable` refusal (not in the queue's loadout, not implemented,
+ * `once_per_turn` already used) counts. Its target and Focus are left to `previewSteps` once the
+ * entry is in the queue, since the target is not chosen yet. Null too when the stage is not in play
+ * or `queue` is already refused before its end: the preview names that error instead.
+ */
+export function skillUnavailable(
+  run: RunState, stage: StageState, queue: Action[], skillId: string, config: EngineConfig,
+): SkillUnavailable | null {
+  const begun = beginQueue(run, stage);
+  if (!begun.ok) return null;
+  let r = begun.value;
+  for (const action of queue) {
+    const next = resolveStep(r, action, config);
+    if (!next.ok) return null;
+    r = next.value;
+  }
+  const tried = resolveStep(r, { type: 'ACTIVATE_SKILL', skillId }, config);
+  return !tried.ok && tried.error.kind === 'skill_unavailable' ? tried.error.reason : null;
+}
+
 /**
  * The HUD's coin figures, from the economy functions `simulate` uses. `freeTurnsLeft` counts the
  * turns still inside the par, this one included. `*IfMateNow` are for a mate on this turn, with

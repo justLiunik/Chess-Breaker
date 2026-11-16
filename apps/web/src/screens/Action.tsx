@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { legalPlayerMoves, previewSteps, threatMap } from '@checkbreaker/engine';
-import type { Square, StageState } from '@checkbreaker/engine';
+import { legalPlayerMoves, previewSteps, skillUnavailable, threatMap } from '@checkbreaker/engine';
+import type { SkillUnavailable, Square, StageState } from '@checkbreaker/engine';
 import type { RunSession } from '@checkbreaker/run';
 import { clear as clearPlan, empty as emptyPlan, toggleArrow, toggleMark } from '../board/arrows';
 import type { Plan } from '../board/arrows';
@@ -18,6 +18,13 @@ import { useReducedMotion } from '../settings';
 import { useRun } from '../state/store';
 
 type Phase = 'idle' | 'thinking' | 'playback';
+
+/** The skill button's note for each reason the engine gives that a skill cannot be the queue's next entry. */
+const SKILL_UNAVAILABLE: Record<SkillUnavailable, string> = {
+  once_per_turn: 'used this turn',
+  not_in_loadout: 'none left',
+  not_implemented: 'not available yet',
+};
 
 /** How long the player's resolved position stays up before the enemy's reply replaces it. */
 const PLAYBACK_MS = 900;
@@ -143,8 +150,6 @@ export function Action() {
   const marks: Mark[] = [];
   if (preview.error?.kind === 'king_in_check_at_end') marks.push({ square: preview.error.square, kind: 'king-unsafe', label: 'King in check' });
 
-  const copies = (id: string): number => run.loadout.filter((l) => l.skillId === id).length;
-  const used = (id: string): number => q.queue.filter((a) => a.type === 'ACTIVATE_SKILL' && a.skillId === id).length;
   const skillIds = [...new Set(run.loadout.map((l) => l.skillId))];
 
   const playing = locked && resolved !== null;
@@ -180,19 +185,21 @@ export function Action() {
               <h2>Skills</h2>
               {skillIds.map((id) => {
                 const def = engineConfig.skills[id];
-                const spent = used(id) >= copies(id);
+                // The engine says whether this skill could be the queue's next entry; its target and Focus
+                // are judged by the preview once it is in the queue.
+                const why = skillUnavailable(run, stage, q.queue, id, engineConfig);
                 return (
                   <button
                     key={id}
                     type="button"
-                    disabled={locked || spent}
+                    disabled={locked || why !== null}
                     aria-pressed={pendingSkill === id}
                     onClick={() => {
                       if (!def || def.target.kind === 'none') q.append({ type: 'ACTIVATE_SKILL', skillId: id });
                       else { setSelected(null); setPendingSkill(pendingSkill === id ? null : id); }
                     }}
                   >
-                    {skillName(id)} ({def?.cost ?? '?'} Focus){spent ? ' — used' : ''}
+                    {skillName(id)} ({def?.cost ?? '?'} Focus){why ? ` — ${SKILL_UNAVAILABLE[why]}` : ''}
                   </button>
                 );
               })}
