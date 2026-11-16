@@ -2,7 +2,8 @@
 // Needs the Node loader (fs); the jsdom environment gives import.meta.url a non-file scheme.
 import { describe, expect, it } from 'vitest';
 import { loadRunConfig } from '@checkbreaker/content';
-import { engineConfig, genTexts, runConfig } from '../src/config';
+import { engineConfig, runConfig } from '../src/config';
+import { genTexts } from '../src/state/genContent';
 
 describe('web config', () => {
   it('runConfig deep-equals the Node loader result', () => {

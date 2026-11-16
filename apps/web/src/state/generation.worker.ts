@@ -3,7 +3,7 @@ import type { GenContent } from '@checkbreaker/gen';
 import { parseFormations, parseGenConfig, parseTemplates } from '@checkbreaker/content/parse';
 import type { GenConfig } from '@checkbreaker/content/parse';
 import type { GenRequest } from '@checkbreaker/run';
-import { genTexts } from '../config';
+import { genTexts } from './genContent';
 import type { StageAnswer } from './stageSource';
 
 type Loaded = { config: GenConfig; content: GenContent };

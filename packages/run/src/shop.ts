@@ -70,6 +70,11 @@ export function rollSlots(run: RunState, shop: ShopState, c: RunConfig): ShopSta
   return offers.map(o => ({ ...o, sold: false }));
 }
 
+/** Rerolls still allowed in this shop visit (free ones included). */
+export function rerollsLeft(shop: ShopState, c: RunConfig): number {
+  return Math.max(0, c.run.services.maxRerollsPerVisit - shop.rerollsUsed);
+}
+
 /**
  * Redraws slots 1-4, sold ones included (docs/07 section 2). The first `freeRerollsPerVisit` are free, then
  * `services.reroll` each, at most `maxRerollsPerVisit`. An unsold, still-live recovery offer stays in slot 1;

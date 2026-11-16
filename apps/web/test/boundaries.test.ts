@@ -48,7 +48,7 @@ function specifiers(text: string): { spec: string; typeOnly: boolean }[] {
 function violation(file: string, spec: string, typeOnly: boolean): string | null {
   if (spec.startsWith('./') || spec.startsWith('../')) {
     if (file === BENCH_FILE && spec.endsWith('engine/test/bench-positions')) return null;
-    if (/\.(yaml|json)\?raw$/.test(spec)) return file === 'config.ts' ? null : `${file}: ?raw import outside config.ts: ${spec}`;
+    if (/\.(yaml|json)\?raw$/.test(spec)) return file === 'config.ts' || file === 'state/genContent.ts' ? null : `${file}: ?raw import outside config.ts: ${spec}`;
     if (/^(\.\.?\/)+(packages|apps|data|content)\//.test(spec)) return `${file}: relative import into repo data or another package: ${spec}`;
     return null;
   }

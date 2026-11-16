@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { rerollShop } from '@checkbreaker/run';
+import { buy as tryBuy, rerollShop, rerollsLeft } from '@checkbreaker/run';
 import { Board } from '../board/Board';
 import { PieceGlyph } from '../board/pieces';
 import { engineConfig, runConfig, skillNames, skillTexts } from '../config';
 import { Header } from '../hud/Header';
 import { useShortcuts } from '../input/shortcuts';
 import { useReducedMotion } from '../settings';
+import { runErrorText } from '../messages';
 import { useRun } from '../state/store';
 import { DeckList, pieceLabel } from './DeckList';
 
@@ -20,17 +21,16 @@ export function Shop() {
   const c = runConfig;
   const next = session.next?.stage ?? null;
   const recoveryLive = shop.recovery && !shop.slots[0]?.sold;
-  const loadoutFull = run.loadout.length >= c.run.loadoutSlots;
 
   // The reroll's price and availability are the run function's own answer, not recomputed here.
   const roll = rerollShop(run, shop, c);
-  const exhausted = !roll.ok && roll.error.kind === 'rerolls_exhausted';
   const rollCost = roll.ok ? roll.value.cost : roll.error.kind === 'insufficient_coins' ? roll.error.price : null;
-  const left = c.run.services.maxRerollsPerVisit - shop.rerollsUsed;
+  const left = rerollsLeft(shop, c);
 
   const buy = (slot: number): void => {
-    const offer = shop.slots[slot - 1]!;
-    if (offer.kind === 'skill' && loadoutFull) setChoosing(slot);
+    // A buy the run layer refuses only for a full loadout asks which skill to replace.
+    const verdict = tryBuy(session, slot, {}, c);
+    if (!verdict.ok && verdict.error.kind === 'loadout_full') setChoosing(slot);
     else dispatch({ type: 'buy', slot });
   };
 
@@ -45,7 +45,8 @@ export function Shop() {
             {shop.slots.map((o, i) => {
               const slot = i + 1;
               const live = i === 0 && recoveryLive && o.kind === 'piece' && o.recovery === true;
-              const afford = run.coins >= o.price;
+              const verdict = o.sold ? null : tryBuy(session, slot, {}, c);
+              const blocked = verdict !== null && !verdict.ok && verdict.error.kind !== 'loadout_full' ? runErrorText(verdict.error) : null;
               const text = o.kind === 'skill' ? skillTexts.find((s) => s.id === o.skillId) : null;
               return (
                 <li key={slot} className="offer" data-testid={`shop-slot-${slot}`} data-sold={o.sold ? '' : undefined}>
@@ -64,7 +65,7 @@ export function Shop() {
                   )}
                   {' '}<span className="price">{o.price} ◈</span>{' '}
                   {o.sold ? <em>Sold</em> : (
-                    <button type="button" disabled={!afford} title={afford ? undefined : `You have ${run.coins} coins`} onClick={() => buy(slot)}>
+                    <button type="button" disabled={blocked !== null} title={blocked ?? undefined} onClick={() => buy(slot)}>
                       Buy {o.price} ◈
                     </button>
                   )}
@@ -74,7 +75,7 @@ export function Shop() {
           </ol>
           <p>
             <button type="button" disabled={!roll.ok} onClick={() => dispatch({ type: 'reroll' })}>
-              Reroll ({rollCost === 0 ? 'free' : rollCost === null ? 'no rerolls left' : `${rollCost} ◈`}){' · '}{exhausted ? 0 : left} left
+              Reroll ({rollCost === 0 ? 'free' : rollCost === null ? 'no rerolls left' : `${rollCost} ◈`}){' · '}{left} left
             </button>
           </p>
           {error && <p role="alert" className="error" data-testid="run-error">{error}</p>}

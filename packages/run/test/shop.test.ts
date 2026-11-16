@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { draw, hash } from '@checkbreaker/engine';
 import type { DeckType, PieceInstance, Result, RunState } from '@checkbreaker/engine';
-import { buyOffer, openShop, rerollShop, rollSlots } from '../src/shop';
+import { buyOffer, openShop, rerollShop, rerollsLeft, rollSlots } from '../src/shop';
 import { piecePrice, sellPrice } from '../src/prices';
 import { sellPiece } from '../src/deck';
 import type { Offer, RunError, ShopState } from '../src/types';
@@ -301,5 +301,15 @@ describe('sale cap property (Review Focus 5)', () => {
     }
     expect(pairs).toBeGreaterThanOrEqual(1000);
     expect(recoveries).toBeGreaterThan(50);
+  });
+});
+
+describe('rerollsLeft', () => {
+  it('counts down from the per-visit maximum and never goes below zero', () => {
+    const max = c.run.services.maxRerollsPerVisit;
+    expect(rerollsLeft(shopOf([]), c)).toBe(max);
+    expect(rerollsLeft(shopOf([], { rerollsUsed: 1 }), c)).toBe(max - 1);
+    expect(rerollsLeft(shopOf([], { rerollsUsed: max }), c)).toBe(0);
+    expect(rerollsLeft(shopOf([], { rerollsUsed: max + 2 }), c)).toBe(0);
   });
 });

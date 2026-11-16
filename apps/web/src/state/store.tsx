@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { previewSteps } from '@checkbreaker/engine';
+import { commitQueue as playQueue, previewSteps } from '@checkbreaker/engine';
 import type { Action, Square, StageState } from '@checkbreaker/engine';
 import {
   abandon, buy, commit, cut, devSkipStage, leave, loadSave, merge, newRun, provideStage, reroll, repair, restartStage,
@@ -148,7 +148,11 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       const resolved = preview.steps.at(-1)?.stage.board;
       if (resolved) {
         const won = preview.result?.stage.status === 'won';
-        last = { resolved, after: won ? null : preview.result?.stage.board ?? null, won };
+        // The preview stops before the enemy's reply; the engine's own commit gives the board after it (none if the
+        // queue itself ended the stage).
+        const played = won ? null : playQueue(s.run, s.stage, queue, engineConfig);
+        const board = played?.ok ? played.value.stage.board : null;
+        last = { resolved, after: board && JSON.stringify(board) !== JSON.stringify(resolved) ? board : null, won };
       }
     }
     run(r, last);

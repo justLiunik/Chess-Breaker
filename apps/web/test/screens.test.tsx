@@ -217,6 +217,15 @@ describe('Chooser', () => {
 });
 
 describe('overlays', () => {
+  it('Codex has a core-rules section naming checkmate and stalemate', async () => {
+    const { u } = await mount(wonSession());
+    await u.keyboard('c');
+    const rules = within(screen.getByRole('dialog', { name: 'Codex' })).getByTestId('codex-rules');
+    expect(rules.textContent).toMatch(/checkmate/i);
+    expect(rules.textContent).toMatch(/stalemat/i);
+    expect(rules.textContent).toMatch(/COMMIT/);
+  });
+
   it('Codex lists every skill with its rule and every deck piece type with its rarity abilities; Escape closes', async () => {
     const yaml = readFileSync(resolve(__dirname, '../../../content/examples/skills.yaml'), 'utf8');
     const names = [...yaml.matchAll(/^\s+name: (.+)$/gm)].map((m) => m[1]!.trim());
@@ -324,4 +333,116 @@ describe('storage banner', () => {
     await u.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText(/Saving is unavailable/)).toBeNull();
   });
+});
+
+describe('losing playback reaches the reply', () => {
+  const matedStage = (s: StageState): StageState => ({
+    ...s,
+    mateIn: 1,
+    board: {
+      b8: { pieceType: 'king', color: 'black' },
+      a2: { pieceType: 'rook', color: 'black' },
+      h8: { pieceType: 'rook', color: 'black' },
+    },
+    enemyPolicy: { type: 'scripted', line: ['h8h1'], fallbackDepth: 1 },
+  });
+  it('shows the resolved board, then a different board after the enemy reply', async () => {
+    const { u } = await mount(actionSession(undefined, matedStage));
+    await u.click(square('a3'));
+    await u.click(square('b4'));
+    await u.click(screen.getByRole('button', { name: /^COMMIT/ }));
+    await flush();
+    const resolved = screen.getByTestId('playback-resolved').innerHTML;
+    await waitFor(() => expect(screen.getByTestId('playback-after')).toBeTruthy(), { timeout: 3000 });
+    expect(screen.getByTestId('playback-after').innerHTML).not.toBe(resolved);
+    expect(screen.queryByTestId('run-results')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('run-results').textContent).toMatch(/checkmated/), { timeout: 3000 });
+  });
+});
+
+describe('merge from the deck UI', () => {
+  it('three identical pieces enable Merge, and merging changes the deck', async () => {
+    const s = wonSession((x) => { x.run.deck.push(knight(9)); });
+    const { u } = await mount(s);
+    const boxes = screen.getAllByRole('checkbox', { name: /Merge Normal Knight/ });
+    expect(boxes).toHaveLength(3);
+    const merge = () => screen.getByRole('button', { name: /^Merge selected/ }) as HTMLButtonElement;
+    expect(merge().disabled).toBe(true);
+    for (const b of boxes) await u.click(b);
+    expect(merge().disabled).toBe(false);
+    await u.click(merge());
+    const deck = screen.getByTestId('decklist');
+    expect(within(deck).getByText('Rare Knight')).toBeTruthy();
+    expect(within(deck).queryByTestId('deck-piece-p_x_9')).toBeNull();
+    expect(within(deck).queryByTestId('deck-piece-p_knight_02')).toBeNull();
+  });
+});
+
+describe('abandon', () => {
+  const deploymentSession = () => ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session;
+  it('Cancel keeps the run; Abandon ends it into run Results', async () => {
+    const { u } = await mount(deploymentSession());
+    await u.click(screen.getByRole('button', { name: 'Abandon run' }));
+    await u.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByTestId('run-map')).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Abandon run' }));
+    await u.click(screen.getByRole('button', { name: 'Abandon' }));
+    expect(screen.getByTestId('run-results').textContent).toMatch(/RUN LOST/);
+  });
+});
+
+describe('C and D overlays from every in-run screen', () => {
+  const deployment = () => ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session;
+  const check = async (u: ReturnType<typeof userEvent.setup>) => {
+    await u.keyboard('c');
+    expect(screen.getByRole('dialog', { name: 'Codex' })).toBeTruthy();
+    await u.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await u.keyboard('d');
+    expect(screen.getByRole('dialog', { name: 'Deck' })).toBeTruthy();
+    await u.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  };
+  it('Run Map', async () => { const { u } = await mount(deployment()); await check(u); });
+  it('Deployment', async () => {
+    const { u } = await mount(deployment());
+    await u.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByTestId('deployment-screen')).toBeTruthy();
+    await check(u);
+  });
+  it('Action', async () => { const { u } = await mount(actionSession()); await check(u); });
+  it('Shop', async () => { const { u } = await mount(wonSession()); await check(u); });
+});
+
+describe('Escape and the replace-slot dialog', () => {
+  it('closes the dialog and buys nothing', async () => {
+    const s = wonSession((x) => { x.run.loadout.push({ skillId: 'twin_step' }, { skillId: 'twin_step' }, { skillId: 'twin_step' }); });
+    const slots = s.shop!.slots.map((o, i) => (i === 2 ? { kind: 'skill' as const, skillId: 'lockdown', price: 1, sold: false } : o));
+    const { u } = await mount({ ...s, run: { ...s.run, coins: 50 }, shop: { ...s.shop!, slots } });
+    await u.click(within(screen.getByTestId('shop-slot-3')).getByRole('button', { name: /Buy/ }));
+    expect(screen.getByRole('dialog', { name: 'Replace a skill' })).toBeTruthy();
+    await u.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('run-coins').textContent).toContain('50');
+  });
+});
+
+describe('resume', () => {
+  const never: StageSource = { request: () => new Promise(() => undefined) };
+  const cases: [string, () => RunSession, string, StageSource?][] = [
+    ['deployment', () => ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session, 'run-map'],
+    ['action', () => actionSession(), 'action-screen'],
+    ['shop', () => wonSession(), 'shop'],
+    ['chooser', () => wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); }), 'chooser'],
+    ['awaiting_stage', () => newRun(SEED, c), 'building', never],
+    ['ended', () => ok(abandon(wonSession())).session, 'run-results'],
+  ];
+  for (const [phase, make, testid, source] of cases) {
+    it(`a ${phase} save opens its screen after Continue`, async () => {
+      const session = make();
+      expect(session.phase).toBe(phase);
+      await mount(session, source);
+      expect(screen.getByTestId(testid)).toBeTruthy();
+    });
+  }
 });
