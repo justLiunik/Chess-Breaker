@@ -2,7 +2,7 @@
 import { parse } from 'yaml';
 import { compileAbilities } from '@checkbreaker/engine';
 import type {
-  AbilityTable, DeckType, EngineConfig, PieceType, Rarity, SkillDef, Square,
+  AbilityTable, DeckType, EngineConfig, PieceType, Rarity, RunState, SkillDef, Square,
 } from '@checkbreaker/engine';
 
 /** Raw text of the three config files. */
@@ -481,6 +481,11 @@ export function parseTemplates(files: { name: string; text: string }[]): Templat
       return t;
     });
   return templates.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** Parses a RunState written as YAML (the example decks in content/examples/run-*.yaml). */
+export function parseRunState(text: string): RunState {
+  return parse(text) as RunState;
 }
 
 /** One enemy starting formation: the defending side of a Lichess puzzle, as Black-only FEN placement. */

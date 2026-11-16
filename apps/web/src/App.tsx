@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import type { RunStorage } from '@checkbreaker/run';
 import { Codex } from './overlays/Codex';
 import { DeckOverlay } from './overlays/DeckOverlay';
@@ -67,10 +67,26 @@ export interface AppProps {
   makeStorage?: (onError: (e: unknown) => void) => RunStorage;
 }
 
+// The dev bench is loaded on demand so its templates, decks and positions stay out of the game's bundle.
+const Bench = lazy(() => import('./screens/Bench').then((m) => ({ default: m.Bench })));
+
 export function App({ source, makeStorage = localStorageRunStorage }: AppProps) {
   const [storageFailed, setStorageFailed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [storage] = useState(() => makeStorage(() => setStorageFailed(true)));
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onChange = (): void => setHash(window.location.hash);
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  if (hash === '#bench') {
+    return (
+      <Suspense fallback={<p>Loading the bench...</p>}>
+        <Bench source={source} />
+      </Suspense>
+    );
+  }
   return (
     <RunProvider source={source} storage={storage}>
       {storageFailed && !dismissed && (

@@ -7,5 +7,6 @@ export type StageAnswer =
 
 /** Where stages come from: the generation worker in the app, a hand-made double in tests. */
 export interface StageSource {
-  request(id: number, req: GenRequest): Promise<StageAnswer>;
+  /** `templateId` (dev bench only) offers just that template to the generator, so the draw lands on it. */
+  request(id: number, req: GenRequest, templateId?: string): Promise<StageAnswer>;
 }

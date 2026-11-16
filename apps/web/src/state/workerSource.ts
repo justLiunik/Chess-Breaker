@@ -27,11 +27,11 @@ export function workerSource(): StageSource {
     return w;
   };
   return {
-    request(id: number, request: GenRequest): Promise<StageAnswer> {
+    request(id: number, request: GenRequest, templateId?: string): Promise<StageAnswer> {
       return new Promise((resolve) => {
         waiting.set(id, resolve);
         try {
-          ensure().postMessage({ id, request });
+          ensure().postMessage({ id, request, templateId });
         } catch (e) {
           waiting.delete(id);
           resolve({ id, ok: false, message: e instanceof Error ? e.message : String(e) });

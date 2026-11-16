@@ -20,13 +20,17 @@ function load(): Loaded {
   return loaded;
 }
 
-self.onmessage = (e: MessageEvent<{ id: number; request: GenRequest }>): void => {
-  const { id, request } = e.data;
+self.onmessage = (e: MessageEvent<{ id: number; request: GenRequest; templateId?: string }>): void => {
+  const { id, request, templateId } = e.data;
   let answer: StageAnswer;
   try {
     const { config, content } = load();
     const t0 = performance.now();
-    const out = generateStage(request, content, config);
+    // The dev bench forces a template by offering only it (as scripts/gen-report does); the game never sets one.
+    const offered = templateId === undefined
+      ? content
+      : { ...content, templates: content.templates.filter((t) => t.id === templateId) };
+    const out = generateStage(request, offered, config);
     answer = { id, ok: true, stage: out.stage, provenance: out.provenance, ms: performance.now() - t0 };
   } catch (err) {
     answer = { id, ok: false, message: err instanceof Error ? err.message : String(err) };
