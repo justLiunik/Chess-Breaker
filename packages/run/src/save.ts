@@ -116,7 +116,29 @@ const STAGE_STATUSES = ['active', 'won', 'lost'] as const satisfies readonly Sta
 const _stageStatuses: Exclude<StageState['status'], typeof STAGE_STATUSES[number]> extends never ? true : never = true;
 const END_REASONS = ['checkmate', 'enemy_stalemated', 'out_of_coins', 'player_mated', 'player_stalemated'] as const satisfies readonly EndReason[];
 const _endReasons: Exclude<EndReason, typeof END_REASONS[number]> extends never ? true : never = true;
-void [_phases, _pieceTypes, _instanceTypes, _deckTypes, _colors, _origins, _pieceStatuses, _runStatuses, _stageStatuses, _endReasons];
+const OUTCOME_END_REASONS = [...END_REASONS, 'abandoned'] as const satisfies readonly NonNullable<NonNullable<RunSession['outcome']>['endReason']>[];
+const _outcomeEndReasons: Exclude<NonNullable<NonNullable<RunSession['outcome']>['endReason']>, typeof OUTCOME_END_REASONS[number]> extends never ? true : never = true;
+const OUTCOME_RESULTS = ['won', 'lost'] as const satisfies readonly NonNullable<RunSession['outcome']>['result'][];
+const _outcomeResults: Exclude<NonNullable<RunSession['outcome']>['result'], typeof OUTCOME_RESULTS[number]> extends never ? true : never = true;
+const HISTORY_OUTCOMES = ['win', 'loss'] as const satisfies readonly RunState['history'][number]['outcome'][];
+const _historyOutcomes: Exclude<RunState['history'][number]['outcome'], typeof HISTORY_OUTCOMES[number]> extends never ? true : never = true;
+const POLICY_TYPES = ['best_move', 'scripted'] as const satisfies readonly EnemyPolicy['type'][];
+const _policyTypes: Exclude<EnemyPolicy['type'], typeof POLICY_TYPES[number]> extends never ? true : never = true;
+const STAGE_PHASES = ['deployment', 'action'] as const satisfies readonly StageState['phase'][];
+const _stagePhases: Exclude<StageState['phase'], typeof STAGE_PHASES[number]> extends never ? true : never = true;
+const OFFER_KINDS = ['piece', 'skill'] as const satisfies readonly Offer['kind'][];
+const _offerKinds: Exclude<Offer['kind'], typeof OFFER_KINDS[number]> extends never ? true : never = true;
+const SESSION_VERSIONS = [1] as const satisfies readonly RunSession['version'][];
+const _sessionVersions: Exclude<RunSession['version'], typeof SESSION_VERSIONS[number]> extends never ? true : never = true;
+/**
+ * `RunState['version']` is `number` in the engine's types, not a finite union, so no completeness check can
+ * exist: the save accepts the one run-state version this build writes.
+ */
+const RUN_STATE_VERSIONS = [1] as const satisfies readonly RunState['version'][];
+void [
+  _phases, _pieceTypes, _instanceTypes, _deckTypes, _colors, _origins, _pieceStatuses, _runStatuses, _stageStatuses, _endReasons,
+  _outcomeEndReasons, _outcomeResults, _historyOutcomes, _policyTypes, _stagePhases, _offerKinds, _sessionVersions,
+];
 
 const isRecord = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 /** An own property only: JSON never sets the prototype, and `toString` and friends are not fields. */
@@ -191,7 +213,7 @@ function checkPiece(v: unknown, path: string): PieceInstance {
 function checkRun(v: unknown, path: string, c: RunConfig): RunState {
   const r = obj(v, path);
   return {
-    version: oneOf(own(r, 'version'), `${path}.version`, [1]),
+    version: oneOf(own(r, 'version'), `${path}.version`, RUN_STATE_VERSIONS),
     seed: str(own(r, 'seed'), `${path}.seed`),
     actIndex: int(own(r, 'actIndex'), `${path}.actIndex`, 0, c.run.acts - 1),
     stageIndex: int(own(r, 'stageIndex'), `${path}.stageIndex`, 0, c.run.stagesPerAct - 1),
@@ -208,7 +230,7 @@ function checkRun(v: unknown, path: string, c: RunConfig): RunState {
       return {
         stageSeed: str(own(h, 'stageSeed'), `${at}.stageSeed`),
         templateId: str(own(h, 'templateId'), `${at}.templateId`),
-        outcome: oneOf(own(h, 'outcome'), `${at}.outcome`, ['win', 'loss'] as const),
+        outcome: oneOf(own(h, 'outcome'), `${at}.outcome`, HISTORY_OUTCOMES),
         turnsUsed: num(own(h, 'turnsUsed'), `${at}.turnsUsed`),
         coinsEarned: num(own(h, 'coinsEarned'), `${at}.coinsEarned`),
         piecesLost: num(own(h, 'piecesLost'), `${at}.piecesLost`),
@@ -255,7 +277,7 @@ function checkModifier(v: unknown, path: string): ActiveModifier {
 
 function checkEnemyPolicy(v: unknown, path: string): EnemyPolicy {
   const p = obj(v, path);
-  const out: EnemyPolicy = { type: oneOf(own(p, 'type'), `${path}.type`, ['best_move', 'scripted'] as const) };
+  const out: EnemyPolicy = { type: oneOf(own(p, 'type'), `${path}.type`, POLICY_TYPES) };
   put(out, 'depth', p, path, num);
   put(out, 'seed', p, path, str);
   put(out, 'line', p, path, (x, at) => strings(x, at));
@@ -276,7 +298,7 @@ function checkStage(v: unknown, path: string): StageState {
     stageSeed: str(own(s, 'stageSeed'), `${path}.stageSeed`),
     templateId: str(own(s, 'templateId'), `${path}.templateId`),
     playerColor: oneOf(own(s, 'playerColor'), `${path}.playerColor`, COLORS),
-    phase: oneOf(own(s, 'phase'), `${path}.phase`, ['deployment', 'action'] as const),
+    phase: oneOf(own(s, 'phase'), `${path}.phase`, STAGE_PHASES),
     board,
     turnsUsed: num(own(s, 'turnsUsed'), `${path}.turnsUsed`),
     mateIn: num(own(s, 'mateIn'), `${path}.mateIn`),
@@ -311,7 +333,7 @@ function checkStage(v: unknown, path: string): StageState {
 
 function checkOffer(v: unknown, path: string): Offer & { sold: boolean } {
   const o = obj(v, path);
-  const kind = oneOf(own(o, 'kind'), `${path}.kind`, ['piece', 'skill'] as const);
+  const kind = oneOf(own(o, 'kind'), `${path}.kind`, OFFER_KINDS);
   const price = num(own(o, 'price'), `${path}.price`);
   const sold = bool(own(o, 'sold'), `${path}.sold`);
   if (kind === 'skill') return { kind, skillId: str(own(o, 'skillId'), `${path}.skillId`), price, sold };
@@ -341,7 +363,7 @@ function checkShop(v: unknown, path: string, c: RunConfig): ShopState {
 function checkSession(v: unknown, c: RunConfig): RunSession {
   const s = obj(v, 'session');
   const session: RunSession = {
-    version: oneOf(own(s, 'version'), 'session.version', [1]),
+    version: oneOf(own(s, 'version'), 'session.version', SESSION_VERSIONS),
     run: checkRun(own(s, 'run'), 'session.run', c),
     phase: oneOf(own(s, 'phase'), 'session.phase', PHASES),
     stage: nullable(own(s, 'stage'), 'session.stage', checkStage),
@@ -371,8 +393,8 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
     }),
     outcome: nullable(own(s, 'outcome'), 'session.outcome', (x, at) => {
       const o = obj(x, at);
-      const out: NonNullable<RunSession['outcome']> = { result: oneOf(own(o, 'result'), `${at}.result`, ['won', 'lost'] as const) };
-      put(out, 'endReason', o, at, (y, p) => oneOf(y, p, [...END_REASONS, 'abandoned'] as const));
+      const out: NonNullable<RunSession['outcome']> = { result: oneOf(own(o, 'result'), `${at}.result`, OUTCOME_RESULTS) };
+      put(out, 'endReason', o, at, (y, p) => oneOf(y, p, OUTCOME_END_REASONS));
       return out;
     }),
   };
