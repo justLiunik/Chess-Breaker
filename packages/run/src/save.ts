@@ -345,6 +345,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
     run: checkRun(own(s, 'run'), 'session.run', c),
     phase: oneOf(own(s, 'phase'), 'session.phase', PHASES),
     stage: nullable(own(s, 'stage'), 'session.stage', checkStage),
+    entryStage: nullable(own(s, 'entryStage'), 'session.entryStage', checkStage),
     tally: nullable(own(s, 'tally'), 'session.tally', (x, at) => {
       const t = obj(x, at);
       return {
@@ -391,6 +392,10 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
   const needs: Partial<Record<RunPhase, (keyof RunSession)[]>> = {
     awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], chooser: ['chooser'], shop: ['shop', 'next'], ended: ['outcome'],
   };
+  const inStage = phase === 'deployment' || phase === 'action';
+  if (inStage !== (session.entryStage !== null)) {
+    bad('session.entryStage', inStage ? `phase ${phase} needs it set` : `must be null in phase ${phase}`);
+  }
   for (const field of needs[phase] ?? []) {
     if (session[field] === null) bad(`session.${field}`, `phase ${phase} needs it set`);
   }

@@ -64,7 +64,7 @@ export function newRun(seed: string, c: RunConfig): RunSession {
     deck, loadout: [], history: [], rngCursor: 0, status: 'in_progress',
   };
   return {
-    version: 1, run, phase: 'awaiting_stage', stage: null, tally: null, chooser: null, shop: null,
+    version: 1, run, phase: 'awaiting_stage', stage: null, entryStage: null, tally: null, chooser: null, shop: null,
     next: { request: requestFor(run, 0, c), stage: null }, outcome: null,
   };
 }
@@ -85,7 +85,7 @@ function enterDeployment(s: RunSession, request: GenRequest, stage: StageState, 
     events.push({ type: 'skill_granted', skillId: free.skillId });
   }
   const tally: StageTally = { startCoins: run.coins, salvage: 0, piecesLost: 0 };
-  return done({ ...s, run, phase: 'deployment', stage, tally, chooser: null, shop: null, next: null }, events);
+  return done({ ...s, run, phase: 'deployment', stage, entryStage: stage, tally, chooser: null, shop: null, next: null }, events);
 }
 
 /**
@@ -111,6 +111,19 @@ export function start(s: RunSession, placements: { instanceId: string; to: Squar
   const r = startStage(s.run, s.stage, placements, c);
   if (!r.ok) return fail({ kind: 'engine', error: r.error });
   return done({ ...s, run: r.value.run, stage: r.value.stage, phase: 'action' }, r.value.events);
+}
+
+/**
+ * Action, before the stage's first COMMIT: back to Deployment with the stage as provided. Durability paid at
+ * START stays paid; placed pieces return to the tray, a piece START took to 0 stays spent. Nothing else changes.
+ */
+export function restartStage(s: RunSession, c: RunConfig): RunResult {
+  void c;
+  if (s.phase !== 'action') return wrongPhase(['action']);
+  if (!s.stage || !s.entryStage) return fail({ kind: 'not_ready' });
+  if (s.stage.turnsUsed !== 0) return fail({ kind: 'restart_unavailable' });
+  const deck = s.run.deck.map(p => (p.status === 'deployed' ? { ...p, status: 'in_deck' as const } : p));
+  return done({ ...s, run: { ...s.run, deck }, phase: 'deployment', stage: s.entryStage }, [{ type: 'stage_restarted' }]);
 }
 
 /**
@@ -154,7 +167,7 @@ export function commit(s: RunSession, queue: Action[], c: RunConfig): RunResult 
   const win = record('win', (award?.coins ?? 0) + tally.salvage, tally.piecesLost + removed);
   run = { ...ended.value.run, history: [...ended.value.run.history, win] };
   events = [...events, ...ended.value.events];
-  const cleared: RunSession = { ...s, run, stage: null, tally: null };
+  const cleared: RunSession = { ...s, run, stage: null, entryStage: null, tally: null };
   const over = ended.value.overCapacity;
   if (over > 0) {
     return done({ ...cleared, phase: 'chooser', chooser: { overCapacity: over } }, [...events, { type: 'chooser_opened', overCapacity: over }]);
@@ -180,7 +193,7 @@ function endRun(
 ): RunResult {
   const outcome = { result, ...(endReason !== undefined && { endReason }) };
   return done(
-    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, tally: null, chooser: null, shop: null, next: null, outcome },
+    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, entryStage: null, tally: null, chooser: null, shop: null, next: null, outcome },
     [...events, { type: 'run_ended', ...outcome }],
   );
 }
