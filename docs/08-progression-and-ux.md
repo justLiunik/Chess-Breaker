@@ -137,6 +137,12 @@ This is the signature UI and the game's main skill-expression surface.
   in check, the preview shows `STALEMATE — YOU LOSE` and COMMIT asks for confirmation
   ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
 - **UNDO is free and total before COMMIT.** After commit there is no undo (§6).
+- **Planning arrows** (M5, as on chess.com and lichess): a right-drag from square to square draws an
+  arrow, a right-click marks a square, and Shift / Ctrl / Alt while drawing pick one of four colours.
+  Drawing the same arrow or mark again removes it; a left click on the board or a COMMIT clears them
+  all, and they are never saved. They are the player's own notes: dashed, in their own palette, under
+  the ghost preview, and never in the threat or rule-breaking accent colours, so they cannot be read
+  as engine information.
 
 **Deliberate non-feature:** no auto-solver, no "hint: play Rxf7." Hints describe *intent*
 ([§7](#7-hints-and-chess-literacy)).
@@ -207,6 +213,9 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | First Rare+ piece acquired | That tier's ability | The piece card shows the ability sentence once; its first selection previews the new squares |
 | Act III | Everything composes | No scaffolding |
 
+**Schedule:** M5 ships only the free Twin Step (the run layer grants it); the one-time highlights and
+prompts in this table land in M6 ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) U3).
+
 Rules for teaching:
 - **One new concept per stage.** Never two.
 - **Teach by forcing, not explaining.** A prompt that requires the action beats a text box.
@@ -228,12 +237,19 @@ feature would collapse the durability economy to zero. This is a hard design rul
 | Before START | Free placement, swapping and taking back |
 | After START | The deck is locked for the stage |
 
-The only concession: **restart stage** is available. A restarted stage returns to its generated state
-and the Deployment phase, *without refunding durability already paid at START* — summoning again pays
-again. Restarting is for mis-clicked plans, not for scouting the enemy's replies.
+The only concession: **restart stage**, available **only in the Action phase before the stage's first
+COMMIT** (`turnsUsed = 0`). A restarted stage returns to its generated state and the Deployment phase,
+*without refunding durability already paid at START* — summoning again pays again. Placed pieces return
+to the tray with their reduced durability; a piece that START took to 0 stays `spent`: shown in the
+tray, not placeable, and removed from the deck if the stage is won, exactly as if it had played. A
+restart can leave too few usable pieces to win; that cost is intended. After the first COMMIT there is
+no restart: no turn, overtime, capture, salvage, promotion or skill use has happened before it, so
+nothing else needs undoing, and the enemy's replies can never be scouted. Restarting is for a
+mis-chosen deployment; a mis-clicked plan is fixed with UNDO before COMMIT.
 
 ## 7. Hints and chess literacy
 
+- **Hints land in M6** (they need a hint generator); M5 has none.
 - **Two hints per stage**, each a sentence of intent: "Your rook is doing nothing. The enemy queen
   is the only defender of f6."
 - Hints **do not** name coordinates or moves.
@@ -252,7 +268,7 @@ again. Restarting is for mis-clicked plans, not for scouting the enemy's replies
 | Color blindness | Threat = icon + shape, never color alone. Deployment ranks = hatch pattern. |
 | Motion | Reduced-motion setting disables piece travel animation; state changes become fades. |
 | Timing | No timed inputs anywhere. |
-| Keyboard | Full play without a mouse: board focus grid, arrow keys to navigate, `Enter` to select, `Q`/`E` for queue reorder, `Space` to commit. |
+| Keyboard | Full play without a mouse: board focus grid, arrow keys to navigate, `Enter` to select, `Q`/`E` for queue reorder, `Space` to commit. **M6.** M5 is mouse-first and ships shortcuts only: `Space` commit, `Z` undo the last queue entry, `←`/`→` step through the preview, `C` Codex, `D` Deck, `Esc` close or cancel ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §7.6). |
 | Text scale | UI scales to 150% without clipping the HUD numbers. |
 | Contrast | HUD numbers meet WCAG AA against the board background. |
 | Screen reader | Queue entries and HUD counters are live regions; the board exposes square coordinates and occupant description. |

@@ -58,7 +58,8 @@ no Deployment phase: M1 tests start from stages already in `phase: action`.
 - [x] Enemy AI golden-position suite passes (docs/09 §9), and a depth-4 enemy move takes < 50 ms
       in Node (`npm run bench`, sparse stage-like positions).
 - [ ] The same depth-4 < 50 ms check in the browser on a mid-range laptop — **open until M5**, the
-      first milestone with a UI; M1 measures in Node only.
+      first milestone with a UI; M1 measures in Node only. M5 measures it on the dev bench page and
+      records the figures here ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §9.3); a miss is recorded as a gap.
 - [x] Deep-frozen state in tests: no mutation anywhere.
 
 **Risks:** deferred check validation is unusual; the temptation to "fix" it by validating mid-queue
@@ -316,35 +317,64 @@ until a `byAct` layer ships).
 
 ## M5 — Web UI Vertical Slice
 
-**Delivers:** `apps/web` — Run Map, Stage screen, Action Queue builder, Shop, Deck, Results, Codex.
-One complete run playable start to finish in a browser.
+**Delivers:** `apps/web` — Title, Run Map, Stage (Deployment and Action), Action Queue builder,
+Chooser, Shop, Deck, Results, Codex. One complete run playable start to finish in a browser.
+Design: [M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) (approved 2026-11-16). The user is the first playtester and plays one full
+run to feel it; hints, onboarding highlights, full keyboard parity and art are M6.
 
 **Scope**
-- Board rendering with ghost preview and step-through.
-- Queue builder with reorder, inline affordability, named commit errors.
-- HUD: the par (`MATE IN X`) and the overtime bill, live coin preview (base + par bonus), focus, credits, salvage.
+- Board rendering (a DOM grid with an SVG overlay) with ghost preview and step-through, from the new
+  engine view helpers (`threatMap`, `deploymentStatus`, `previewSteps`, `hudEconomy`): the UI computes
+  no rule.
+- Queue builder with click-to-append, drag-to-reorder, inline affordability, named commit errors.
+- HUD: the par (`MATE IN X`) and the overtime bill, live coin preview (base + par bonus + interest),
+  focus, credits, salvage.
 - Deployment-phase screen: deck tray with durability pips, summon counter, capture telegraphing,
   START with its durability summary.
 - `STALEMATE — YOU LOSE` preview warning with confirm.
-- Shop screen per the wireframe in [07 §6](07-shop-phase.md#6-screen-layout).
-- Keyboard play, reduced motion, colorblind-safe threat icons.
+- Shop screen per the wireframe in [07 §6](07-shop-phase.md#6-screen-layout); the recovery offer reads
+  as live only while `recovery && !slots[0].sold`.
+- Restart stage before the first COMMIT ([08 §6](08-progression-and-ux.md#6-commit-undo-and-honesty)).
+- Planning arrows and square marks with the right mouse button ([08 §3.3](08-progression-and-ux.md#33-the-action-queue-builder)).
+- Mouse-first input with shortcuts (`Space`, `Z`, `←`/`→`, `C`, `D`, `Esc`), reduced motion,
+  colorblind-safe threat icons.
+- A dev toggle with **skip stage** (base reward only; the run is marked DEBUG RUN), so a stage the
+  solver could not prove does not end the playtest.
+- Generation in one Web Worker; save/resume through `localStorage` behind `RunStorage`.
+- Carry-overs: a Node-free `content` entry (M3); browser wall times for generation (M3) and the enemy
+  search (M1) on the dev bench page; the M4 "before M5" items (enum exhaustiveness in `save.ts`,
+  `loadSave` rebuilding from checked fields, boundary import allowlists, `replace_not_needed`).
 
 **Acceptance criteria**
-- [ ] A full run can be completed without touching a mouse.
+- [ ] A full run can be played in the browser from the title screen to the run Results (automated
+      full-run test, dev skip allowed).
+- [ ] The user completes one full run in the browser (dev skip allowed).
 - [ ] The coin preview in the HUD always equals the payout actually awarded.
-- [ ] Every `CommitError` variant surfaces a distinct, cause-naming message.
-- [ ] No rules logic exists in `apps/web` (code review criterion; grep for legality helpers).
-- [ ] 60 fps during queue preview on a mid-range laptop; no animation blocks input.
-- [ ] Third-party playtester completes Act I of a first run without verbal instruction.
+- [ ] Every `CommitError`, `RunError` and `SaveError` variant surfaces a distinct, cause-naming message.
+- [ ] No rules logic exists in `apps/web` (import allowlist test + code review).
+- [ ] 60 fps during queue preview on a mid-range laptop; no animation blocks input (manual check,
+      recorded).
+- [ ] Generation runs only in the Web Worker; its browser wall times (median, p95 per template) are
+      recorded here.
+- [ ] The browser enemy-search timing (M1's open box) is measured and recorded here.
+- [ ] Every M4 "before M5" item is done and tested.
+- [ ] `npm test`, `npm run typecheck`, `npm run validate` and `npm run check:links` pass.
+
+Moved to M6 (user decisions 2026-11-16): "a full run can be completed without touching a mouse" and
+"a third-party playtester completes Act I of a first run without verbal instruction".
 
 **Risks:** the queue builder is the whole game's usability. If the preview is not instantly readable,
 sacrifice features before fidelity — reduce animation, not information.
 M3 carry-over: `@checkbreaker/gen` imports `solverSettingsFor`, `valueBandFor` and `enemyArmyValue`
 from `@checkbreaker/content`, whose module chain imports `node:fs`/`node:url` at top level; the
-generation Web Worker needs a Node-free entry for these pure helpers.
+generation Web Worker needs a Node-free entry for these pure helpers (addressed by the content parsers,
+[M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §7.2).
 M3 carry-over: measure generation wall time (median and p95 per template) inside the generation Web
 Worker in a browser. M3's one-worker Node figures missed the median ≤ 3 s / p95 ≤ 15 s target for
-First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-13; see M3 above).
+First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-13; see M3 above). A
+browser miss is recorded as a gap and does not block M5.
+About a third of the stages the M4 bot reached were unproven; a human may also meet one, which is
+why the dev skip exists. It changes no rule and never appears unless the dev toggle is on.
 
 ---
 
@@ -362,6 +392,9 @@ First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-1
 - Enemy skills on bosses (`enemyLoadout`).
 - Balance pass driven by the headless bot plus human playtests.
 - Art/audio first pass.
+- From M5: full keyboard play (board focus grid, `Enter` select, `Q`/`E` reorder), hints
+  ([08 §7](08-progression-and-ux.md#7-hints-and-chess-literacy)) and the one-time onboarding highlights
+  ([08 §5](08-progression-and-ux.md#5-onboarding-ramp)).
 
 **Acceptance criteria**
 - [ ] At least one skill from each of categories 1–5 shipped and tested (Twin Step, Ascension,
@@ -370,6 +403,8 @@ First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-1
       is respected by R3's stalemate count and by `enemyMove` alike (tests).
 - [ ] Gallop and Phase Step revert at R1: neither ever mates through its override (test).
 - [ ] Bosses use at least one enemy skill each, and each boss is still provably solvable (M3 suite).
+- [ ] A full run can be completed without touching a mouse (moved from M5).
+- [ ] A third-party playtester completes Act I of a first run without verbal instruction (moved from M5).
 - [ ] Balance targets: first-run Act I clear rate ≥ 70%; Act II clear rate 30–50%; median run 25–35 min.
 - [ ] No skill violates the §7 guardrail checklist (audit documented).
 - [ ] Every new skill's `ruleBroken` is a single sentence naming a specific chess rule.
