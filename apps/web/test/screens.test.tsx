@@ -335,6 +335,27 @@ describe('stage and run endings', () => {
     expect(screen.getByTestId('shop')).toBeTruthy();
   });
 
+  it('stage Results breaks the award down into base, par bonus, interest and salvage (I4)', async () => {
+    // The same commit through the run layer names the award the screen must show.
+    const won = commit(actionSession(), [STARTER_MATE.move], c);
+    if (!won.ok) throw new Error('fixture should mate');
+    const award = won.value.events.find((e) => e.type === 'stage_won');
+    if (award?.type !== 'stage_won') throw new Error('no stage_won event');
+    const earned = won.value.session.run.history.at(-1)!.coinsEarned;
+    const { u } = await mount(actionSession());
+    await u.click(square('a3'));
+    await u.click(square('b2'));
+    await u.click(screen.getByRole('button', { name: /^COMMIT/ }));
+    await flush();
+    const line = (id: string) => screen.getByTestId(`award-${id}`).textContent;
+    expect(line('base')).toContain(`+${award.award.base}`);
+    expect(line('par')).toContain(`+${award.award.parBonus}`);
+    expect(line('interest')).toContain(`+${award.award.interest}`);
+    expect(line('salvage')).toContain(`+${earned - award.award.coins}`);
+    expect(line('total')).toContain(`+${earned}`);
+    expect(award.award.base).toBeGreaterThan(0);
+  });
+
   const queenStage = (s: StageState): StageState => ({
     ...s,
     board: {
@@ -379,6 +400,22 @@ describe('stage and run endings', () => {
     expect(r.textContent).toMatch(/Stages cleared: 1/);
     expect(r.textContent).toContain(SEED);
     expect(r.textContent).toContain('DEBUG RUN');
+  });
+
+  it('run Results shows the wallet and one history line per stage played (I4)', async () => {
+    const won = wonSession();
+    const ended = ok(abandon(won)).session;
+    const h = ended.run.history[0]!;
+    await mount(ended);
+    const r = screen.getByTestId('run-results');
+    expect(within(r).getByTestId('run-coins-final').textContent).toContain(`${ended.run.coins}`);
+    const rows = within(r).getAllByTestId(/^history-/);
+    expect(rows).toHaveLength(ended.run.history.length);
+    expect(rows[0]!.textContent).toMatch(/Act 1, stage 1/);
+    expect(rows[0]!.textContent).toMatch(/won/i);
+    expect(rows[0]!.textContent).toContain(`${h.turnsUsed} turn`);
+    expect(rows[0]!.textContent).toContain(`+${h.coinsEarned}`);
+    expect(rows[0]!.textContent).toMatch(/pieces lost 0/i);
   });
 });
 

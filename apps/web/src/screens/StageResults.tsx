@@ -19,11 +19,25 @@ export function StageResults() {
         <Board stage={{ board: lastCommit.after ?? lastCommit.resolved }} reducedMotion={motionReduced} />
       </div>
       {last && (
-        <p>
-          <strong>+{last.coinsEarned} ◈</strong> earned in {last.turnsUsed} {last.turnsUsed === 1 ? 'turn' : 'turns'}
-          {last.piecesLost > 0 && <>; pieces lost: {last.piecesLost}</>}
-          {' · '}Wallet {session.run.coins} ◈
-        </p>
+        <>
+          {lastCommit.award && (
+            <table className="award" data-testid="award">
+              <tbody>
+                <tr data-testid="award-base"><th scope="row">Base reward</th><td>+{lastCommit.award.base} ◈</td></tr>
+                <tr data-testid="award-par"><th scope="row">Par bonus</th><td>+{lastCommit.award.parBonus} ◈</td></tr>
+                <tr data-testid="award-interest"><th scope="row">Interest</th><td>+{lastCommit.award.interest} ◈</td></tr>
+                <tr data-testid="award-salvage"><th scope="row">Salvage</th><td>+{lastCommit.salvage} ◈</td></tr>
+                <tr data-testid="award-total"><th scope="row">Total</th><td><strong>+{last.coinsEarned} ◈</strong></td></tr>
+              </tbody>
+            </table>
+          )}
+          <p>
+            {!lastCommit.award && <><strong>+{last.coinsEarned} ◈</strong>{' · '}</>}
+            Cleared in {last.turnsUsed} {last.turnsUsed === 1 ? 'turn' : 'turns'}
+            {' · '}Pieces lost: {last.piecesLost}
+            {' · '}Wallet {session.run.coins} ◈
+          </p>
+        </>
       )}
       <button type="button" className="start" autoFocus onClick={done}>{final ? 'Continue to the results' : 'Continue'}</button>
     </main>

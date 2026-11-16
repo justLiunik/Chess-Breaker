@@ -104,3 +104,5 @@ circle.plan { fill: none; stroke: var(--c); stroke-width: 0.11; stroke-dasharray
 .badge { font-weight: bold; border: 2px solid var(--ink); padding: 0 0.25rem; }
 .progress { display: flex; gap: 0.5rem; list-style: none; padding: 0; }
 .debug-flag { color: var(--error); }
+.award th { text-align: left; font-weight: normal; padding-right: 1.5rem; }
+.award td { text-align: right; }

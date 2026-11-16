@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { commitQueue as playQueue, previewSteps } from '@checkbreaker/engine';
-import type { Action, Square, StageState } from '@checkbreaker/engine';
+import type { Action, Award, Square, StageState } from '@checkbreaker/engine';
 import {
   abandon, buy, commit, cut, devSkipStage, leave, loadSave, merge, newRun, provideStage, reroll, repair, restartStage,
   sell, serializeSave, start,
@@ -37,9 +37,10 @@ type Board = StageState['board'];
 /**
  * The positions of a commit that ended its stage, for the playback that precedes the results screens:
  * `resolved` is the player's own position (before the enemy replies), `after` the board once the reply is made
- * (null for a win, which has no reply).
+ * (null for a win, which has no reply). A win also keeps the engine's `stage_won` award and the stage's salvage
+ * (the history record's `coinsEarned` less the award), for the Stage Results breakdown.
  */
-export interface LastCommit { resolved: Board; after: Board | null; won: boolean }
+export interface LastCommit { resolved: Board; after: Board | null; won: boolean; award: Award | null; salvage: number }
 
 export interface RunApi {
   session: RunSession | null;
@@ -167,7 +168,13 @@ export function RunProvider({ source, storage, children }: { source: StageSource
         // queue itself ended the stage).
         const played = won ? null : playQueue(s.run, s.stage, queue, engineConfig);
         const board = played?.ok ? played.value.stage.board : null;
-        last = { resolved, after: board && JSON.stringify(board) !== JSON.stringify(resolved) ? board : null, won };
+        const wonEvent = r.ok ? r.value.events.find((e) => e.type === 'stage_won') : undefined;
+        const award = wonEvent?.type === 'stage_won' ? wonEvent.award : null;
+        const earned = r.ok ? r.value.session.run.history.at(-1)?.coinsEarned ?? 0 : 0;
+        last = {
+          resolved, after: board && JSON.stringify(board) !== JSON.stringify(resolved) ? board : null, won,
+          award, salvage: award ? earned - award.coins : earned,
+        };
       }
     }
     run(r, last);
