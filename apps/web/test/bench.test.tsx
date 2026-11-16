@@ -79,6 +79,47 @@ describe('dev bench', () => {
     expect(md).toContain(GAME_FENS[0]!);
   }, 60_000);
 
+  it('labels the effective depth: plain on normal rows, capped on rarity rows', async () => {
+    render(<Bench source={stubSource()} enemyRuns={1} enemyWarmups={0} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Run bench' }));
+    await waitFor(() => expect(screen.getAllByTestId(/^enemy-/)).toHaveLength(GAME_FENS.length + RARITY_FENS.length), { timeout: 30_000 });
+    expect(within(screen.getByTestId('enemy-0')).getByText('4')).toBeTruthy();
+    const rarityRow = within(screen.getByTestId(`enemy-${GAME_FENS.length}`));
+    expect(rarityRow.getByText('4 requested, capped by the engine on rarity boards')).toBeTruthy();
+  }, 60_000);
+
+  it('recovers when the source rejects and shows the error', async () => {
+    const source: StageSource = { request: () => Promise.reject(new Error('worker died')) };
+    render(<Bench source={source} enemyRuns={1} enemyWarmups={0} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Run bench' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Error: worker died'));
+    expect((screen.getByRole('button', { name: 'Run bench' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('counts failed answers, renders "-" and shows the first message', async () => {
+    const source: StageSource = {
+      request: (id) => Promise.resolve({ id, ok: false as const, message: `no stage ${id}` }),
+    };
+    render(<Bench source={source} enemyRuns={1} enemyWarmups={0} />);
+    fireEvent.change(screen.getByLabelText('Stages per template'), { target: { value: '3' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Run bench' }));
+    await waitFor(() => expect(screen.getAllByTestId(/^gen-tpl/).length).toBeGreaterThan(0), { timeout: 20_000 });
+    const row = within(screen.getByTestId(`gen-${templates[0]!.id}`));
+    expect(row.getByText('3', { selector: 'td:nth-child(4)' })).toBeTruthy();
+    expect(row.getAllByText('-')).toHaveLength(2);
+    const errors = screen.getByTestId('gen-errors').textContent!;
+    expect(errors).toContain(`${templates[0]!.id}: 3 failed, first message: no stage 1`);
+  }, 60_000);
+
+  it('shows "Copy failed" when the clipboard rejects', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true });
+    render(<Bench source={stubSource()} enemyRuns={1} enemyWarmups={0} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Run bench' }));
+    await waitFor(() => expect(screen.getAllByTestId(/^enemy-/)).toHaveLength(GAME_FENS.length + RARITY_FENS.length), { timeout: 30_000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Copy as Markdown' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Copy failed'));
+  }, 60_000);
+
   it('is shown by the app at #bench', async () => {
     window.location.hash = '#bench';
     render(<App source={testStageSource()} />);

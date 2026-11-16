@@ -16,6 +16,9 @@ const DEFAULT_RUNS = 20;
 const ENEMY_CLOCK = 6; // player turns left, as the engine bench passes it
 const ENEMY_DEPTH = 4;
 const P95 = 0.95;
+const MAX_STAGES = 100;
+const NORMAL_DEPTH = String(ENEMY_DEPTH);
+const CAPPED_DEPTH = `${ENEMY_DEPTH} requested, capped by the engine on rarity boards`;
 
 export interface BenchProps {
   source: StageSource;
@@ -25,8 +28,8 @@ export interface BenchProps {
   enemyWarmups?: number;
 }
 
-type GenRow = { id: string; act: number; stages: number; failed: number; median: number | null; p95: number | null };
-type EnemyRow = { fen: string; rarity: string; median: number; max: number };
+type GenRow = { id: string; act: number; stages: number; failed: number; error: string | null; median: number | null; p95: number | null };
+type EnemyRow = { fen: string; rarity: string; depth: string; median: number; max: number };
 
 const sorted = (xs: number[]): number[] => [...xs].sort((a, b) => a - b);
 function median(xs: number[]): number | null {
@@ -42,6 +45,10 @@ function percentile(xs: number[], q: number): number | null {
 const fmt = (x: number | null): string => (x === null ? '-' : x.toFixed(1));
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
+function genErrors(rows: GenRow[]): string[] {
+  return rows.filter((r) => r.error !== null).map((r) => `${r.id}: ${r.failed} failed, first message: ${r.error}`);
+}
+
 function genTable(rows: GenRow[]): string {
   return [
     '| Template | Act | Stages | Failed | Median ms | p95 ms |',
@@ -52,9 +59,9 @@ function genTable(rows: GenRow[]): string {
 
 function enemyTable(rows: EnemyRow[]): string {
   return [
-    '| Position | Rarity | Median ms | Max ms |',
-    '| --- | --- | --- | --- |',
-    ...rows.map((r) => `| ${r.fen} | ${r.rarity} | ${fmt(r.median)} | ${fmt(r.max)} |`),
+    '| Position | Rarity | Depth | Median ms | Max ms |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows.map((r) => `| ${r.fen} | ${r.rarity} | ${r.depth} | ${fmt(r.median)} | ${fmt(r.max)} |`),
   ].join('\n');
 }
 
@@ -69,65 +76,78 @@ export function Bench({ source, enemyRuns = DEFAULT_RUNS, enemyWarmups = DEFAULT
   const nextId = useRef(1);
 
   const run = async (): Promise<void> => {
-    const n = Math.max(1, Math.floor(Number(count)) || DEFAULT_STAGES);
+    const n = Math.min(MAX_STAGES, Math.max(1, Math.floor(Number(count)) || DEFAULT_STAGES));
     setRunning(true);
     setGenRows([]);
     setEnemyRows([]);
-
-    // Generation, one template after another through the one worker, as the game uses it.
-    for (const t of templates) {
-      setStatus(`Generating ${t.id} (${n} stages)...`);
-      const actIndex = t.act - 1;
-      const stageIndex = t.tier === 'boss' ? 2 : 0;
-      const times: number[] = [];
-      let failed = 0;
-      for (let i = 0; i < n; i++) {
-        const request: GenRequest = {
-          run: { ...decks[actIndex]!, actIndex, stageIndex, seed: `bench-${t.id}-${i}` },
-          actIndex,
-          stageIndex,
-        };
-        const answer = await source.request(nextId.current++, request, t.id);
-        if (answer.ok) times.push(answer.ms);
-        else failed++;
+    try {
+      // Generation, one template after another through the one worker, as the game uses it.
+      for (const t of templates) {
+        setStatus(`Generating ${t.id} (${n} stages)...`);
+        const actIndex = t.act - 1;
+        const stageIndex = t.tier === 'boss' ? 2 : 0;
+        const times: number[] = [];
+        let failed = 0;
+        let error: string | null = null;
+        for (let i = 0; i < n; i++) {
+          const request: GenRequest = {
+            run: { ...decks[actIndex]!, actIndex, stageIndex, seed: `bench-${t.id}-${i}` },
+            actIndex,
+            stageIndex,
+          };
+          const answer = await source.request(nextId.current++, request, t.id);
+          if (answer.ok) times.push(answer.ms);
+          else {
+            failed++;
+            error ??= answer.message;
+          }
+        }
+        const row: GenRow = { id: t.id, act: t.act, stages: n, failed, error, median: median(times), p95: percentile(times, P95) };
+        setGenRows((rows) => [...rows, row]);
       }
-      const row: GenRow = { id: t.id, act: t.act, stages: n, failed, median: median(times), p95: percentile(times, P95) };
-      setGenRows((rows) => [...rows, row]);
-    }
 
-    // Enemy search on the main thread: the public enemyMove at depth 4 (capped on rarity boards by the engine).
-    const positions: { fen: string; rarity: string; stage: StageState }[] = [
-      ...GAME_FENS.map((fen) => ({
-        fen, rarity: 'normal', stage: fenToStage(fen, { enemyPolicy: { type: 'best_move', depth: ENEMY_DEPTH } }),
-      })),
-      ...RARITY_FENS.map(({ fen, rarity }) => {
-        const stage = rarityStage(fen, rarity);
-        return { fen, rarity, stage: { ...stage, enemyPolicy: { type: 'best_move' as const, depth: ENEMY_DEPTH } } };
-      }),
-    ];
-    for (const [k, p] of positions.entries()) {
-      setStatus(`Enemy search ${k + 1}/${positions.length}...`);
-      await tick();
-      for (let i = 0; i < enemyWarmups; i++) enemyMove(p.stage, 1, ENEMY_CLOCK, engineConfig);
-      const times: number[] = [];
-      for (let i = 0; i < enemyRuns; i++) {
-        const t0 = performance.now();
-        enemyMove(p.stage, 1, ENEMY_CLOCK, engineConfig);
-        times.push(performance.now() - t0);
+      // Enemy search on the main thread: the public enemyMove asked for depth 4; the engine caps it on rarity boards (it does not report the depth it used).
+      const positions: { fen: string; rarity: string; depth: string; stage: StageState }[] = [
+        ...GAME_FENS.map((fen) => ({
+          fen, rarity: 'normal', depth: NORMAL_DEPTH, stage: fenToStage(fen, { enemyPolicy: { type: 'best_move', depth: ENEMY_DEPTH } }),
+        })),
+        ...RARITY_FENS.map(({ fen, rarity }) => {
+          const stage = rarityStage(fen, rarity);
+          return { fen, rarity, depth: CAPPED_DEPTH, stage: { ...stage, enemyPolicy: { type: 'best_move' as const, depth: ENEMY_DEPTH } } };
+        }),
+      ];
+      for (const [k, p] of positions.entries()) {
+        setStatus(`Enemy search ${k + 1}/${positions.length}...`);
+        await tick();
+        for (let i = 0; i < enemyWarmups; i++) enemyMove(p.stage, 1, ENEMY_CLOCK, engineConfig);
+        const times: number[] = [];
+        for (let i = 0; i < enemyRuns; i++) {
+          const t0 = performance.now();
+          enemyMove(p.stage, 1, ENEMY_CLOCK, engineConfig);
+          times.push(performance.now() - t0);
+        }
+        const row: EnemyRow = { fen: p.fen, rarity: p.rarity, depth: p.depth, median: median(times) ?? 0, max: Math.max(...times, 0) };
+        setEnemyRows((rows) => [...rows, row]);
       }
-      const row: EnemyRow = { fen: p.fen, rarity: p.rarity, median: median(times) ?? 0, max: Math.max(...times, 0) };
-      setEnemyRows((rows) => [...rows, row]);
+      setStatus('Done.');
+    } catch (e) {
+      setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRunning(false);
     }
-    setStatus('Done.');
-    setRunning(false);
   };
 
   const copy = (): void => {
     const text = [
       '## Stage generation (Web Worker, ms per stage)', '', genTable(genRows), '',
-      `## Enemy search (main thread, depth ${ENEMY_DEPTH}, ms; ${enemyWarmups} warm-ups, ${enemyRuns} runs)`, '', enemyTable(enemyRows), '',
+      ...genErrors(genRows).map((e) => `- ${e}`), ...(genErrors(genRows).length > 0 ? [''] : []),
+      `## Enemy search (main thread, ms; ${enemyWarmups} warm-ups, ${enemyRuns} runs; depth ${ENEMY_DEPTH} requested, the engine caps it on rarity boards)`,
+      '', enemyTable(enemyRows), '',
     ].join('\n');
-    void navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).then(
+      () => setStatus('Copied.'),
+      () => setStatus('Copy failed'),
+    );
   };
 
   return (
@@ -138,7 +158,7 @@ export function Bench({ source, enemyRuns = DEFAULT_RUNS, enemyWarmups = DEFAULT
         <label>
           Stages per template
           {' '}
-          <input type="number" min={1} value={count} onChange={(e) => setCount(e.target.value)} disabled={running} />
+          <input type="number" min={1} max={MAX_STAGES} value={count} onChange={(e) => setCount(e.target.value)} disabled={running} />
         </label>
         {' '}
         <button type="button" onClick={() => void run()} disabled={running}>Run bench</button>
@@ -163,15 +183,21 @@ export function Bench({ source, enemyRuns = DEFAULT_RUNS, enemyWarmups = DEFAULT
         </tbody>
       </table>
 
+      {genErrors(genRows).length > 0 && (
+        <ul role="alert" data-testid="gen-errors">
+          {genErrors(genRows).map((e) => <li key={e}>{e}</li>)}
+        </ul>
+      )}
+
       <h2>Enemy search (main thread)</h2>
       <table>
         <thead>
-          <tr><th>Position</th><th>Rarity</th><th>Median ms</th><th>Max ms</th></tr>
+          <tr><th>Position</th><th>Rarity</th><th>Depth</th><th>Median ms</th><th>Max ms</th></tr>
         </thead>
         <tbody>
           {enemyRows.map((r, k) => (
             <tr key={k} data-testid={`enemy-${k}`}>
-              <td>{r.fen}</td><td>{r.rarity}</td><td>{fmt(r.median)}</td><td>{fmt(r.max)}</td>
+              <td>{r.fen}</td><td>{r.rarity}</td><td>{r.depth}</td><td>{fmt(r.median)}</td><td>{fmt(r.max)}</td>
             </tr>
           ))}
         </tbody>
