@@ -117,14 +117,45 @@ describe('store', () => {
     });
     await send({ type: 'new_run', seed: '7F3A-2210' });
     await flush();
-    expect(api.error).toContain('boom');
+    expect(api.genError).toContain('boom');
+    expect(api.error).toBeNull();
     expect(api.session?.phase).toBe('awaiting_stage');
     expect(api.generating).toBe(false);
     fail = false;
     await send({ type: 'retry' });
     await flush();
     expect(calls).toBe(2);
-    expect(api.error).toBeNull();
+    expect(api.genError).toBeNull();
+    expect(api.session?.phase).toBe('deployment');
+  });
+
+  it('a generation failure in the shop survives later actions, and Retry still posts (I1)', async () => {
+    const inner = testStageSource();
+    let calls = 0;
+    let fail = true;
+    mount({
+      request(id, req) {
+        calls++;
+        return calls > 1 && fail ? Promise.resolve({ id, ok: false as const, message: 'boom' }) : inner.request(id, req);
+      },
+    });
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await flush();
+    await send({ type: 'start', placements: STARTER_MATE.placements });
+    await send({ type: 'commit', queue: [STARTER_MATE.move] });
+    await flush();
+    expect(api.session?.phase).toBe('shop');
+    expect(api.genError).toContain('boom');
+    await send({ type: 'reroll' });
+    await send({ type: 'leave' });
+    expect(api.session?.phase).toBe('awaiting_stage');
+    expect(api.genError).toContain('boom');
+    expect(api.generating).toBe(false);
+    fail = false;
+    await send({ type: 'retry' });
+    await flush();
+    expect(calls).toBe(3);
+    expect(api.genError).toBeNull();
     expect(api.session?.phase).toBe('deployment');
   });
 
@@ -132,7 +163,7 @@ describe('store', () => {
     mount({ request: () => Promise.reject(new Error('worker died')) });
     await send({ type: 'new_run', seed: '7F3A-2210' });
     await flush();
-    expect(api.error).toContain('worker died');
+    expect(api.genError).toContain('worker died');
   });
 
   it('set_dev persists the toggle', async () => {
@@ -183,7 +214,7 @@ describe('store', () => {
     await send({ type: 'new_run', seed: '7F3A-2210' });
     await flush();
     expect(api.session?.phase).toBe('awaiting_stage');
-    expect(api.error).toBeTruthy();
+    expect(api.genError).toBeTruthy();
     expect(api.generating).toBe(false);
   });
 });

@@ -44,7 +44,13 @@ export interface LastCommit { resolved: Board; after: Board | null; won: boolean
 export interface RunApi {
   session: RunSession | null;
   dispatch(action: UiAction): void;
+  /** The last refused player action; the next successful action clears it. */
   error: string | null;
+  /**
+   * A failed stage generation (or a stage the run refused). It outlives later actions, so Building and the Shop keep
+   * offering Retry; only `retry`, a good answer, `new_run`, `continue` and `to_title` clear it.
+   */
+  genError: string | null;
   generating: boolean;
   dev: boolean;
   lastCommit: LastCommit | null;
@@ -58,17 +64,20 @@ export function newSeed(): string {
   return `${h.slice(0, 4)}-${h.slice(4)}`;
 }
 
-type View = { session: RunSession | null; error: string | null; generating: boolean; lastCommit: LastCommit | null };
+type View = {
+  session: RunSession | null; error: string | null; genError: string | null; generating: boolean; lastCommit: LastCommit | null;
+};
 
 const Ctx = createContext<RunApi | null>(null);
 
 export function RunProvider({ source, storage, children }: { source: StageSource; storage: RunStorage; children: ReactNode }) {
-  const [view, setView] = useState<View>({ session: null, error: null, generating: false, lastCommit: null });
+  const [view, setView] = useState<View>({ session: null, error: null, genError: null, generating: false, lastCommit: null });
   const [dev, setDev] = useState<boolean>(() => devToggle.read());
 
   // The truth lives in refs so async answers always see the current session; `view` mirrors it for rendering.
   const sessionRef = useRef<RunSession | null>(null);
   const errorRef = useRef<string | null>(null);
+  const genErrorRef = useRef<string | null>(null);
   const lastCommitRef = useRef<LastCommit | null>(null);
   const pendingRef = useRef<{ id: number; request: GenRequest } | null>(null);
   const failedRef = useRef<GenRequest | null>(null);
@@ -85,7 +94,13 @@ export function RunProvider({ source, storage, children }: { source: StageSource
 
   const publish = useCallback((): void => {
     if (!mounted.current) return;
-    setView({ session: sessionRef.current, error: errorRef.current, generating: pendingRef.current !== null, lastCommit: lastCommitRef.current });
+    setView({
+      session: sessionRef.current,
+      error: errorRef.current,
+      genError: genErrorRef.current,
+      generating: pendingRef.current !== null,
+      lastCommit: lastCommitRef.current,
+    });
   }, []);
 
   /** Posts the session's request when it has one without a stage and none is in flight or failed for it. */
@@ -103,7 +118,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       if (pendingRef.current?.id !== id) return; // stale
       pendingRef.current = null;
       failedRef.current = wanted;
-      errorRef.current = `Stage generation failed: ${message}`;
+      genErrorRef.current = `Stage generation failed: ${message}`;
       publish();
     };
     sourceRef.current.request(id, wanted).then((answer) => {
@@ -113,10 +128,10 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       pendingRef.current = null;
       if (!r.ok) {
         failedRef.current = wanted;
-        errorRef.current = runErrorText(r.error);
+        genErrorRef.current = runErrorText(r.error);
       } else {
+        genErrorRef.current = null;
         accept(r.value.session);
-        errorRef.current = null;
       }
       publish();
     }, (e: unknown) => fail(e instanceof Error ? e.message : String(e)));
@@ -175,6 +190,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       pendingRef.current = null;
       failedRef.current = null;
       errorRef.current = null;
+      genErrorRef.current = null;
       lastCommitRef.current = null;
       sessionRef.current = null;
       publish();
@@ -185,6 +201,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       pendingRef.current = null;
       failedRef.current = null;
       errorRef.current = null;
+      genErrorRef.current = null;
       accept(newRun(a.seed ?? newSeed(), c));
       publish();
       return;
@@ -201,6 +218,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
       pendingRef.current = null;
       failedRef.current = null;
       errorRef.current = null;
+      genErrorRef.current = null;
       lastCommitRef.current = null;
       sessionRef.current = back.value;
       sync();
@@ -209,7 +227,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
     }
     if (a.type === 'retry') {
       failedRef.current = null;
-      errorRef.current = null;
+      genErrorRef.current = null;
       sync();
       publish();
       return;

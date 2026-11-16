@@ -8,10 +8,11 @@ import { useShortcuts } from '../input/shortcuts';
 import { useReducedMotion } from '../settings';
 import { runErrorText } from '../messages';
 import { useRun } from '../state/store';
+import { GenFailure } from './Building';
 import { DeckList, pieceLabel } from './DeckList';
 
 export function Shop() {
-  const { session, dispatch, error } = useRun();
+  const { session, dispatch, error, genError } = useRun();
   const [choosing, setChoosing] = useState<number | null>(null);
   const motionReduced = useReducedMotion();
   useShortcuts({ escape: () => setChoosing(null) });
@@ -84,7 +85,9 @@ export function Shop() {
         </section>
         <aside data-testid="next-preview">
           <h2>Next stage</h2>
-          {next ? <Board stage={next} reducedMotion={motionReduced} /> : <p role="status">The next stage is being prepared…</p>}
+          {next ? <Board stage={next} reducedMotion={motionReduced} />
+            : genError ? <GenFailure message={genError} onRetry={() => dispatch({ type: 'retry' })} />
+              : <p role="status">The next stage is being prepared…</p>}
         </aside>
       </div>
       <p><button type="button" className="start" onClick={() => dispatch({ type: 'leave' })}>Leave shop</button></p>

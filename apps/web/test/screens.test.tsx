@@ -153,6 +153,31 @@ describe('Building', () => {
     await flush();
     expect(screen.getByTestId('run-map')).toBeTruthy();
   });
+
+  it('a failure while in the shop keeps Retry in the shop and on Building after Leave (I1)', async () => {
+    let fail = true;
+    const base = testStageSource();
+    const source: StageSource = {
+      request: (id, req) => (fail ? Promise.resolve({ id, ok: false as const, message: 'boom' }) : base.request(id, req)),
+    };
+    const { u } = await mount(actionSession(), source);
+    await u.click(square('a3'));
+    await u.click(square('b2'));
+    await u.click(screen.getByRole('button', { name: /^COMMIT/ }));
+    await flush();
+    await u.click(screen.getByRole('button', { name: 'Continue' }));
+    const next = screen.getByTestId('next-preview');
+    expect(within(next).getByRole('alert').textContent).toContain('boom');
+    expect(within(next).getByRole('button', { name: 'Retry' })).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: /^Reroll/ }));
+    await u.click(screen.getByRole('button', { name: 'Leave shop' }));
+    expect(screen.getByTestId('building')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('boom');
+    fail = false;
+    await u.click(screen.getByRole('button', { name: 'Retry' }));
+    await flush();
+    expect(screen.getByTestId('run-map')).toBeTruthy();
+  });
 });
 
 describe('Shop', () => {
