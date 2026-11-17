@@ -539,7 +539,8 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
     used the dev skip). `SAVE_VERSION` stays 1.
   - `loadSave` rebuilds the session from the fields it checked and drops unknown keys; the hand-copied
     enum lists in `save.ts` carry type-level exhaustiveness checks.
-- M5.1 bumps `SAVE_VERSION` to **2** (key `checkbreaker.save.2`): the pawn and deck shapes change
+- M5.1 bumps `SAVE_VERSION` to **2**. The storage key stays `checkbreaker.save.1`, so an old save is
+  found and refused with a message, not silently ignored. The pawn and deck shapes change
   (`promotesTo` gone, the `chooser` phase gone, promoted pieces carry `pricePaid: 0`). A version 1 save
   is refused with the existing `unknown_version` message, never migrated (decision P8 of the
   [M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md)).
