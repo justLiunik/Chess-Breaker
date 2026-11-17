@@ -57,9 +57,13 @@ no Deployment phase: M1 tests start from stages already in `phase: action`.
 - [x] Zero runtime dependencies in `packages/engine`.
 - [x] Enemy AI golden-position suite passes (docs/09 §9), and a depth-4 enemy move takes < 50 ms
       in Node (`npm run bench`, sparse stage-like positions).
-- [ ] The same depth-4 < 50 ms check in the browser on a mid-range laptop — **open until M5**, the
-      first milestone with a UI; M1 measures in Node only. M5 measures it on the dev bench page and
-      records the figures here ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §9.3); a miss is recorded as a gap.
+- [x] The same depth-4 < 50 ms check in the browser on a mid-range laptop — measured in M5 on the dev
+      bench page (`/#bench`, main thread, 3 warm-ups and 20 runs per position, the user's laptop,
+      2026-11-17; [M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §9.3). The five
+      normal boards at depth 4: medians 5.0–31.0 ms, max 33 ms — **met**. The rarity boards (depth
+      capped to 3 by `enemyAI.search.maxDepthWithRarity`): medians 2.0–31.5 ms, except the Legendary
+      variant of `2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3` at median 50.0 ms, max 53 ms — **a gap of
+      a few ms on one board**, recorded and not blocking (the cap's Node figure was ≤ 40 ms).
 - [x] Deep-frozen state in tests: no mutation anywhere.
 
 **Risks:** deferred check validation is unusual; the temptation to "fix" it by validating mid-queue
@@ -168,7 +172,11 @@ Design: [the M3 spec](superpowers/specs/2026-11-11-m3-generation-solver-design.m
       was using the machine, so the First Steps and Gatehouse figures (Task 18 measured p95 13.9 s
       and 15.8 s) need re-measuring on an idle machine. The cause is the unproven boards, which run
       the solver three times; it is not a separate gap from the proven rate above. **Accepted gap
-      (user decision 2026-11-13)**; re-measured in the browser's generation Web Worker in M5.
+      (user decision 2026-11-13)**; re-measured in the browser's generation Web Worker in M5
+      (dev bench, 10 stages per template, the user's laptop, 2026-11-17), median / p95: Gatehouse
+      11.0 s / 20.6 s (**misses both**); Open Field 3.8 s / 7.8 s (**misses the median**); First
+      Steps 2.0 s / 5.9 s; Fortress 2.7 s / 9.9 s; Citadel 0.6 s / 6.2 s; Redoubt 2.1 s / 7.1 s;
+      Last Line 0.6 s / 3.3 s (met). No stage failed. The gap stays accepted.
 - [x] Every template reports a median solver mating turn within one turn of its par (10,003 stages:
       First Steps 4 vs 4, Open Field 4 vs 5, Gatehouse 3 vs 4, Fortress 3 vs 4, Citadel 3 vs 4, Last
       Line 2 vs 3, Redoubt 2 vs 2).
@@ -346,19 +354,40 @@ run to feel it; hints, onboarding highlights, full keyboard parity and art are M
   `loadSave` rebuilding from checked fields, boundary import allowlists, `replace_not_needed`).
 
 **Acceptance criteria**
-- [ ] A full run can be played in the browser from the title screen to the run Results (automated
-      full-run test, dev skip allowed).
-- [ ] The user completes one full run in the browser (dev skip allowed).
-- [ ] The coin preview in the HUD always equals the payout actually awarded.
-- [ ] Every `CommitError`, `RunError` and `SaveError` variant surfaces a distinct, cause-naming message.
-- [ ] No rules logic exists in `apps/web` (import allowlist test + code review).
-- [ ] 60 fps during queue preview on a mid-range laptop; no animation blocks input (manual check,
-      recorded).
-- [ ] Generation runs only in the Web Worker; its browser wall times (median, p95 per template) are
-      recorded here.
-- [ ] The browser enemy-search timing (M1's open box) is measured and recorded here.
-- [ ] Every M4 "before M5" item is done and tested.
-- [ ] `npm test`, `npm run typecheck`, `npm run validate` and `npm run check:links` pass.
+- [x] A full run can be played in the browser from the title screen to the run Results (automated
+      full-run test, dev skip allowed): `apps/web/test/full-run.test.tsx`, "plays 9 stages from the
+      title screen to a won run, by clicking only".
+- [ ] The user completes one full run in the browser (dev skip allowed). **Not met.** The user's
+      playtest (2026-11-17) found every stage very hard and did not finish a run. Findings, all
+      open for design work: a promoted pawn leaves the board with no explanation in the UI; a summon
+      may give check to the enemy king at START; shop prices feel too high; stages feel too hard.
+- [x] The coin preview in the HUD always equals the payout actually awarded:
+      `packages/engine/test/view-preview.test.ts` (I10 property cases) and
+      `apps/web/test/action.test.tsx` ("… COMMIT pays it (I10)").
+- [x] Every `CommitError`, `RunError` and `SaveError` variant surfaces a distinct, cause-naming message:
+      `apps/web/test/messages.test.ts`.
+- [x] No rules logic exists in `apps/web` (import allowlist test + code review):
+      `apps/web/test/boundaries.test.ts` and the M5 whole-branch review; its one finding (skill
+      availability computed in the UI) was fixed with the engine's `skillUnavailable`.
+- [x] 60 fps during queue preview on a mid-range laptop; no animation blocks input (manual check,
+      recorded): the user's check on their laptop, 2026-11-17 — smooth, no stutter (subjective; no
+      DevTools trace was taken).
+- [x] Generation runs only in the Web Worker (`apps/web/test/boundaries.test.ts` fences `gen` to
+      `state/generation.worker.ts`); its browser wall times (median, p95 per template) are recorded
+      under M3 above. The Gatehouse misses both targets and Open Field the median (accepted gap).
+- [x] The browser enemy-search timing (M1's open box) is measured and recorded under M1 above:
+      depth 4 met on every normal board; one Legendary board at median 50.0 ms is a recorded gap.
+- [x] Every M4 "before M5" item is done and tested: enum exhaustiveness in `save.ts`
+      (`packages/run/test/save-enums.test.ts` plus compile-time checks), `loadSave` rebuilding from
+      checked fields (`save.test.ts`, "drops unknown keys at every level"), boundary import
+      allowlists (`boundaries.test.ts`), `replace_not_needed` (`shop.test.ts`, "replace with room is
+      refused"), the recovery offer live only while `recovery && !slots[0].sold` (`shop.test.ts`),
+      `localStorage` only behind `RunStorage` (`apps/web/test/storage.test.ts`), and the Node-free
+      content entry (`packages/content/test/parse.test.ts`). Main chunk (engine + app) 124.35 kB
+      gzipped, under the 250 KB target (docs/09 §10).
+- [x] `npm test`, `npm run typecheck`, `npm run validate` and `npm run check:links` pass: 85 test
+      files / 1,054 tests, validate 71 checks, check:links 0 broken (2026-11-17). Under parallel load
+      `packages/gen/test/bulk.test.ts` can exceed its 125 s timeout (it passes alone in ~81 s).
 
 Moved to M6 (user decisions 2026-11-16): "a full run can be completed without touching a mouse" and
 "a third-party playtester completes Act I of a first run without verbal instruction".
