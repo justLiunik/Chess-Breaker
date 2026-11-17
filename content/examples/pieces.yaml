@@ -37,8 +37,10 @@ pieces:
     purchasable: false
     notes: >-
       Never sold and never in the deck. Each stage spawns a few pawns for the
-      player with a rolled rarity; the rarity only decides what the pawn
-      promotes into. Promotion turns stage tempo into a permanent deck piece.
+      player with a rolled rarity. On rank 8 the player chooses a knight,
+      bishop, rook or queen; the promoted piece keeps the pawn's rarity, stays
+      on the board and joins the deck. Promotion turns stage tempo into a
+      stronger board at once and a permanent deck piece.
       Its spawnCost is nominal: a pawn is never in the deck, so never summoned.
 
   - id: knight

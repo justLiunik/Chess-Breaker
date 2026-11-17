@@ -34,6 +34,11 @@ If a screen cannot show 1–4 simultaneously, the screen is wrong.
 
 No screen has a timer. The game is turn-based; urgency is diegetic (the counter), never real.
 
+There is no stage-end chooser screen: a won stage goes straight to the Shop. If a promotion
+overflowed the deck, the Shop shows **"Deck 9/8: sell, merge or cut to continue"** and disables the
+next-stage button with that reason until the deck fits again (`deck_over_capacity`,
+[07 §1](07-shop-phase.md#1-entry-exit-and-flow)).
+
 ## 3. The Stage screen
 
 ### 3.1 Coin preview — the load-bearing number
@@ -77,7 +82,7 @@ paid until START.
 │     6  │  │  │  │  │  │♞ │  │  │      ENEMY  ♟♟♟♞  9                 │
 │     5  │  │  │  │  │  │  │  │  │                                     │
 │     4  │  │  │  │  │  │  │  │  │                                     │
-│     3  │  │  │♙ │  │  │  │  │  │      SPAWNED ♙c3 → Rare Knight      │
+│     3  │  │  │♙ │  │  │  │  │  │      SPAWNED ♙c3 Rare → any piece   │
 │     2  │  │  │  │  │  │  │  │  │                                     │
 │     1  │♖ │  │  │♔ │  │♝ │  │  │                                     │
 │        └──┴──┴──┴──┴──┴──┴──┴──┘    DEPLOYMENT RANKS ▓▓ (1–4)        │
@@ -133,6 +138,12 @@ This is the signature UI and the game's main skill-expression surface.
   name the *cause*, never just say "invalid."
 - **A queue needs a move.** An empty queue, or one holding only skills, blocks COMMIT (`Add a move —
   there is no pass`).
+- **Promotion picker** (M5.1, as on lichess): the moment a planned move puts a spawned pawn on rank
+  8, a picker opens on that square offering **Q / R / B / N**, each at the pawn's rarity. The choice
+  is part of building the queue: it is stored in that `MOVE`, the queue entry shows the chosen piece
+  (`♙ e7→e8 = ♕ Rare`), and the ghost preview shows the promoted piece on the board — so the preview
+  still equals the outcome (I10). Cancelling the picker drops the move. The picker offers exactly what
+  the engine accepts; it holds no rules of its own.
 - **Stalemate is called out.** If the previewed end state leaves the enemy with no legal move and not
   in check, the preview shows `STALEMATE — YOU LOSE` and COMMIT asks for confirmation
   ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
@@ -165,13 +176,18 @@ pawns are already on the board; the player's side is empty.
   that would follow (see [06 §9](06-deck-durability-and-permadeath.md#9-communication-rules-ui-contract)).
 - A square where the King would start in check is marked invalid with a king-safety icon; START names
   the cause if pressed.
+- A square where the piece being placed would give check to the enemy king is marked **invalid,
+  gives check** (`gives_check`, I16), shown like the other invalid reasons with a named message
+  ("No check at START — the enemy never got to answer it").
+- Once one queen is placed, every further queen in the tray is marked unavailable, "one queen per
+  stage" (`queen_limit`, [02 §5](02-rules-framework.md#5-deployment)).
 - **START** summarises what it will cost (`♖ 2→1  ♝ 2→1`) and states that the deck locks. After
   START the tray disappears for the rest of the stage.
 - The tray shows durability pips and the rarity marker (tier name + frame shape), and disables pieces
   with `spent` status. On the board, Hero Pieces and spawned pawns keep their rarity frame; enemy
   pieces have none.
-- Each spawned pawn always shows its promotion result ("→ Rare Knight") and the number of moves it
-  still needs, so promotion competes visibly with the coin preview.
+- Each spawned pawn always shows its label — "Rare pawn, promotes to any piece" — and the number of
+  moves it still needs, so promotion competes visibly with the coin preview.
 - Selecting a Rare+ bishop or knight highlights the extra squares its abilities reach; leap-only
   (non-capturing) squares are marked differently from capture squares. A Legendary knight shows
   "bonus move available" after its first move each turn.
@@ -206,7 +222,7 @@ Chess literacy is not assumed. The ramp is content, not a tutorial wall.
 | Run 1, Act I stage 2 | Choosing who to summon, spawn points, and durability | The deck holds more pieces than the spawn points pay for; the first START is prompted with its durability cost |
 | Run 1, Act I stage 3 | The first skill (Twin Step) | One free, single-use Twin Step granted when the stage starts, if a loadout slot is free (`onboarding.freeSkill`); card text highlighted once |
 | Act I boss | Mating under par pressure | A shorter par than the rest of Act I; the overtime bill is highlighted once |
-| Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the result is highlighted once |
+| Act II, stage 1 | Promotion | A spawned pawn starts close to rank 8; the promotion picker is explained once |
 | Act II | Deckbuilding, shopping, attrition | Shop tutorial appears once, dismissible |
 | First time three identical pieces are owned | Merging | The shop highlights the set and its `[MERGE]` action once |
 | First plan whose preview would stalemate the enemy | Stalemate is a loss | The `STALEMATE — YOU LOSE` warning is explained once, in one sentence |
@@ -282,7 +298,8 @@ mis-chosen deployment; a mis-clicked plan is fixed with UNDO before COMMIT.
 - ❌ A shop that pressures with a timer.
 - ❌ Sorting the deck by durability (it reshuffles under the player's hand).
 - ❌ Any screen where the coin preview is not visible.
-- ❌ A promotion result revealed only when the pawn arrives — it is always shown in advance.
+- ❌ A promotion decided by a hidden roll, or asked for only during resolution — the player picks the
+  piece while planning, and the preview shows it.
 - ❌ A stalemate the player discovers only after COMMIT — the preview always says so first.
 - ❌ Rarity shown by glow or by the threat/rule-breaking accent colors — rarity must never read as
   danger. Tier name plus frame shape, never color alone.

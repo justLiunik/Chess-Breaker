@@ -74,9 +74,10 @@ are held to it.
 
 - Entry: the stage is generated from the player's **actual deck** (see
   [04](04-stage-generation-and-authoring.md)), so it is always provably solvable.
-- Every stage also **spawns free pawns** for the player, each with a rarity and a visible promotion
-  result. Pushing one to rank 8 turns it into a permanent deck piece — at the price of the turns,
-  and therefore the coins, spent getting there ([02 §2.2](02-rules-framework.md#22-promotion)).
+- Every stage also **spawns free pawns** for the player, each with a visible rarity. Pushing one to
+  rank 8 promotes it as in chess, to the piece the player chooses at the pawn's rarity: it keeps
+  playing on the board and becomes a permanent deck piece — at the price of the turns, and therefore
+  the coins, spent getting there ([02 §2.2](02-rules-framework.md#22-promotion)).
 - Play until a terminal condition fires (see
   [02 §7](02-rules-framework.md#7-stage-end-evaluation)).
 - Exit routes:

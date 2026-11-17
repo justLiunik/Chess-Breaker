@@ -17,6 +17,12 @@ Checkmate is the only way to clear a stage (docs/02 §7), so the one material
 rule every template must satisfy is that enemyArmyValue sits inside the act
 band from docs/04 §6; the solver then proves a mate exists within the par (mateIn).
 
-spawnedPawns are free, stage-only pawns for the player (docs/02 §2.2). Their
+spawnedPawns are free, stage-only pawns for the player (docs/02 §2.1). Their
 ranks must stay outside enemyZone; a spawned pawn near rank 8 is a real
-promotion option that competes with chasing the par.
+promotion option that competes with chasing the par: on rank 8 the player
+chooses a knight, bishop, rook or queen at the pawn's rarity, and it stays on
+the board (docs/02 §2.2). Generation rolls only each pawn's square and rarity,
+never a promotion result, so no template or stage carries `promotesTo`.
+
+Every template lists the `no_start_check` precondition: no spawned pawn may
+attack the black king, because no check may stand at START (I16, docs/04 §4).

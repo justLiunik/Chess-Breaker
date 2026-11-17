@@ -22,6 +22,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Act II boss. Enemy value 13-15 (the Act II band x1.25 is 12.5-17.5), mate
   in 4 (Act II's par after Fortress was tuned), depth-4 policy. Two rooks hold

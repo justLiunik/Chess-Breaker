@@ -237,6 +237,67 @@ replies and needs a rule for each kind of loss (overtime, captures, salvage, pro
 
 ---
 
+## S. Chess promotion and no check at START (M5.1)
+
+**Question:** what happens when a spawned pawn reaches rank 8? In the first M5 playtest
+(2026-11-17) the promoted pawn left the board with no explanation, felt like a bug, and paid nothing
+during the stage.
+**Decided (2026-11-17, M5.1, decisions P1–P4):** promotion works like chess
+([02 §2.2](02-rules-framework.md#22-promotion)). The pawn **stays on the board** as the promoted piece,
+on its square, for the rest of the stage (P1); the player **chooses** knight, bishop, rook or queen,
+with no exception — a Legendary pawn may become a Legendary queen (P2); the piece has the **pawn's
+rarity**, with no tier-up and no roll (P3); and it **joins the deck at once** as a Hero Piece at full
+durability, `origin: promotion`, `pricePaid: 0` (P4). The choice is made while building the queue and
+stored in the `MOVE`, so the preview equals the outcome (I10)
+([M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md)).
+**Alternatives:** the pre-M5.1 rule (pawn leaves the board, a result rolled at generation and shown
+on the pawn); a chooser during resolution (breaks I10, because the queue resolves at once on COMMIT).
+**Trigger:** the replay on the new rules (P7) — if mid-stage queens make stages too easy, tune spawn
+ranks and pars, not this rule.
+
+---
+
+## T. Deck over capacity after a promotion (M5.1)
+
+**Question:** where does the player trim a deck that a promotion pushed above 8?
+**Decided (2026-11-17, M5.1, decision P5):** the stage-end chooser is removed. A won stage goes
+straight to the shop; while the deck holds more than 8 pieces the shop **cannot start the next stage**
+(`deck_over_capacity`), and the player sells, merges or cuts there until it fits (I9,
+[07 §1](07-shop-phase.md#1-entry-exit-and-flow)). Selling and merging happen only in the shop. A
+promoted piece sells for 0 (its `pricePaid`), so promotion is never a coin source.
+**Alternatives:** the M4 stage-end chooser (merge, sell or cut before the shop opens) — an extra
+screen and phase for a rare event, and coins from a sale there were the same as in the shop anyway.
+**Trigger:** revisit sell values in the tuning pass after the replay (P7).
+
+---
+
+## U. No check at START (M5.1)
+
+**Question:** may the player's deployment give check to the enemy king at START?
+**Decided (2026-11-17, M5.1, decision P6):** no. New invariant **I16**: at Start, the black king is
+not in check. `startStage` refuses it (`gives_check`), the Deployment screen marks such squares, and
+generation guarantees the stage's own spawned pawns never give check (`no_start_check`)
+([02 §5](02-rules-framework.md#5-deployment)). User rationale: the player moves first, so a check that
+already stands at START is a free attack the enemy never got to answer.
+**Alternatives:** allow it (the pre-M5.1 rule; felt illegal in the playtest); let the enemy move
+first when a check stands (contradicts "the player always moves first").
+**Trigger:** only if Playing as Black (F) lands, where the side to move changes.
+
+---
+
+## V. One queen summon per stage (M5.1)
+
+**Question:** how many queens may a deployment summon?
+**Decided (2026-11-17, M5.1, decision P10):** **at most one** per stage, of any rarity
+(`deployment.maxQueenSummons: 1`, `queen_limit`, [02 §5](02-rules-framework.md#5-deployment)). The
+limit counts summons only: a pawn may still promote to a queen in that stage; in the next stage that
+queen is a deck piece and counts like any other.
+**Alternatives:** no limit (the spawn-point budget alone; the Act III boss budget of 18 fits two queens);
+counting promoted queens too (would make the promotion picker refuse a type, against P2).
+**Trigger:** the M6 balance pass, if queen-heavy decks still dominate Act III.
+
+---
+
 ## Deferred-by-design (not open, just later)
 
 - Full art and audio production

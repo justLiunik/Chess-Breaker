@@ -25,6 +25,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Boss. Enemy value 25-26, mate in 2, depth-4 policy. There is no line that
   does not spend skills and durability. The player who banked coins into

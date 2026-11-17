@@ -103,7 +103,7 @@
         "color": { "enum": ["white", "black"] },
         "instanceId": {
           "type": "string",
-          "description": "Present only for Hero Pieces (deck-owned); their rarity is read from the deck instance. Stage Pieces have no instance."
+          "description": "Present only for Hero Pieces (deck-owned), including a piece promoted from a spawned pawn during the stage; their rarity is read from the deck instance. Stage Pieces have no instance."
         },
         "stageId": {
           "type": "string",
@@ -116,17 +116,7 @@
         },
         "rarity": {
           "enum": ["normal", "rare", "unique", "legendary"],
-          "description": "Only on spawned pawns. Hero Piece rarity lives on the deck instance; enemy pieces are always Normal (I13)."
-        },
-        "promotesTo": {
-          "type": "object",
-          "required": ["pieceType", "rarity"],
-          "additionalProperties": false,
-          "description": "Only on spawned pawns: the piece this pawn becomes on reaching rank 8. Rolled at generation and shown to the player.",
-          "properties": {
-            "pieceType": { "enum": ["knight", "bishop", "rook", "queen"] },
-            "rarity": { "enum": ["normal", "rare", "unique", "legendary"] }
-          }
+          "description": "Only on spawned pawns. A promoted piece keeps it; the player chooses the type in the MOVE that reaches rank 8, so there is no promotesTo (docs/02 §2.2, M5.1). Hero Piece rarity lives on the deck instance; enemy pieces are always Normal (I13)."
         },
         "transformed": {
           "type": "object",
@@ -141,15 +131,15 @@
       },
       "allOf": [
         {
-          "$comment": "A spawned pawn is a white pawn with a rarity and a visible promotion result, and no deck instance.",
+          "$comment": "A spawned pawn is a white pawn with a rarity and no deck instance. It promotes to the type the player chooses, at its own rarity (docs/02 §2.2).",
           "if": { "required": ["spawned"] },
           "then": {
-            "required": ["rarity", "promotesTo"],
+            "required": ["rarity"],
             "properties": { "pieceType": { "const": "pawn" }, "color": { "const": "white" } },
             "not": { "required": ["instanceId"] }
           },
           "else": {
-            "not": { "anyOf": [{ "required": ["rarity"] }, { "required": ["promotesTo"] }] }
+            "not": { "required": ["rarity"] }
           }
         }
       ]

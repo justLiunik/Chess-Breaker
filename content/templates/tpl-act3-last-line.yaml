@@ -24,6 +24,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Act III normal. Enemy value 21-22 (Act III band 14-22), mate in 2-3,
   depth-3 policy. A queen, a rook and a bishop behind the pawns: every enemy

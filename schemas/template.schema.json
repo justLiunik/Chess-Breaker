@@ -94,7 +94,8 @@
           "enemy_has_moves",
           "deployment_squares_available",
           "enemy_value_in_band",
-          "spawned_pawns_placed"
+          "spawned_pawns_placed",
+          "no_start_check"
         ]
       }
     },
