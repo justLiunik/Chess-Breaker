@@ -58,7 +58,7 @@ Rules for using it:
 
 ```
 package.json                npm workspaces root (`"workspaces": ["packages/*"]` from M1;
-                            `apps/*` joins when apps/web exists in M5)
+                            `"apps/*"` joins in M5)
 data/
   economy.yaml              ALL tuning constants (single source of truth)
 schemas/
@@ -76,12 +76,17 @@ packages/
                             public API) and `./internal` (re-exports for `gen` only)
   content/                  Loads + validates data, exports typed definitions: `loadEngineConfig`,
                             `loadGenConfig`, `loadTemplates`, `loadFormations`, `solverSettingsFor`,
-                            `valueBandFor`, `enemyArmyValue`
+                            `valueBandFor`, `enemyArmyValue`. From M5 each loader is a file read
+                            plus a pure `parse…(text)`; a Node-free browser entry exports the
+                            parsers and the pure helpers (no `node:*` import)
   gen/                      Stage generation + solver (M3), `@checkbreaker/gen`
   run/                      Run layer (M4), `@checkbreaker/run`: run state machine, shop, merge/sell/
                             cut/repair, the stage-end chooser, save serialization
 apps/
-  web/                      React UI
+  web/                      React UI (M5): screens, reducer, `config.ts` (YAML text via Vite `?raw` /
+                            `import.meta.glob` → the content parsers), `storage.ts` (the
+                            `localStorage` `RunStorage`), `generation.worker.ts` (the only importer
+                            of `gen`), `messages.ts` (every error variant → a cause-naming text)
 scripts/
   validate-content.mjs      ajv validation of content/ against schemas/
   check-links.mjs           Broken-link check over the Markdown (`npm run check:links`)
@@ -105,6 +110,25 @@ Boundary rules:
   `node:fs`); it takes its config as a parameter and never imports `gen`. When it needs a stage it
   emits a generation request and is handed the stage (`provideStage`) by the caller — the bot in M4,
   the generation Web Worker in M5 ([M4 spec](superpowers/specs/2026-11-13-m4-run-loop-design.md) §8).
+- `apps/web` (M5): the main thread imports `engine` (never `./internal`), `run` and the Node-free
+  `content` entry; `generation.worker.ts` may also import `gen`. Boundary tests are import
+  **allowlists** for `run` and for `apps/web`: anything not listed fails.
+- **The generation worker protocol** (M5): the main thread posts `{ id, request: GenRequest }` whenever
+  the session has `next.request` and no `next.stage`; the worker answers
+  `{ id, ok: true, stage, provenance, ms }` (`ms` timed inside the worker, around `generateStage`; `gen`
+  itself still never reads a clock) or `{ id, ok: false, message }`. The answer goes to `provideStage`;
+  an answer for a request the session has moved past is dropped by `id`. Tests replace the worker with
+  a `StageSource` double that builds small stages carrying the expected `stageSeed`.
+- **Run-layer additions in M5** ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §6, §9.1):
+  - `restartStage(s, c)`: Action phase before the first COMMIT only (docs/08 §6); back to Deployment
+    with `entryStage`, durability already paid kept, a piece START took to 0 still `spent`. Refusals:
+    `wrong_phase`, and `{ kind: 'restart_unavailable' }` once a turn was committed.
+  - `devSkipStage(s, c)`: a development tool, shown only when the app's dev toggle is on. In Deployment
+    or Action, the stage counts as won through the normal post-win path with the stage's pending base
+    reward only (no par bonus, interest or further salvage); the session gets `debug: true`, kept in the
+    save, and every screen that shows the run marks it **DEBUG RUN**.
+  - `buy` with `opts.replace` while the loadout has room is refused with `{ kind: 'replace_not_needed' }`.
+  - The shop's recovery offer reads as live only while `shop.recovery && !shop.slots[0].sold`.
 
 ## 3. Core types
 
@@ -428,7 +452,8 @@ Rulings the generator and solver depend on:
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
 | `run` | The run state machine (stage → chooser → shop → stage, run end), shop stock and every shop action, merge/sell/cut/repair, the free onboarding skill, the history record, save serialization and validation | Import `gen` or runtime `content`; read a clock or `Math.random`; contain board rules (those are `engine`'s) |
 | `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app's main thread (only the generation Web Worker imports it); use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
-| `apps/web` | Rendering, input, animation, persistence | Contain rules logic |
+| `engine/view` (`view.ts`, M5) | Read-only answers for the UI: `threatMap` (attackers per square, capture lines), `deploymentStatus` (drop validity with its cause, spawn points, START cost summary), `previewSteps` (board and affordability per queue entry, first failing step, and `simulate`'s result for a complete queue), `hudEconomy` (par, overtime bill, next-turn coin potential), `skillUnavailable` (whether a skill could be the queue's next entry, by the queue's own `resolveStep`: not in the loadout, not implemented, or `once_per_turn` used) | Compute anything `simulate`, `startStage` or `legality` would compute differently: it calls them |
+| `apps/web` | Rendering, input, animation, persistence, planning arrows | Contain rules logic; import `gen` or `@checkbreaker/engine/internal` outside `generation.worker.ts` (an import allowlist test enforces it) |
 
 **The single most important architectural rule:** *no rule may live in the UI.* If a designer wants a
 behavior the engine does not express, the engine gains a primitive — the UI never compensates.
@@ -476,6 +501,13 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
   - `RunStorage { read(): string | null; write(text); clear() }` and `memoryStorage()` (each call makes
     a separate store; used by tests and the bot). The `localStorage` adapter, keyed
     `checkbreaker.save.<version>`, arrives in M5.
+- M5 adds ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §7.5, §9.1):
+  - `localStorageRunStorage()` in `apps/web`, keyed `checkbreaker.save.1`; on launch a valid save
+    offers Continue, a refused save shows its `SaveError` text once and offers New run.
+  - `RunSession` gains `entryStage` (the stage as provided, for restart) and `debug?: true` (a run that
+    used the dev skip). `SAVE_VERSION` stays 1.
+  - `loadSave` rebuilds the session from the fields it checked and drops unknown keys; the hand-copied
+    enum lists in `save.ts` carry type-level exhaustiveness checks.
 - **No server.** A lost save is a lost run; the UI says so once and never nags.
 
 ## 9. Testing strategy
@@ -499,7 +531,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
 | Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
-| Run layer | `packages/run/test/`: `session.test.ts` (new run, requests and `provideStage`, commit outcomes, salvage, lost pieces, chooser, free Twin Step at I-3, abandon, phase gating), `session-flow.test.ts` (9 stages from stub stages: acts 1,1,1,2,2,2,3,3 shops, interest, stage 9 → `won`), `boundaries.test.ts` (run imports the engine only, never `gen`, content as types only; no clock or RNG source) |
+| Run layer | `packages/run/test/`: `session.test.ts` (new run, requests and `provideStage`, commit outcomes, salvage, lost pieces, chooser, free Twin Step at I-3, abandon, phase gating), `session-flow.test.ts` (9 stages from stub stages: acts 1,1,1,2,2,2,3,3 shops, interest, stage 9 → `won`), `boundaries.test.ts` (an import allowlist from M5: run imports the engine only, never `gen`, content as types only; no clock or RNG source) |
 | Shop and deck | `prices.test.ts` (piece and skill price tables, sale price and cap), `deck.test.ts` (merge, sell, repair, cut), `shop.test.ts` (stock, recovery offer and withdrawal, purchases, rerolls, 1,000-purchase sale-cap property), `shop-stats.test.ts` (10,000 seeded visits per act: pool, ceilings, weights, skill share; Legendary-queen retention over 100,000 rolls) |
 | Save | `save.test.ts`: every phase round trips deep-equal and plays on to the same end, Review Focus 1 (no second free skill after a reload), unknown versions refused, truncated or mutated saves are typed refusals and never throw |
 | Headless bot | `bot-policy.test.ts` (shop and fallback policy); `npm run bot -- --runs 20` is the acceptance run (0 crashes, 0 invariant breaches, 0 bot failures); the same seed twice gives byte-identical JSON. Kept out of `npm test`: it generates real stages and takes minutes |
@@ -518,7 +550,13 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 - The only performance-sensitive component is the **generation-time solver**. It runs at runtime in
   the generation Web Worker, off the main thread ([04 §5](04-stage-generation-and-authoring.md#5-the-solver)).
 - Target bundle: engine + app under 250 KB gzipped, the worker (with the solver) counted separately.
-  No chess library and no schema validator in the shipped bundle.
+  No chess library and no schema validator in the shipped bundle. The `yaml` parser ships (≈30 KB
+  gzipped) because the browser parses the repository's YAML with the same parsers as Node (M5 U4).
+- COMMIT (`commitQueue`, the enemy search and `hasLegalQueue`) runs on the main thread: input is locked
+  from COMMIT until the reply has played anyway (docs/08 §6), and the app shows a "thinking" state past
+  ~100 ms. The 60 fps target applies to the queue preview, which never runs the enemy search.
+- M5 measures in the browser, on the dev bench page (`/#bench`): generation wall time per template
+  (median, p95) inside the worker, and the enemy search on the golden and rarity bench boards.
 
 ## 11. Repository scripts
 
@@ -531,6 +569,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 | `npm run play` | Terminal playground: place the King and two minors (Deployment phase, `startStage`), then play one Act I stage against the enemy | **M1**, M2 |
 | `npm run dev` | Vite dev server for `apps/web` | M5 |
 | `npm run build` | Production build | M5 |
+| `/#bench` in the app | Dev bench page: browser generation wall time per template (median, p95) in the worker, and `enemyMove` timing on the bench boards | M5 |
 | `npm run gen:report -- [--stages N] [--template id] [--workers W] [--json out.json]` | Template health report: proven rate, mating turn vs par, bonus pawns, `validationFailed`, replay failures, solver nodes and wall time per template, on a fixed deck per act. Numbers are identical whatever `--workers` is; only the wall times differ, so measure them with `--workers 1` (the game generates in one Web Worker) | M3 |
 | `npm run formations:extract` | Rebuild `content/formations/<templateId>.json` from the cached Lichess puzzle file in `.cache/lichess/` (git-ignored, CC0). Offline: it never downloads | M3 |
 | `npm run check:links` | Fail on a broken relative link or heading anchor in the Markdown | M3 |

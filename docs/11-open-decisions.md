@@ -125,6 +125,7 @@ trademark search.
 **Alternative:** hints cost coins, tying information to the economy. Rejected for MVP because it
 punishes new players with the currency they most need for pieces.
 **Trigger:** if playtests show hints trivialize stages.
+**Schedule:** hints are built in M6, not M5 ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) U3).
 
 ---
 
@@ -209,6 +210,30 @@ player-side kind of Stage Piece; neutral pieces would be a third side.)
 **Cost:** a third side means new rules for who may capture them, whether capturing them pays salvage,
 and how the enemy policy treats them. They also overlap with terrain (L).
 **Trigger:** M6+, together with L.
+
+---
+
+## Q. Dev skip stage
+
+**Question:** what happens when the player meets a stage the solver could not prove winnable?
+**Decided (2026-11-16, M5):** a development tool, not a rule: with the app's dev toggle on, **skip
+stage** counts the stage as won with its pending base reward only, and the run is marked DEBUG RUN for
+good ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) U2, [09 §2](09-technical-architecture.md#2-repository-layout)).
+**Alternatives:** regenerate until proven (changes gen, adds wall time over its target, reopens the
+accepted M3 gap); nothing (honest, but a full run may be unreachable).
+**Trigger:** revisit when the proven rate makes unwinnable stages rare, or before any public build.
+
+---
+
+## R. Restart stage scope
+
+**Question:** when may a stage be restarted, and what does a restart keep?
+**Decided (2026-11-16, M5):** only in the Action phase before the first COMMIT; durability paid at
+START stays paid and a piece START took to 0 stays `spent`
+([08 §6](08-progression-and-ux.md#6-commit-undo-and-honesty), [M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) U6, U10).
+**Alternative:** restart at any time with every loss kept. Rejected: it allows scouting the enemy's
+replies and needs a rule for each kind of loss (overtime, captures, salvage, promotions, skills).
+**Trigger:** if playtests show players want to retry a stage they have started playing.
 
 ---
 

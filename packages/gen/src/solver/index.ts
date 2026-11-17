@@ -1,7 +1,7 @@
 import { startStage } from '@checkbreaker/engine';
 import type { RunState, StageState } from '@checkbreaker/engine';
-import { solverSettingsFor } from '@checkbreaker/content';
-import type { GenConfig } from '@checkbreaker/content';
+import { solverSettingsFor } from '@checkbreaker/content/parse';
+import type { GenConfig } from '@checkbreaker/content/parse';
 import type { Placement, SolveResult } from '../types';
 import { deploymentCandidates } from './deployment';
 import { byText, newSearch, runBeam } from './beam';

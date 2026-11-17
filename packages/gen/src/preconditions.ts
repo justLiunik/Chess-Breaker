@@ -2,8 +2,8 @@ import * as internal from '@checkbreaker/engine/internal';
 import type { Move } from '@checkbreaker/engine/internal';
 import { rankOf, spawnCostOf, toIndex, toSquare } from '@checkbreaker/engine';
 import type { AbilityTable, DeckType, Rarity, RunState, Square, StageState } from '@checkbreaker/engine';
-import { enemyArmyValue, valueBandFor } from '@checkbreaker/content';
-import type { ActKey, GenConfig, PreconditionId, Template } from '@checkbreaker/content';
+import { enemyArmyValue, valueBandFor } from '@checkbreaker/content/parse';
+import type { ActKey, GenConfig, PreconditionId, Template } from '@checkbreaker/content/parse';
 import type { Placement } from './types';
 
 // Imported bindings are copied into module constants once (see packages/engine/src/movegen.ts):

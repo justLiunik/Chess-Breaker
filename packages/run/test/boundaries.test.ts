@@ -32,6 +32,23 @@ describe('run boundaries', () => {
     }
   });
 
+  it('imports only allowlisted modules', () => {
+    for (const f of files) {
+      const text = readFileSync(f, 'utf8');
+      const specs = [
+        ...[...text.matchAll(/(?:import|export)\s(type\s)?[^;]*?from\s*['"]([^'"]+)['"]/g)].map((m) => ({ type: !!m[1], spec: m[2]! })),
+        ...[...text.matchAll(/import\s*['"]([^'"]+)['"]/g)].map((m) => ({ type: false, spec: m[1]! })),
+        ...[...text.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => ({ type: false, spec: m[1]! })),
+        ...[...text.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => ({ type: false, spec: m[1]! })),
+      ];
+      for (const { type, spec } of specs) {
+        const allowed = spec.startsWith('./') || spec.startsWith('../') || spec === '@checkbreaker/engine'
+          || (spec === '@checkbreaker/content' && type);
+        expect(allowed, `${f} imports ${spec}`).toBe(true);
+      }
+    }
+  });
+
   it('uses no nondeterministic sources', () => {
     for (const f of files) {
       const text = readFileSync(f, 'utf8');

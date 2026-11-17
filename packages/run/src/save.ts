@@ -1,7 +1,10 @@
 import { TIERS, isSquare } from '@checkbreaker/engine';
-import type { Result } from '@checkbreaker/engine';
+import type {
+  ActiveModifier, BoardPiece, Color, DeckType, EndReason, EnemyPolicy, PieceInstance, PieceType, Rarity, Result,
+  RunState, StageState,
+} from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { RunPhase, RunSession } from './types';
+import type { GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
 
 /** The save file's format version (spec section 8.5); `loadSave` reads this version only. */
 export const SAVE_VERSION = 1;
@@ -88,16 +91,54 @@ type Obj = Record<string, unknown>;
 
 class Invalid extends Error {}
 
-const PHASES: readonly RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'];
-const PIECE_TYPES = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'] as const;
-const INSTANCE_TYPES = ['king', 'knight', 'bishop', 'rook', 'queen'] as const;
-const DECK_TYPES = ['knight', 'bishop', 'rook', 'queen'] as const;
-const COLORS = ['white', 'black'] as const;
-const ORIGINS = ['starter', 'shop', 'promotion', 'merge', 'reward'] as const;
-const PIECE_STATUSES = ['in_deck', 'deployed', 'captured', 'spent'] as const;
-const RUN_STATUSES = ['in_progress', 'won', 'lost'] as const;
-const STAGE_STATUSES = ['active', 'won', 'lost'] as const;
-const END_REASONS = ['checkmate', 'enemy_stalemated', 'out_of_coins', 'player_mated', 'player_stalemated'] as const;
+/**
+ * The enum lists below are hand-copied from the types. Each is `satisfies` its union (no stray value) and has
+ * a compile-time check that it misses none: a union member absent from its list turns the paired constant
+ * into `never`, which `true` is not assignable to.
+ */
+const PHASES = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'] as const satisfies readonly RunPhase[];
+const _phases: Exclude<RunPhase, typeof PHASES[number]> extends never ? true : never = true;
+const PIECE_TYPES = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'] as const satisfies readonly PieceType[];
+const _pieceTypes: Exclude<PieceType, typeof PIECE_TYPES[number]> extends never ? true : never = true;
+const INSTANCE_TYPES = ['king', 'knight', 'bishop', 'rook', 'queen'] as const satisfies readonly PieceInstance['pieceType'][];
+const _instanceTypes: Exclude<PieceInstance['pieceType'], typeof INSTANCE_TYPES[number]> extends never ? true : never = true;
+const DECK_TYPES = ['knight', 'bishop', 'rook', 'queen'] as const satisfies readonly DeckType[];
+const _deckTypes: Exclude<DeckType, typeof DECK_TYPES[number]> extends never ? true : never = true;
+const COLORS = ['white', 'black'] as const satisfies readonly Color[];
+const _colors: Exclude<Color, typeof COLORS[number]> extends never ? true : never = true;
+const ORIGINS = ['starter', 'shop', 'promotion', 'merge', 'reward'] as const satisfies readonly PieceInstance['origin'][];
+const _origins: Exclude<PieceInstance['origin'], typeof ORIGINS[number]> extends never ? true : never = true;
+const PIECE_STATUSES = ['in_deck', 'deployed', 'captured', 'spent'] as const satisfies readonly PieceInstance['status'][];
+const _pieceStatuses: Exclude<PieceInstance['status'], typeof PIECE_STATUSES[number]> extends never ? true : never = true;
+const RUN_STATUSES = ['in_progress', 'won', 'lost'] as const satisfies readonly RunState['status'][];
+const _runStatuses: Exclude<RunState['status'], typeof RUN_STATUSES[number]> extends never ? true : never = true;
+const STAGE_STATUSES = ['active', 'won', 'lost'] as const satisfies readonly StageState['status'][];
+const _stageStatuses: Exclude<StageState['status'], typeof STAGE_STATUSES[number]> extends never ? true : never = true;
+const END_REASONS = ['checkmate', 'enemy_stalemated', 'out_of_coins', 'player_mated', 'player_stalemated'] as const satisfies readonly EndReason[];
+const _endReasons: Exclude<EndReason, typeof END_REASONS[number]> extends never ? true : never = true;
+const OUTCOME_END_REASONS = [...END_REASONS, 'abandoned'] as const satisfies readonly NonNullable<NonNullable<RunSession['outcome']>['endReason']>[];
+const _outcomeEndReasons: Exclude<NonNullable<NonNullable<RunSession['outcome']>['endReason']>, typeof OUTCOME_END_REASONS[number]> extends never ? true : never = true;
+const OUTCOME_RESULTS = ['won', 'lost'] as const satisfies readonly NonNullable<RunSession['outcome']>['result'][];
+const _outcomeResults: Exclude<NonNullable<RunSession['outcome']>['result'], typeof OUTCOME_RESULTS[number]> extends never ? true : never = true;
+const HISTORY_OUTCOMES = ['win', 'loss'] as const satisfies readonly RunState['history'][number]['outcome'][];
+const _historyOutcomes: Exclude<RunState['history'][number]['outcome'], typeof HISTORY_OUTCOMES[number]> extends never ? true : never = true;
+const POLICY_TYPES = ['best_move', 'scripted'] as const satisfies readonly EnemyPolicy['type'][];
+const _policyTypes: Exclude<EnemyPolicy['type'], typeof POLICY_TYPES[number]> extends never ? true : never = true;
+const STAGE_PHASES = ['deployment', 'action'] as const satisfies readonly StageState['phase'][];
+const _stagePhases: Exclude<StageState['phase'], typeof STAGE_PHASES[number]> extends never ? true : never = true;
+const OFFER_KINDS = ['piece', 'skill'] as const satisfies readonly Offer['kind'][];
+const _offerKinds: Exclude<Offer['kind'], typeof OFFER_KINDS[number]> extends never ? true : never = true;
+const SESSION_VERSIONS = [1] as const satisfies readonly RunSession['version'][];
+const _sessionVersions: Exclude<RunSession['version'], typeof SESSION_VERSIONS[number]> extends never ? true : never = true;
+/**
+ * `RunState['version']` is `number` in the engine's types, not a finite union, so no completeness check can
+ * exist: the save accepts the one run-state version this build writes.
+ */
+const RUN_STATE_VERSIONS = [1] as const satisfies readonly RunState['version'][];
+void [
+  _phases, _pieceTypes, _instanceTypes, _deckTypes, _colors, _origins, _pieceStatuses, _runStatuses, _stageStatuses, _endReasons,
+  _outcomeEndReasons, _outcomeResults, _historyOutcomes, _policyTypes, _stagePhases, _offerKinds, _sessionVersions,
+];
 
 const isRecord = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 /** An own property only: JSON never sets the prototype, and `toString` and friends are not fields. */
@@ -125,166 +166,243 @@ function bool(v: unknown, path: string): boolean {
 function oneOf<T>(v: unknown, path: string, values: readonly T[]): T {
   return values.includes(v as T) ? (v as T) : bad(path, `expected one of ${values.join(' | ')}`);
 }
-/** Checks `o[key]` with `check` when the key is present. */
-function opt(o: Obj, key: string, path: string, check: (v: unknown, path: string) => unknown): void {
-  if (Object.hasOwn(o, key)) check(o[key], `${path}.${key}`);
-}
-function nullable(v: unknown, path: string, check: (v: unknown, path: string) => void): void {
-  if (v !== null) check(v, path);
-}
-function each(v: unknown, path: string, check: (x: unknown, path: string) => void): unknown[] {
-  const xs = arr(v, path);
-  xs.forEach((x, i) => check(x, `${path}[${i}]`));
-  return xs;
+/** `null` stays `null`; anything else is rebuilt by `check`. */
+function nullable<T>(v: unknown, path: string, check: (v: unknown, path: string) => T): T | null {
+  return v === null ? null : check(v, path);
 }
 
-function checkPiece(v: unknown, path: string): void {
+/** Sets `target[key]` to the checked value of `o[key]` when the key is present; absent keys stay absent. */
+function put<T extends object, K extends keyof T>(
+  target: T, key: K, o: Obj, path: string, check: (v: unknown, path: string) => T[K],
+): void {
+  if (Object.hasOwn(o, key as string)) target[key] = check(o[key as string], `${path}.${String(key)}`);
+}
+function strings<T extends string = string>(v: unknown, path: string): T[] {
+  return arr(v, path).map((x, i) => str(x, `${path}[${i}]`) as T);
+}
+function exactly<T>(value: T): (v: unknown, path: string) => T {
+  return (v, path) => oneOf(v, path, [value]);
+}
+function tier(v: unknown, path: string): Rarity {
+  return oneOf(v, path, TIERS);
+}
+
+// Each checker returns a fresh object holding only the keys it checks: unknown keys in the file are dropped,
+// so nothing player-supplied (however deeply nested) reaches the session beyond the typed shape.
+
+function checkPiece(v: unknown, path: string): PieceInstance {
   const p = obj(v, path);
-  str(own(p, 'instanceId'), `${path}.instanceId`);
-  oneOf(own(p, 'pieceType'), `${path}.pieceType`, INSTANCE_TYPES);
-  nullable(own(p, 'rarity'), `${path}.rarity`, (x, at) => oneOf(x, at, TIERS));
-  nullable(own(p, 'durability'), `${path}.durability`, num);
-  nullable(own(p, 'durabilityMax'), `${path}.durabilityMax`, num);
-  oneOf(own(p, 'origin'), `${path}.origin`, ORIGINS);
-  int(own(p, 'acquiredAtStage'), `${path}.acquiredAtStage`);
-  opt(p, 'pricePaid', path, num);
-  opt(p, 'usedOnce', path, (x, at) => each(x, at, str));
-  oneOf(own(p, 'status'), `${path}.status`, PIECE_STATUSES);
+  const rarity = own(p, 'rarity');
+  const durability = own(p, 'durability');
+  const durabilityMax = own(p, 'durabilityMax');
+  const out: PieceInstance = {
+    instanceId: str(own(p, 'instanceId'), `${path}.instanceId`),
+    pieceType: oneOf(own(p, 'pieceType'), `${path}.pieceType`, INSTANCE_TYPES),
+    rarity: rarity === null ? null : tier(rarity, `${path}.rarity`),
+    durability: durability === null ? null : num(durability, `${path}.durability`),
+    durabilityMax: durabilityMax === null ? null : num(durabilityMax, `${path}.durabilityMax`),
+    origin: oneOf(own(p, 'origin'), `${path}.origin`, ORIGINS),
+    acquiredAtStage: int(own(p, 'acquiredAtStage'), `${path}.acquiredAtStage`),
+    status: oneOf(own(p, 'status'), `${path}.status`, PIECE_STATUSES),
+  };
+  put(out, 'pricePaid', p, path, num);
+  put(out, 'usedOnce', p, path, (x, at) => strings<'lifeline'>(x, at));
+  return out;
 }
 
-function checkRun(v: unknown, path: string, c: RunConfig): Obj {
+function checkRun(v: unknown, path: string, c: RunConfig): RunState {
   const r = obj(v, path);
-  oneOf(own(r, 'version'), `${path}.version`, [1]);
-  str(own(r, 'seed'), `${path}.seed`);
-  int(own(r, 'actIndex'), `${path}.actIndex`, 0, c.run.acts - 1);
-  int(own(r, 'stageIndex'), `${path}.stageIndex`, 0, c.run.stagesPerAct - 1);
-  num(own(r, 'coins'), `${path}.coins`);
-  int(own(r, 'deckCapacity'), `${path}.deckCapacity`);
-  each(own(r, 'deck'), `${path}.deck`, checkPiece);
-  each(own(r, 'loadout'), `${path}.loadout`, (x, at) => str(own(obj(x, at), 'skillId'), `${at}.skillId`));
-  each(own(r, 'history'), `${path}.history`, (x, at) => {
-    const h = obj(x, at);
-    str(own(h, 'stageSeed'), `${at}.stageSeed`);
-    str(own(h, 'templateId'), `${at}.templateId`);
-    oneOf(own(h, 'outcome'), `${at}.outcome`, ['win', 'loss']);
-    for (const k of ['turnsUsed', 'coinsEarned', 'piecesLost']) num(own(h, k), `${at}.${k}`);
-  });
-  num(own(r, 'rngCursor'), `${path}.rngCursor`);
-  oneOf(own(r, 'status'), `${path}.status`, RUN_STATUSES);
-  return r;
+  return {
+    version: oneOf(own(r, 'version'), `${path}.version`, RUN_STATE_VERSIONS),
+    seed: str(own(r, 'seed'), `${path}.seed`),
+    actIndex: int(own(r, 'actIndex'), `${path}.actIndex`, 0, c.run.acts - 1),
+    stageIndex: int(own(r, 'stageIndex'), `${path}.stageIndex`, 0, c.run.stagesPerAct - 1),
+    coins: num(own(r, 'coins'), `${path}.coins`),
+    deckCapacity: int(own(r, 'deckCapacity'), `${path}.deckCapacity`) as 8,
+    deck: arr(own(r, 'deck'), `${path}.deck`).map((x, i) => checkPiece(x, `${path}.deck[${i}]`)),
+    loadout: arr(own(r, 'loadout'), `${path}.loadout`).map((x, i) => {
+      const at = `${path}.loadout[${i}]`;
+      return { skillId: str(own(obj(x, at), 'skillId'), `${at}.skillId`) };
+    }),
+    history: arr(own(r, 'history'), `${path}.history`).map((x, i) => {
+      const at = `${path}.history[${i}]`;
+      const h = obj(x, at);
+      return {
+        stageSeed: str(own(h, 'stageSeed'), `${at}.stageSeed`),
+        templateId: str(own(h, 'templateId'), `${at}.templateId`),
+        outcome: oneOf(own(h, 'outcome'), `${at}.outcome`, HISTORY_OUTCOMES),
+        turnsUsed: num(own(h, 'turnsUsed'), `${at}.turnsUsed`),
+        coinsEarned: num(own(h, 'coinsEarned'), `${at}.coinsEarned`),
+        piecesLost: num(own(h, 'piecesLost'), `${at}.piecesLost`),
+      };
+    }),
+    rngCursor: num(own(r, 'rngCursor'), `${path}.rngCursor`),
+    status: oneOf(own(r, 'status'), `${path}.status`, RUN_STATUSES),
+  };
 }
 
-function checkBoardPiece(v: unknown, path: string): void {
+function checkBoardPiece(v: unknown, path: string): BoardPiece {
   const p = obj(v, path);
-  oneOf(own(p, 'pieceType'), `${path}.pieceType`, PIECE_TYPES);
-  oneOf(own(p, 'color'), `${path}.color`, COLORS);
-  opt(p, 'instanceId', path, str);
-  opt(p, 'stageId', path, str);
-  opt(p, 'spawned', path, (x, at) => oneOf(x, at, [true]));
-  opt(p, 'rarity', path, (x, at) => oneOf(x, at, TIERS));
-  opt(p, 'promotesTo', path, (x, at) => {
+  const out: BoardPiece = {
+    pieceType: oneOf(own(p, 'pieceType'), `${path}.pieceType`, PIECE_TYPES),
+    color: oneOf(own(p, 'color'), `${path}.color`, COLORS),
+  };
+  put(out, 'instanceId', p, path, str);
+  put(out, 'stageId', p, path, str);
+  put(out, 'spawned', p, path, exactly(true as const));
+  put(out, 'rarity', p, path, tier);
+  put(out, 'promotesTo', p, path, (x, at) => {
     const t = obj(x, at);
-    oneOf(own(t, 'pieceType'), `${at}.pieceType`, DECK_TYPES);
-    oneOf(own(t, 'rarity'), `${at}.rarity`, TIERS);
+    return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, DECK_TYPES), rarity: tier(own(t, 'rarity'), `${at}.rarity`) };
   });
-  opt(p, 'transformed', path, (x, at) => {
+  put(out, 'transformed', p, path, (x, at) => {
     const t = obj(x, at);
-    oneOf(own(t, 'pieceType'), `${at}.pieceType`, PIECE_TYPES);
-    str(own(t, 'modifierId'), `${at}.modifierId`);
+    return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, PIECE_TYPES), modifierId: str(own(t, 'modifierId'), `${at}.modifierId`) };
   });
+  return out;
 }
 
-function checkStage(v: unknown, path: string): void {
+function checkModifier(v: unknown, path: string): ActiveModifier {
+  const m = obj(v, path);
+  const out = {
+    modifierId: str(own(m, 'modifierId'), `${path}.modifierId`),
+    primitive: str(own(m, 'primitive'), `${path}.primitive`),
+    duration: str(own(m, 'duration'), `${path}.duration`),
+  } as ActiveModifier;
+  put(out, 'source', m, path, str);
+  put(out, 'target', m, path, str);
+  put(out, 'appliedOnTurn', m, path, num);
+  return out;
+}
+
+function checkEnemyPolicy(v: unknown, path: string): EnemyPolicy {
+  const p = obj(v, path);
+  const out: EnemyPolicy = { type: oneOf(own(p, 'type'), `${path}.type`, POLICY_TYPES) };
+  put(out, 'depth', p, path, num);
+  put(out, 'seed', p, path, str);
+  put(out, 'line', p, path, (x, at) => strings(x, at));
+  put(out, 'fallbackDepth', p, path, num);
+  put(out, 'cursor', p, path, num);
+  put(out, 'fellBack', p, path, bool);
+  return out;
+}
+
+function checkStage(v: unknown, path: string): StageState {
   const s = obj(v, path);
-  str(own(s, 'stageSeed'), `${path}.stageSeed`);
-  str(own(s, 'templateId'), `${path}.templateId`);
-  oneOf(own(s, 'playerColor'), `${path}.playerColor`, COLORS);
-  oneOf(own(s, 'phase'), `${path}.phase`, ['deployment', 'action']);
+  const board: Record<string, BoardPiece> = {};
   for (const [sq, piece] of Object.entries(obj(own(s, 'board'), `${path}.board`))) {
     if (!isSquare(sq)) bad(`${path}.board`, `${JSON.stringify(sq.slice(0, 8))} is not a square`);
-    checkBoardPiece(piece, `${path}.board.${sq}`);
+    board[sq] = checkBoardPiece(piece, `${path}.board.${sq}`);
   }
-  for (const k of ['turnsUsed', 'mateIn', 'overtimePaid', 'focus', 'focusPool', 'moveCredits', 'spawnPoints']) {
-    num(own(s, k), `${path}.${k}`);
-  }
-  each(own(s, 'modifiers'), `${path}.modifiers`, (x, at) => {
-    const m = obj(x, at);
-    str(own(m, 'modifierId'), `${at}.modifierId`);
-    str(own(m, 'primitive'), `${at}.primitive`);
-    str(own(m, 'duration'), `${at}.duration`);
-    opt(m, 'source', at, str);
-    opt(m, 'target', at, str);
-    opt(m, 'appliedOnTurn', at, num);
+  const out: StageState = {
+    stageSeed: str(own(s, 'stageSeed'), `${path}.stageSeed`),
+    templateId: str(own(s, 'templateId'), `${path}.templateId`),
+    playerColor: oneOf(own(s, 'playerColor'), `${path}.playerColor`, COLORS),
+    phase: oneOf(own(s, 'phase'), `${path}.phase`, STAGE_PHASES),
+    board,
+    turnsUsed: num(own(s, 'turnsUsed'), `${path}.turnsUsed`),
+    mateIn: num(own(s, 'mateIn'), `${path}.mateIn`),
+    overtimePaid: num(own(s, 'overtimePaid'), `${path}.overtimePaid`),
+    focus: num(own(s, 'focus'), `${path}.focus`),
+    focusPool: num(own(s, 'focusPool'), `${path}.focusPool`),
+    moveCredits: num(own(s, 'moveCredits'), `${path}.moveCredits`),
+    spawnPoints: num(own(s, 'spawnPoints'), `${path}.spawnPoints`),
+    modifiers: arr(own(s, 'modifiers'), `${path}.modifiers`).map((x, i) => checkModifier(x, `${path}.modifiers[${i}]`)),
+    skillLog: arr(own(s, 'skillLog'), `${path}.skillLog`).map((x, i) => {
+      const at = `${path}.skillLog[${i}]`;
+      const e = obj(x, at);
+      const entry: StageState['skillLog'][number] = { skillId: str(own(e, 'skillId'), `${at}.skillId`), turn: num(own(e, 'turn'), `${at}.turn`) };
+      put(entry, 'targetId', e, at, str);
+      return entry;
+    }),
+    enemyPolicy: checkEnemyPolicy(own(s, 'enemyPolicy'), `${path}.enemyPolicy`),
+    status: oneOf(own(s, 'status'), `${path}.status`, STAGE_STATUSES),
+  };
+  put(out, 'endReason', s, path, (x, at) => oneOf(x, at, END_REASONS));
+  put(out, 'provenance', s, path, (x, at) => {
+    const pv = obj(x, at);
+    const prov: NonNullable<StageState['provenance']> = {};
+    put(prov, 'templateId', pv, at, str);
+    put(prov, 'seed', pv, at, str);
+    put(prov, 'attempts', pv, at, num);
+    put(prov, 'validationFailed', pv, at, bool);
+    return prov;
   });
-  each(own(s, 'skillLog'), `${path}.skillLog`, (x, at) => {
-    const e = obj(x, at);
-    str(own(e, 'skillId'), `${at}.skillId`);
-    num(own(e, 'turn'), `${at}.turn`);
-    opt(e, 'targetId', at, str);
-  });
-  const policy = obj(own(s, 'enemyPolicy'), `${path}.enemyPolicy`);
-  oneOf(own(policy, 'type'), `${path}.enemyPolicy.type`, ['best_move', 'scripted']);
-  for (const k of ['depth', 'fallbackDepth', 'cursor']) opt(policy, k, `${path}.enemyPolicy`, num);
-  opt(policy, 'seed', `${path}.enemyPolicy`, str);
-  opt(policy, 'line', `${path}.enemyPolicy`, (x, at) => each(x, at, str));
-  opt(policy, 'fellBack', `${path}.enemyPolicy`, bool);
-  oneOf(own(s, 'status'), `${path}.status`, STAGE_STATUSES);
-  opt(s, 'endReason', path, (x, at) => oneOf(x, at, END_REASONS));
-  opt(s, 'provenance', path, obj);
+  return out;
 }
 
-function checkShop(v: unknown, path: string, c: RunConfig): void {
+function checkOffer(v: unknown, path: string): Offer & { sold: boolean } {
+  const o = obj(v, path);
+  const kind = oneOf(own(o, 'kind'), `${path}.kind`, OFFER_KINDS);
+  const price = num(own(o, 'price'), `${path}.price`);
+  const sold = bool(own(o, 'sold'), `${path}.sold`);
+  if (kind === 'skill') return { kind, skillId: str(own(o, 'skillId'), `${path}.skillId`), price, sold };
+  const piece: Extract<Offer, { kind: 'piece' }> & { sold: boolean } = {
+    kind,
+    pieceType: oneOf(own(o, 'pieceType'), `${path}.pieceType`, DECK_TYPES),
+    rarity: tier(own(o, 'rarity'), `${path}.rarity`),
+    price,
+    sold,
+  };
+  put(piece, 'recovery', o, path, exactly(true as const));
+  return piece;
+}
+
+function checkShop(v: unknown, path: string, c: RunConfig): ShopState {
   const s = obj(v, path);
-  int(own(s, 'act'), `${path}.act`, 1, c.run.acts);
-  int(own(s, 'stageNumber'), `${path}.stageNumber`, 0, c.run.acts * c.run.stagesPerAct - 1);
-  int(own(s, 'roll'), `${path}.roll`);
-  int(own(s, 'rerollsUsed'), `${path}.rerollsUsed`);
-  bool(own(s, 'recovery'), `${path}.recovery`);
-  each(own(s, 'slots'), `${path}.slots`, (x, at) => {
-    const o = obj(x, at);
-    const kind = oneOf(own(o, 'kind'), `${at}.kind`, ['piece', 'skill']);
-    if (kind === 'piece') {
-      oneOf(own(o, 'pieceType'), `${at}.pieceType`, DECK_TYPES);
-      oneOf(own(o, 'rarity'), `${at}.rarity`, TIERS);
-      opt(o, 'recovery', at, (y, p) => oneOf(y, p, [true]));
-    } else {
-      str(own(o, 'skillId'), `${at}.skillId`);
-    }
-    num(own(o, 'price'), `${at}.price`);
-    bool(own(o, 'sold'), `${at}.sold`);
-  });
+  return {
+    act: int(own(s, 'act'), `${path}.act`, 1, c.run.acts) as ShopState['act'],
+    stageNumber: int(own(s, 'stageNumber'), `${path}.stageNumber`, 0, c.run.acts * c.run.stagesPerAct - 1),
+    roll: int(own(s, 'roll'), `${path}.roll`),
+    rerollsUsed: int(own(s, 'rerollsUsed'), `${path}.rerollsUsed`),
+    recovery: bool(own(s, 'recovery'), `${path}.recovery`),
+    slots: arr(own(s, 'slots'), `${path}.slots`).map((x, i) => checkOffer(x, `${path}.slots[${i}]`)),
+  };
 }
 
 function checkSession(v: unknown, c: RunConfig): RunSession {
   const s = obj(v, 'session');
-  oneOf(own(s, 'version'), 'session.version', [1]);
-  const run = checkRun(own(s, 'run'), 'session.run', c);
-  const phase = oneOf(own(s, 'phase'), 'session.phase', PHASES);
-  nullable(own(s, 'stage'), 'session.stage', checkStage);
-  nullable(own(s, 'tally'), 'session.tally', (x, at) => {
-    const t = obj(x, at);
-    for (const k of ['startCoins', 'salvage', 'piecesLost']) num(own(t, k), `${at}.${k}`);
-  });
-  nullable(own(s, 'chooser'), 'session.chooser', (x, at) => int(own(obj(x, at), 'overCapacity'), `${at}.overCapacity`, 1));
-  nullable(own(s, 'shop'), 'session.shop', (x, at) => checkShop(x, at, c));
-  nullable(own(s, 'next'), 'session.next', (x, at) => {
-    const n = obj(x, at);
-    const request = obj(own(n, 'request'), `${at}.request`);
-    checkRun(own(request, 'run'), `${at}.request.run`, c);
-    int(own(request, 'actIndex'), `${at}.request.actIndex`, 0, c.run.acts - 1);
-    int(own(request, 'stageIndex'), `${at}.request.stageIndex`, 0, c.run.stagesPerAct - 1);
-    opt(request, 'previousTemplateId', `${at}.request`, str);
-    nullable(own(n, 'stage'), `${at}.stage`, checkStage);
-  });
-  nullable(own(s, 'outcome'), 'session.outcome', (x, at) => {
-    const o = obj(x, at);
-    oneOf(own(o, 'result'), `${at}.result`, ['won', 'lost']);
-    opt(o, 'endReason', at, (y, p) => oneOf(y, p, [...END_REASONS, 'abandoned']));
-  });
+  const session: RunSession = {
+    version: oneOf(own(s, 'version'), 'session.version', SESSION_VERSIONS),
+    run: checkRun(own(s, 'run'), 'session.run', c),
+    phase: oneOf(own(s, 'phase'), 'session.phase', PHASES),
+    stage: nullable(own(s, 'stage'), 'session.stage', checkStage),
+    entryStage: nullable(own(s, 'entryStage'), 'session.entryStage', checkStage),
+    tally: nullable(own(s, 'tally'), 'session.tally', (x, at) => {
+      const t = obj(x, at);
+      return {
+        startCoins: num(own(t, 'startCoins'), `${at}.startCoins`),
+        salvage: num(own(t, 'salvage'), `${at}.salvage`),
+        piecesLost: num(own(t, 'piecesLost'), `${at}.piecesLost`),
+      };
+    }),
+    chooser: nullable(own(s, 'chooser'), 'session.chooser', (x, at) => (
+      { overCapacity: int(own(obj(x, at), 'overCapacity'), `${at}.overCapacity`, 1) }
+    )),
+    shop: nullable(own(s, 'shop'), 'session.shop', (x, at) => checkShop(x, at, c)),
+    next: nullable(own(s, 'next'), 'session.next', (x, at) => {
+      const n = obj(x, at);
+      const rq = obj(own(n, 'request'), `${at}.request`);
+      const request: GenRequest = {
+        run: checkRun(own(rq, 'run'), `${at}.request.run`, c),
+        actIndex: int(own(rq, 'actIndex'), `${at}.request.actIndex`, 0, c.run.acts - 1),
+        stageIndex: int(own(rq, 'stageIndex'), `${at}.request.stageIndex`, 0, c.run.stagesPerAct - 1),
+      };
+      put(request, 'previousTemplateId', rq, `${at}.request`, str);
+      return { request, stage: nullable(own(n, 'stage'), `${at}.stage`, checkStage) };
+    }),
+    outcome: nullable(own(s, 'outcome'), 'session.outcome', (x, at) => {
+      const o = obj(x, at);
+      const out: NonNullable<RunSession['outcome']> = { result: oneOf(own(o, 'result'), `${at}.result`, OUTCOME_RESULTS) };
+      put(out, 'endReason', o, at, (y, p) => oneOf(y, p, OUTCOME_END_REASONS));
+      return out;
+    }),
+  };
+  put(session, 'debug', s, 'session', exactly(true as const));
+  const { run, phase } = session;
 
   // Invariants (spec section 8.5).
-  const session = s as unknown as RunSession;
-  const deck = session.run.deck;
+  const deck = run.deck;
   const kings = deck.filter(p => p.pieceType === 'king').length;
   if (kings !== 1) bad('session.run.deck', `expected exactly one King, found ${kings}`);
   const nonKing = deck.length - kings;
@@ -292,11 +410,15 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
   if (!midStage && nonKing > c.deck.capacity) {
     bad('session.run.deck', `${nonKing} non-king pieces exceed the capacity of ${c.deck.capacity} in phase ${phase}`);
   }
-  const loadout = (run.loadout as unknown[]).length;
+  const loadout = run.loadout.length;
   if (loadout > c.run.loadoutSlots) bad('session.run.loadout', `${loadout} skills exceed the ${c.run.loadoutSlots} loadout slots`);
   const needs: Partial<Record<RunPhase, (keyof RunSession)[]>> = {
     awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], chooser: ['chooser'], shop: ['shop', 'next'], ended: ['outcome'],
   };
+  const inStage = phase === 'deployment' || phase === 'action';
+  if (inStage !== (session.entryStage !== null)) {
+    bad('session.entryStage', inStage ? `phase ${phase} needs it set` : `must be null in phase ${phase}`);
+  }
   for (const field of needs[phase] ?? []) {
     if (session[field] === null) bad(`session.${field}`, `phase ${phase} needs it set`);
   }

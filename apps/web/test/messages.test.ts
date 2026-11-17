@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+import type { CommitError } from '@checkbreaker/engine';
+import type { RunError, SaveError } from '@checkbreaker/run';
+import { commitErrorText, runErrorText, saveErrorText } from '../src/messages';
+
+const commit: Record<CommitError['kind'], CommitError> = {
+  king_in_check_at_end: { kind: 'king_in_check_at_end', square: 'e1', checkers: ['e8'], afterRevert: false },
+  focus_exceeded: { kind: 'focus_exceeded', atStep: 2, needed: 2, available: 1 },
+  credits_exceeded: { kind: 'credits_exceeded', atStep: 4 },
+  empty_queue: { kind: 'empty_queue' },
+  illegal_move: { kind: 'illegal_move', atStep: 0, from: 'a2', to: 'h7', reason: 'unreachable' },
+  stage_not_active: { kind: 'stage_not_active' },
+  stage_not_won: { kind: 'stage_not_won', status: 'active' },
+  wrong_phase: { kind: 'wrong_phase', expected: 'deployment' },
+  durability_unavailable: { kind: 'durability_unavailable', instanceId: 'n1' },
+  invalid_deployment: { kind: 'invalid_deployment', to: 'c4', reason: 'occupied' },
+  spawn_points_exceeded: { kind: 'spawn_points_exceeded', budget: 5, cost: 7 },
+  skill_unavailable: { kind: 'skill_unavailable', atStep: 1, skillId: 'x', reason: 'once_per_turn' },
+  invalid_target: { kind: 'invalid_target', atStep: 1, skillId: 'x', reason: 'no_target' },
+  invariant_violation: { kind: 'invariant_violation', invariant: 'I1', detail: 'oops' },
+};
+
+const run: Record<RunError['kind'], RunError> = {
+  wrong_phase: { kind: 'wrong_phase', expected: ['shop'] },
+  insufficient_coins: { kind: 'insufficient_coins', price: 9, coins: 4 },
+  deck_full: { kind: 'deck_full' },
+  loadout_full: { kind: 'loadout_full' },
+  replace_not_needed: { kind: 'replace_not_needed' },
+  restart_unavailable: { kind: 'restart_unavailable' },
+  slot_sold: { kind: 'slot_sold', slot: 1 },
+  no_such_slot: { kind: 'no_such_slot', slot: 7 },
+  not_damaged: { kind: 'not_damaged', instanceId: 'n1' },
+  cannot_repair: { kind: 'cannot_repair', instanceId: 'n1', reason: 'spent' },
+  cannot_sell: { kind: 'cannot_sell', instanceId: 'n1', reason: 'king' },
+  cannot_cut: { kind: 'cannot_cut', instanceId: 'n1', reason: 'not_in_deck' },
+  merge_invalid: { kind: 'merge_invalid', reason: 'mismatch' },
+  rerolls_exhausted: { kind: 'rerolls_exhausted' },
+  stage_mismatch: { kind: 'stage_mismatch', expected: 'a', got: 'b' },
+  stage_already_provided: { kind: 'stage_already_provided' },
+  not_ready: { kind: 'not_ready' },
+  engine: { kind: 'engine', error: { kind: 'empty_queue' } },
+};
+
+const save: Record<SaveError['kind'], SaveError> = {
+  malformed: { kind: 'malformed', detail: 'not JSON' },
+  unknown_version: { kind: 'unknown_version', version: 2, message: 'this build reads save version 1' },
+  invalid_session: { kind: 'invalid_session', detail: 'deck: bad' },
+};
+
+function checkTable(texts: string[]) {
+  for (const t of texts) expect(t.trim().length).toBeGreaterThan(0);
+  expect(new Set(texts).size).toBe(texts.length);
+}
+
+describe('error messages', () => {
+  it('commit texts are non-empty and distinct', () => {
+    checkTable(Object.values(commit).map(commitErrorText));
+  });
+  it('run texts are non-empty and distinct', () => {
+    checkTable(Object.values(run).map(runErrorText));
+  });
+  it('save texts are non-empty and distinct', () => {
+    checkTable(Object.values(save).map(saveErrorText));
+  });
+
+  it('names the cause', () => {
+    const f = commitErrorText(commit.focus_exceeded);
+    expect(f).toContain('step 3');
+    expect(f).toContain('needs 2');
+    expect(f).toContain('have 1');
+    expect(f).toContain('Focus');
+    const m = commitErrorText(commit.illegal_move);
+    expect(m).toContain('a2');
+    expect(m).toContain('h7');
+    expect(
+      commitErrorText({ kind: 'king_in_check_at_end', square: 'e1', checkers: ['e8'], afterRevert: true }),
+    ).toMatch(/revert/i);
+    expect(commitErrorText(commit.king_in_check_at_end)).not.toMatch(/revert/i);
+    expect(saveErrorText(save.unknown_version)).toContain('this build reads save version 1');
+    expect(runErrorText(run.insufficient_coins)).toMatch(/9.*4/);
+    expect(runErrorText(run.engine)).toBe(commitErrorText({ kind: 'empty_queue' }));
+  });
+
+  it('distinguishes sub-reasons', () => {
+    const reasons = ['no_piece', 'not_your_piece', 'unreachable', 'own_piece', 'king_square'] as const;
+    checkTable(reasons.map((reason) => commitErrorText({ kind: 'illegal_move', atStep: 0, from: 'a2', to: 'a3', reason })));
+    const merge = ['count', 'mismatch', 'durability', 'legendary', 'ceiling', 'king', 'not_in_deck'] as const;
+    checkTable(merge.map((reason) => runErrorText({ kind: 'merge_invalid', reason })));
+  });
+});

@@ -1,0 +1,108 @@
+:root {
+  --bg: #f4f1ea;
+  --ink: #1d1d1f;
+  --light-sq: #ecdfc2;
+  --dark-sq: #a98b62;
+  --white-piece: #fffdf5;
+  --black-piece: #1b1b1d;
+  --outline: #1d1d1f;
+  --threat: #b3261e;
+  --highlight: #2563eb;
+  --hatch: rgba(29, 29, 31, 0.28);
+  --zone-tint: rgba(37, 99, 235, 0.16);
+  --error: #8c1d18;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; margin: 0; }
+.hud { display: flex; gap: 1.5rem; padding: 0.5rem 1rem; align-items: baseline; border-bottom: 2px solid var(--ink); }
+.deployment-body { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 1rem; }
+.side { min-width: 16rem; max-width: 24rem; }
+
+.board { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); width: min(90vw, 36rem); aspect-ratio: 1; border: 2px solid var(--outline); }
+.square { position: relative; padding: 0; border: 0; cursor: pointer; background: var(--light-sq); }
+.square.dark { background: var(--dark-sq); }
+.square.highlight { outline: 3px solid var(--highlight); outline-offset: -3px; }
+.square:focus-visible { outline: 3px solid var(--highlight); outline-offset: -3px; }
+.square[data-hatch]::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg, var(--hatch) 0 2px, transparent 2px 8px), var(--zone-tint);
+}
+.square.vacated .piece { opacity: 0.3; }
+.square.ghost .piece { opacity: 0.8; filter: drop-shadow(0 0 0 var(--highlight)); }
+.square.ghost { box-shadow: inset 0 0 0 3px var(--highlight); }
+.mark-icon { position: absolute; bottom: 2px; left: 2px; width: 30%; height: 30%; }
+.mark-king-unsafe path:first-child { fill: var(--threat); stroke: var(--outline); stroke-width: 1.5; }
+.mark-king-unsafe path:last-child { fill: none; stroke: #fff; stroke-width: 2; }
+.tray-glyph { display: inline-block; width: 2rem; height: 2rem; vertical-align: middle; }
+.piece { width: 90%; height: 90%; }
+.piece-white .glyph { fill: var(--white-piece); stroke: var(--outline); stroke-width: 2; }
+.piece-black .glyph { fill: var(--black-piece); stroke: var(--black-piece); }
+.frame { fill: none; stroke: var(--outline); stroke-width: 4; }
+.frame-rare { stroke-dasharray: none; }
+.frame-unique { stroke-width: 5; }
+.frame-legendary { stroke-width: 6; }
+.threat { position: absolute; top: 2px; right: 2px; width: 28%; height: 28%; }
+.threat path:first-child { fill: var(--threat); stroke: var(--outline); stroke-width: 1.5; }
+.threat path:last-child { fill: none; stroke: #fff; stroke-width: 2; }
+.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.arrow { stroke: var(--threat); stroke-width: 0.08; stroke-dasharray: 0.2 0.12; }
+.mark { fill: var(--highlight); }
+
+.tray { list-style: none; padding: 0; display: grid; gap: 0.4rem; }
+.tray-piece { width: 100%; text-align: left; padding: 0.4rem; border: 2px solid var(--ink); background: #fff; }
+.tray-piece.selected { outline: 3px solid var(--highlight); }
+.tray-piece:disabled { opacity: 0.6; }
+.pip { font-size: 1rem; }
+.error { color: var(--error); font-weight: 600; }
+.start { margin-top: 1rem; padding: 0.6rem 1.4rem; font-weight: 700; }
+
+.action-body { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 1rem; }
+.action-hud p { margin: 0.25rem 0; }
+.hud-warn { color: var(--error); }
+.hud-loss { color: var(--error); border: 2px solid var(--error); padding: 0.3rem; }
+.hud-win { font-size: 1.2rem; }
+.hud-muted { opacity: 0.65; }
+.queue { list-style: none; padding: 0; display: grid; gap: 0.3rem; }
+.queue-entry { display: flex; gap: 0.25rem; align-items: stretch; }
+.queue-entry.current .queue-main { outline: 3px solid var(--highlight); }
+.queue-entry.problem .queue-main { border-style: dashed; border-color: var(--error); }
+.queue-main { flex: 1; text-align: left; padding: 0.3rem; border: 2px solid var(--ink); background: #fff; }
+.queue-icon { display: inline-block; width: 1.5rem; height: 1.5rem; vertical-align: middle; }
+.queue-problem { color: var(--error); }
+.confirm { position: fixed; inset: auto 0 20% 0; margin: 0 auto; width: min(90vw, 26rem); padding: 1rem; background: #fff; border: 3px solid var(--error); }
+.commit:disabled { opacity: 0.5; }
+
+/* Planning arrows and marks (right mouse button). Own palette (green, amber, purple, teal), kept clear of the
+   engine's threat red and highlight blue; long-short dash, thicker stroke and round caps unlike the preview arrows.
+   Stacking: square backgrounds < plan layer (1) < pieces and icons (2) < preview arrows (3). */
+.plan-overlay { --plan-1: #2e9e45; --plan-2: #d9a400; --plan-3: #8e44ad; --plan-4: #0f9c93; z-index: 1; }
+.plan-1 { --c: var(--plan-1); } .plan-2 { --c: var(--plan-2); } .plan-3 { --c: var(--plan-3); } .plan-4 { --c: var(--plan-4); }
+.plan line { stroke: var(--c); stroke-width: 0.13; stroke-dasharray: 0.4 0.1 0.08 0.1; stroke-linecap: round; opacity: 0.9; }
+.plan polygon { fill: var(--c); opacity: 0.9; }
+circle.plan { fill: none; stroke: var(--c); stroke-width: 0.11; stroke-dasharray: 0.4 0.1 0.08 0.1; stroke-linecap: round; opacity: 0.9; }
+.board .piece, .board .threat, .board .mark-icon { position: relative; z-index: 2; }
+.board .threat, .board .mark-icon { position: absolute; }
+.board .overlay:not(.plan-overlay) { z-index: 3; }
+
+/* Reduced motion is a class from settings.ts, never the media query: motion slides/scales newly shown pieces in, reduced fades them. */
+@keyframes piece-slide-in { from { transform: translateY(-18%) scale(0.85); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes piece-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.board.motion-travel .square.ghost .piece, .board.motion-travel.entering .piece { animation: piece-slide-in 0.25s ease-out; }
+.board.motion-fade .square.ghost .piece, .board.motion-fade.entering .piece { animation: piece-fade-in 0.25s linear; }
+
+.appbar { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.25rem 1rem; }
+.screen { padding: 1rem; }
+.banner { padding: 0.5rem 1rem; background: #fff3cd; border-bottom: 2px solid var(--error); }
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.45); display: flex; justify-content: center; align-items: flex-start; overflow: auto; }
+.modal { position: relative; margin: 2rem 1rem; padding: 1rem 1.5rem; width: min(90vw, 40rem); background: #fff; border: 3px solid var(--ink); }
+.modal-close { float: right; }
+.shop-body { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.offers, .deck, .codex { padding-left: 0; list-style: none; }
+.offer, .deck-piece { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.25rem 0; border-bottom: 1px solid var(--hatch); }
+.offer[data-sold] { opacity: 0.5; }
+.offer-glyph svg, .deck-glyph svg { width: 2rem; height: 2rem; }
+.badge { font-weight: bold; border: 2px solid var(--ink); padding: 0 0.25rem; }
+.progress { display: flex; gap: 0.5rem; list-style: none; padding: 0; }
+.debug-flag { color: var(--error); }
+.award th { text-align: left; font-weight: normal; padding-right: 1.5rem; }
+.award td { text-align: right; }

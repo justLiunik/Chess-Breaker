@@ -25,11 +25,15 @@ export interface RunSession {
   run: RunState;
   phase: RunPhase;
   stage: StageState | null;
+  /** The stage as provided, kept in deployment and action so `restartStage` can go back to it; null elsewhere. */
+  entryStage: StageState | null;
   tally: StageTally | null;
   chooser: { overCapacity: number } | null;
   shop: ShopState | null;
   next: { request: GenRequest; stage: StageState | null } | null;
   outcome: { result: 'won' | 'lost'; endReason?: EndReason | 'abandoned' } | null;
+  /** Set by `devSkipStage` and never cleared: the run used a development tool. Absent otherwise. */
+  debug?: true;
 }
 
 export type RunError =
@@ -37,6 +41,8 @@ export type RunError =
   | { kind: 'insufficient_coins'; price: number; coins: number }
   | { kind: 'deck_full' }
   | { kind: 'loadout_full' }
+  | { kind: 'replace_not_needed' }
+  | { kind: 'restart_unavailable' }
   | { kind: 'slot_sold'; slot: number }
   | { kind: 'no_such_slot'; slot: number }
   | { kind: 'not_damaged'; instanceId: string }
@@ -53,6 +59,8 @@ export type RunError =
 export type RunEvent =
   | GameEvent
   | { type: 'stage_entered'; stageNumber: number }
+  | { type: 'stage_restarted' }
+  | { type: 'stage_skipped'; coins: number }
   | { type: 'skill_granted'; skillId: string }
   | { type: 'chooser_opened'; overCapacity: number }
   | { type: 'shop_opened'; act: number; recovery: boolean }

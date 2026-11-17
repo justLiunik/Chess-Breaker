@@ -9,7 +9,9 @@
     "check:links": "node scripts/check-links.mjs",
     "test": "vitest run",
     "bench": "vitest run --config vitest.bench.config.ts",
-    "typecheck": "tsc -p tsconfig.json",
+    "dev": "npm run dev -w @checkbreaker/web",
+    "build": "npm run build -w @checkbreaker/web",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
     "gen:report": "tsx scripts/gen-report.ts",
     "play": "tsx scripts/play.ts",
     "bot": "tsx scripts/run-bot.ts",
@@ -28,6 +30,7 @@
     "node": ">=20"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ]
 }

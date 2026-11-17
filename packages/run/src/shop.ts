@@ -70,6 +70,11 @@ export function rollSlots(run: RunState, shop: ShopState, c: RunConfig): ShopSta
   return offers.map(o => ({ ...o, sold: false }));
 }
 
+/** Rerolls still allowed in this shop visit (free ones included). */
+export function rerollsLeft(shop: ShopState, c: RunConfig): number {
+  return Math.max(0, c.run.services.maxRerollsPerVisit - shop.rerollsUsed);
+}
+
 /**
  * Redraws slots 1-4, sold ones included (docs/07 section 2). The first `freeRerollsPerVisit` are free, then
  * `services.reroll` each, at most `maxRerollsPerVisit`. An unsold, still-live recovery offer stays in slot 1;
@@ -91,8 +96,8 @@ export function rerollShop(
 
 /**
  * Buys slot `slot` (1-4). A piece needs room in the deck and becomes a new full-durability instance
- * recording `pricePaid`; a skill needs a free loadout slot or `opts.replace` (the loadout index it
- * replaces). A piece purchase that brings the non-king deck back to the threshold withdraws an unsold
+ * recording `pricePaid`; a skill takes a free loadout slot, or with a full loadout needs `opts.replace` (the loadout index it
+ * replaces; `replace` with room to spare is `replace_not_needed`). A piece purchase that brings the non-king deck back to the threshold withdraws an unsold
  * recovery offer (docs/07 section 3): slot 1 is then sold and `recovery` false.
  */
 export function buyOffer(
@@ -109,10 +114,11 @@ export function buyOffer(
     const replace = opts.replace;
     const entry = { skillId: offer.skillId };
     let loadout: RunState['loadout'];
-    if (replace !== undefined && Number.isInteger(replace) && replace >= 0 && replace < run.loadout.length) {
-      loadout = run.loadout.map((e, k) => (k === replace ? entry : e));
-    } else if (run.loadout.length < c.run.loadoutSlots) {
+    if (replace !== undefined && run.loadout.length < c.run.loadoutSlots) return fail({ kind: 'replace_not_needed' });
+    if (run.loadout.length < c.run.loadoutSlots) {
       loadout = [...run.loadout, entry];
+    } else if (replace !== undefined && Number.isInteger(replace) && replace >= 0 && replace < run.loadout.length) {
+      loadout = run.loadout.map((e, k) => (k === replace ? entry : e));
     } else {
       return fail({ kind: 'loadout_full' });
     }

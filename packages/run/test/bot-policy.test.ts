@@ -41,7 +41,7 @@ function shopSession(
     act: 1, stageNumber: 1, roll: 0, rerollsUsed: 0, recovery: false, slots: offers.map(o => ({ ...o, sold: false })), ...over.shop,
   };
   return {
-    version: 1, run, phase: 'shop', stage: null, tally: null, chooser: null, shop,
+    version: 1, run, phase: 'shop', stage: null, entryStage: null, tally: null, chooser: null, shop,
     next: { request: requestFor(run, 2, c), stage: null }, outcome: null,
   };
 }
@@ -50,7 +50,7 @@ function shopSession(
 function chooserSession(deck: PieceInstance[]): RunSession {
   const run: RunState = { ...starterRun(SEED), stageIndex: 1, deck: [KING, ...deck] };
   return {
-    version: 1, run, phase: 'chooser', stage: null, tally: null, chooser: { overCapacity: deck.length - c.deck.capacity },
+    version: 1, run, phase: 'chooser', stage: null, entryStage: null, tally: null, chooser: { overCapacity: deck.length - c.deck.capacity },
     shop: null, next: null, outcome: null,
   };
 }
