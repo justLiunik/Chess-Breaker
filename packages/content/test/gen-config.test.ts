@@ -14,7 +14,7 @@ describe('loadGenConfig', () => {
     expect(c.gen.formations).toEqual({ maxPerTemplate: 50, minPerTemplate: 20 });
     expect(c.gen.acceptance.medianMateTurnTolerance).toBe(1);
     expect(c.gen.retention.queen?.legendary).toBe(0.2);
-    expect(c.gen.promotion.tierUpChance).toBe(0.75);
+    expect('promotion' in c.gen).toBe(false);
     expect(c.gen.rarityPool.act2.ceiling).toBe('unique');
     expect(c.gen.rarityPool.act3.weights.legendary).toBe(6);
     expect(c.pieceValues.queen).toBe(9);

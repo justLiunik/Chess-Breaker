@@ -74,6 +74,12 @@ function passes(
     }
     case 'spawned_pawns_placed':
       return spawnedPawnsPlaced(stage, tpl, extraPawns, config);
+    case 'no_start_check': {
+      // No White piece (only spawned pawns stand there at generation) attacks the Black king.
+      const b = fromBoard(stage.board);
+      const king = b.indexOf(-KING);
+      return king < 0 || !isAttacked(b, king, 'white');
+    }
   }
 }
 
@@ -87,7 +93,7 @@ function enemyKingOnBoard(stage: StageState): boolean {
   return kings === 1 && stage.phase === 'deployment';
 }
 
-/** Every spawned pawn on a spawn rank with a rarity and `promotesTo` at most the act ceiling; the count in range. */
+/** Every spawned pawn on a spawn rank with a rarity at most the act ceiling; the count in range. */
 function spawnedPawnsPlaced(stage: StageState, tpl: Template, extraPawns: number, config: GenConfig): boolean {
   const ceiling = TIERS.indexOf(config.gen.rarityPool[`act${tpl.act}` as ActKey].ceiling);
   const within = (r: Rarity | undefined): boolean => {
@@ -100,7 +106,7 @@ function spawnedPawnsPlaced(stage: StageState, tpl: Template, extraPawns: number
     count++;
     if (p.pieceType !== 'pawn' || p.color !== 'white') return false;
     if (!tpl.spawnedPawns.ranks.includes(rankOf(toIndex(sq)) + 1)) return false;
-    if (!within(p.rarity) || p.promotesTo === undefined || !within(p.promotesTo.rarity)) return false;
+    if (!within(p.rarity)) return false;
   }
   const [lo, hi] = tpl.spawnedPawns.count;
   return count >= lo && count <= hi + extraPawns;

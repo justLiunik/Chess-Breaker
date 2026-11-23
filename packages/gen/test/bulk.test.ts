@@ -73,7 +73,6 @@ describe('1,000-stage CI run', () => {
         if (p.color === 'black') expect(p.rarity, where).toBeUndefined();
         if (p.spawned) {
           expect(TIERS.indexOf(p.rarity!), where).toBeLessThanOrEqual(ceiling);
-          expect(TIERS.indexOf(p.promotesTo!.rarity), where).toBeLessThanOrEqual(ceiling);
         }
       }
       expect(validate(stage), `${where} ${JSON.stringify(validate.errors)}`).toBe(true);

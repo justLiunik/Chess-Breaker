@@ -119,6 +119,7 @@ export function parseEngineConfig(t: ConfigTexts): EngineConfig {
     abilities: parseAbilities(t.pieces),
     skills: parseSkills(t.skills),
     deck: { capacity: num(y, 'deck.capacity') },
+    deployment: { maxQueenSummons: num(y, 'deployment.maxQueenSummons') },
     pieceValues,
     economy: {
       baseReward: {
@@ -190,7 +191,6 @@ export interface GenSettings {
   bossValueMultiplier: number;
   rarityPool: Record<ActKey, { ceiling: Rarity; weights: Record<Rarity, number> }>;
   retention: Partial<Record<DeckType, Partial<Record<Rarity, number>>>>;
-  promotion: { resultTypeWeights: Record<DeckType, number>; tierUpChance: number };
   maxRegenerations: number;
   maxPlacementTries: number;
   maxBoards: number;
@@ -234,15 +234,11 @@ export function parseGenConfig(t: ConfigTexts): GenConfig {
     for (const r of RARITIES) weights[r] = num(y, `rarity.pool.${act}.weights.${r}`);
     rarityPool[act] = { ceiling: need(y, `rarity.pool.${act}.ceiling`) as Rarity, weights };
   }
-  const resultTypeWeights = {} as Record<DeckType, number>;
-  for (const t of DECK_TYPES) resultTypeWeights[t] = num(y, `promotion.resultTypeWeights.${t}`);
-
   const gen: GenSettings = {
     valueBands,
     bossValueMultiplier: num(y, 'stages.enemyArmyValueBand.bossMultiplier'),
     rarityPool,
     retention: structuredClone(need(y, 'rarity.retention')) as GenSettings['retention'],
-    promotion: { resultTypeWeights, tierUpChance: num(y, 'promotion.tierUpChance') },
     maxRegenerations: num(y, 'generation.maxRegenerations'),
     maxPlacementTries: num(y, 'generation.maxPlacementTries'),
     maxBoards: num(y, 'generation.maxBoards'),
@@ -442,7 +438,8 @@ export type PreconditionId =
   | 'enemy_has_moves'
   | 'deployment_squares_available'
   | 'enemy_value_in_band'
-  | 'spawned_pawns_placed';
+  | 'spawned_pawns_placed'
+  | 'no_start_check';
 
 export type EnemyPolicySpec = {
   type: 'best_move' | 'scripted';

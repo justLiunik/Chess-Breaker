@@ -35,6 +35,16 @@ describe('parse entry', () => {
     expect(parseFormations(files, templates)).toEqual(loadFormations());
   });
 
+  it('engine config reads deployment.maxQueenSummons', () => {
+    const t = { economy: read('data/economy.yaml'), pieces: read('content/examples/pieces.yaml'), skills: read('content/examples/skills.yaml') };
+    expect(parseEngineConfig(t).deployment.maxQueenSummons).toBe(1);
+  });
+
+  it('gen config has no promotion roll', () => {
+    const t = { economy: read('data/economy.yaml'), pieces: read('content/examples/pieces.yaml'), skills: read('content/examples/skills.yaml') };
+    expect('resultTypeWeights' in ((parseGenConfig(t).gen as { promotion?: object }).promotion ?? {})).toBe(false);
+  });
+
   it('parse entry imports nothing from node', () => {
     const seen = new Set<string>();
     const bad: string[] = [];

@@ -1,8 +1,6 @@
-import { TIERS, draw, fileOf, rankOf, retainTier, rollTier, toIndex, toSquare } from '@checkbreaker/engine';
-import type { BoardPiece, DeckType, Rarity, Square } from '@checkbreaker/engine';
+import { draw, fileOf, rankOf, rollTier, toIndex, toSquare } from '@checkbreaker/engine';
+import type { BoardPiece, Rarity, Square } from '@checkbreaker/engine';
 import type { ActKey, GenConfig, Template } from '@checkbreaker/content';
-
-const TYPE_ORDER: DeckType[] = ['knight', 'bishop', 'rook', 'queen'];
 
 /** G3: the par, a uniform draw from the template's `mateIn` range. */
 export function drawPar(tpl: Template, stageSeed: string): number {
@@ -13,32 +11,6 @@ export function drawPar(tpl: Template, stageSeed: string): number {
 /** A cumulative pick over the act's rarity weights in tier order. */
 export function rollRarity(act: ActKey, u: number, config: GenConfig): Rarity {
   return rollTier(config.gen.rarityPool[act].weights, u);
-}
-
-/** What a spawned pawn becomes on reaching rank 8: type, then a tier-up capped at the act ceiling, then retention. */
-export function rollPromotion(
-  act: ActKey,
-  tier: Rarity,
-  stream: (field: string) => number,
-  config: GenConfig,
-): { pieceType: DeckType; rarity: Rarity } {
-  const { resultTypeWeights, tierUpChance } = config.gen.promotion;
-  const total = TYPE_ORDER.reduce((s, t) => s + resultTypeWeights[t], 0);
-  const u = stream('type') * total;
-  let acc = 0;
-  let pieceType: DeckType = TYPE_ORDER[TYPE_ORDER.length - 1]!;
-  for (const t of TYPE_ORDER) {
-    acc += resultTypeWeights[t];
-    if (u < acc) {
-      pieceType = t;
-      break;
-    }
-  }
-  const ceiling = TIERS.indexOf(config.gen.rarityPool[act].ceiling);
-  let idx = TIERS.indexOf(tier);
-  if (stream('tierUp') < tierUpChance) idx = Math.min(idx + 1, ceiling);
-  const rarity = retainTier(pieceType, TIERS[idx]!, config.gen.retention, stream('retention'));
-  return { pieceType, rarity };
 }
 
 function blackKing(board: Record<Square, BoardPiece>): number | null {
@@ -78,7 +50,6 @@ function spawnedPawn(
   id: string | undefined,
   act: ActKey,
   uRarity: number,
-  stream: (f: string) => number,
   config: GenConfig,
 ): BoardPiece {
   const rarity = rollRarity(act, uRarity, config);
@@ -88,7 +59,6 @@ function spawnedPawn(
     spawned: true,
     ...(id === undefined ? {} : { stageId: id }),
     rarity,
-    promotesTo: rollPromotion(act, rarity, stream, config),
   };
 }
 
@@ -113,7 +83,6 @@ export function placeSpawnedPawns(
       stageId(first + i),
       act,
       draw(stageSeed, 'spawn', attempt, i, 'rarity'),
-      (f) => draw(stageSeed, 'spawn', attempt, i, f),
       config,
     );
   }
@@ -134,7 +103,6 @@ export function makeBonusPawn(_square: Square, act: ActKey, stageSeed: string, c
     undefined,
     act,
     draw(stageSeed, 'bonus-pawn', 'rarity'),
-    (f) => draw(stageSeed, 'bonus-pawn', f),
     config,
   );
 }

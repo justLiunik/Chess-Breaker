@@ -234,6 +234,8 @@ export interface EngineConfig {
   abilities: AbilityTable;
   skills: Record<string, SkillDef>;
   deck: { capacity: number };
+  /** Deployment limits (docs/02 §5). */
+  deployment: { maxQueenSummons: number };
   pieceValues: Record<PieceType, number>;
   economy: {
     baseReward: { act1: number; act2: number; act3: number; bossMultiplier: number };

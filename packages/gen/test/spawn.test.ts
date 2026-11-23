@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { TIERS, draw, fileOf, rankOf, retainTier, toIndex } from '@checkbreaker/engine';
+import { TIERS, draw, fileOf, rankOf, toIndex } from '@checkbreaker/engine';
 import type { BoardPiece, Rarity } from '@checkbreaker/engine';
 import type { ActKey } from '@checkbreaker/content';
-import { bonusPawnSquares, drawPar, makeBonusPawn, placeSpawnedPawns, rollPromotion, rollRarity } from '../src/spawn';
+import { bonusPawnSquares, drawPar, makeBonusPawn, placeSpawnedPawns, rollRarity } from '../src/spawn';
 import { buildStage } from '../src/stage';
 import { enemyBoard } from '../src/board';
 import { config, stubFormations, tpl } from './helpers';
@@ -41,57 +41,6 @@ describe('rollRarity', () => {
   });
 });
 
-describe('rollPromotion', () => {
-  it('never exceeds the act ceiling', () => {
-    for (const act of ACTS) {
-      const ceiling = TIERS.indexOf(config.gen.rarityPool[act].ceiling);
-      for (let i = 0; i < 10000; i++) {
-        const start = rollRarity(act, draw('pr', act, i, 'r'), config);
-        const r = rollPromotion(act, start, (f) => draw('pr', act, i, f), config);
-        expect(TIERS.indexOf(r.rarity)).toBeLessThanOrEqual(ceiling);
-      }
-    }
-  });
-
-  it('Act III queen legendary appears at about 0.2 of its unretained rate', () => {
-    const keep = config.gen.retention.queen!.legendary!;
-    const n = 200000;
-    let observed = 0;
-    let unretained = 0;
-    for (let i = 0; i < n; i++) {
-      const start = rollRarity('act3', draw('q', i, 'r'), config);
-      const stream = (f: string) => draw('q', i, f);
-      const r = rollPromotion('act3', start, stream, config);
-      if (r.pieceType === 'queen' && r.rarity === 'legendary') observed++;
-      // the same roll without the retention step: the result before the retention check
-      const noRetention = { ...config, gen: { ...config.gen, retention: {} } };
-      const u = rollPromotion('act3', start, stream, noRetention);
-      if (u.pieceType === 'queen' && u.rarity === 'legendary') unretained++;
-    }
-    expect(unretained).toBeGreaterThan(1000);
-    expect(Math.abs(observed / unretained / keep - 1)).toBeLessThan(0.3);
-  });
-});
-
-describe('promotion retention statistic', () => {
-  it('Unique pawn to Legendary queen in Act III runs at 20% +/- 1% of the unretained rate', () => {
-    const keep = config.gen.retention.queen!.legendary!;
-    expect(retainTier('queen', 'legendary', config.gen.retention, 0)).toBe('legendary');
-    const noRetention = { ...config, gen: { ...config.gen, retention: {} } };
-    let observed = 0;
-    let unretained = 0;
-    for (let i = 0; i < 100000; i++) {
-      const stream = (f: string) => draw('ret', i, f);
-      const a = rollPromotion('act3', 'unique', stream, config);
-      const b = rollPromotion('act3', 'unique', stream, noRetention);
-      if (a.pieceType === 'queen' && a.rarity === 'legendary') observed++;
-      if (b.pieceType === 'queen' && b.rarity === 'legendary') unretained++;
-    }
-    expect(unretained).toBeGreaterThan(1000);
-    expect(Math.abs(observed / unretained - keep)).toBeLessThan(0.01);
-  });
-});
-
 const base = () => enemyBoard(tpl({ id: 'e', enemyZone: [7, 8] }), stubFormations, 'ABCD-0001', 0, config)!.board;
 const kingSq = (b: Record<string, BoardPiece>) => Object.keys(b).find((s) => b[s]!.pieceType === 'king')!;
 const attacksKing = (sq: string, king: string) => {
@@ -121,6 +70,7 @@ describe('placeSpawnedPawns', () => {
         expect(attacksKing(sq, ks)).toBe(false);
         expect(p.color).toBe('white');
         expect(p.instanceId).toBeUndefined();
+        expect(p.promotesTo).toBeUndefined();
         expect(Number(p.stageId!.slice(1))).toBeGreaterThan(enemyN);
       }
       expect(pawns).toBeGreaterThanOrEqual(2);
@@ -163,7 +113,7 @@ describe('bonus pawn', () => {
     expect(p.spawned).toBe(true);
     expect(p.pieceType).toBe('pawn');
     expect(TIERS).toContain(p.rarity as Rarity);
-    expect(p.promotesTo).toBeDefined();
+    expect(p.promotesTo).toBeUndefined();
   });
 });
 
