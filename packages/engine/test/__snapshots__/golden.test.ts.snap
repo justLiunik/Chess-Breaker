@@ -2181,7 +2181,7 @@ exports[`golden commitQueue scenarios > overtime straddles reward and wallet 1`]
 }
 `;
 
-exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
+exports[`golden commitQueue scenarios > pawn promotion to a rook that checks 1`] = `
 {
   "ok": true,
   "value": {
@@ -2196,12 +2196,15 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
       },
       {
         "instanceId": "p_61865fae",
-        "promotesTo": {
-          "pieceType": "knight",
-          "rarity": "normal",
-        },
+        "pieceType": "rook",
+        "rarity": "normal",
         "square": "a8",
         "type": "pawn_promoted",
+      },
+      {
+        "king": "black",
+        "square": "e8",
+        "type": "check",
       },
       {
         "from": "e8",
@@ -2273,7 +2276,8 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
           "durabilityMax": 2,
           "instanceId": "p_61865fae",
           "origin": "promotion",
-          "pieceType": "knight",
+          "pieceType": "rook",
+          "pricePaid": 0,
           "rarity": "normal",
           "status": "in_deck",
         },
@@ -2289,6 +2293,12 @@ exports[`golden commitQueue scenarios > pawn promotion removal 1`] = `
     },
     "stage": {
       "board": {
+        "a8": {
+          "color": "white",
+          "instanceId": "p_61865fae",
+          "pieceType": "rook",
+          "rarity": "normal",
+        },
         "e1": {
           "color": "white",
           "instanceId": "p_king_e1",

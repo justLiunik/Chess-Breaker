@@ -239,19 +239,18 @@ describe('Deployment screen', () => {
     });
   });
 
-  it('spawned pawns show their promotion result', async () => {
+  it('spawned pawns show their rarity and that they promote to any piece', async () => {
     const inner = testStageSource();
     await setup({
       async request(id, req) {
         const a = await inner.request(id, req);
         if (!a.ok) return a;
         a.stage.board.e2 = {
-          pieceType: 'pawn', color: 'white', spawned: true, stageId: 's09', rarity: 'normal',
-          promotesTo: { pieceType: 'rook', rarity: 'rare' },
+          pieceType: 'pawn', color: 'white', spawned: true, stageId: 's09', rarity: 'rare',
         };
         return a;
       },
     });
-    expect(screen.getByTestId('stage-pieces').textContent).toMatch(/pawn on e2.*promotes to rook \(rare\)/);
+    expect(screen.getByTestId('stage-pieces').textContent).toContain('Rare pawn on e2, promotes to any piece');
   });
 });

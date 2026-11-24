@@ -6,6 +6,7 @@ import { hasLegalQueue } from '../src/legal-queue';
 import { hasBonusMove, lifelineSaves } from '../src/abilities';
 import { KING, fromBoard, tiersOf } from '../src/position';
 import type { Action, BoardPiece, GameEvent, RunState, StageState } from '../src/types';
+import { hash } from '../src/rng';
 import { config, deepFreeze } from './helpers';
 import { makeCase } from './fuzzgen';
 
@@ -31,10 +32,12 @@ function kings(board: StageState['board']): { white: number; black: number } {
 function replay(stage: StageState, queue: Action[]): { made: number; board: StageState['board'] } {
   let board = stage.board;
   let made = 0;
-  for (const a of queue) {
+  for (const [atStep, a] of queue.entries()) {
     if (a.type !== 'MOVE') continue;
-    expect(checkPlayerMove(board, a.from, a.to, config)).toBeNull(); // I4
-    board = applyPlayerMove(board, a.from, a.to, config).board;
+    expect(checkPlayerMove(board, a.from, a.to, config, a.promotion)).toBeNull(); // I4
+    const promotion = a.promotion === undefined ? undefined
+      : { pieceType: a.promotion, instanceId: 'p_' + hash(stage.stageSeed, stage.turnsUsed, atStep, a.to).toString(16) };
+    board = applyPlayerMove(board, a.from, a.to, config, promotion).board;
     made++;
   }
   return { made, board };
@@ -48,6 +51,11 @@ function bonusMoves(stage: StageState, events: GameEvent[]): number {
   const at = new Map<string, BoardPiece>(Object.entries(stage.board));
   const count = new Map<BoardPiece, number>();
   for (const e of events) {
+    if (e.type === 'pawn_promoted') {
+      // The promoted Hero Piece replaces the pawn: a Legendary knight among them has a bonus move.
+      at.set(e.square, { pieceType: e.pieceType, color: 'white', rarity: e.rarity, instanceId: e.instanceId });
+      continue;
+    }
     if (e.type !== 'move') continue;
     const piece = at.get(e.from)!;
     at.delete(e.from);
@@ -74,6 +82,7 @@ describe('fuzz: queue invariants', () => {
     let bonus = 0;
     let heroCaptures = 0;
     let lifelines = 0;
+    let promotions = 0;
     for (let i = 0; i < CASES; i++) {
       const { run, stage, queue, credits } = makeCase('fuzz', i);
       deepFreeze(run);
@@ -102,6 +111,7 @@ describe('fuzz: queue invariants', () => {
           expect(moves).toBe(made);
         }
         if (multiCaptured(r.value.events)) multiCaptures++;
+        if (r.value.events.some((e) => e.type === 'pawn_promoted')) promotions++;
         // I5: paid moves <= credits (+1 per Twin Step); a Legendary knight's bonus move is free, once.
         const free = bonusMoves(stage, r.value.events);
         if (free > 0) bonus++;
@@ -148,5 +158,6 @@ describe('fuzz: queue invariants', () => {
     expect(bonus, 'accepted queues with a Legendary knight bonus move').toBeGreaterThan(20);
     expect(heroCaptures, 'R5 captures of a Hero Piece').toBeGreaterThan(50);
     expect(lifelines, 'R5 captures saved by a lifeline').toBeGreaterThan(0);
+    expect(promotions, 'accepted queues with a promotion').toBeGreaterThan(20);
   }, 60_000);
 });

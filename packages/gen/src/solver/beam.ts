@@ -1,6 +1,6 @@
 import * as internal from '@checkbreaker/engine/internal';
 import {
-  applyEnemyTurn, enemyClock, enemyMove, hash, legalPlayerMoves, simulate, toIndex,
+  applyEnemyTurn, enemyClock, enemyMove, hash, legalPlayerMoves, promotionChoices, simulate, toIndex,
 } from '@checkbreaker/engine';
 import type { Action, BoardPiece, EnemyPick, RunState, StageState } from '@checkbreaker/engine';
 import type { GenConfig } from '@checkbreaker/content';
@@ -10,8 +10,14 @@ const { applyPlayerMove, evaluate, fromBoard, hasBonusMove, tiersOf } = internal
 
 export const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** One MOVE action. */
-const move = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
+/**
+ * One MOVE action; a move that promotes promotes to a queen (four-way branching: M5.1 Task 4). Only a
+ * pawn's move to rank 8 is asked of `promotionChoices`, which judges the move again.
+ */
+const move = (stage: StageState, from: string, to: string, config: GenConfig): Action =>
+  (stage.board[from]?.pieceType !== 'pawn' || !to.endsWith('8') || promotionChoices(stage, from, to, config) === null
+    ? { type: 'MOVE', from, to }
+    : { type: 'MOVE', from, to, promotion: 'queen' });
 
 /** A queue's text: each MOVE as `from+to`, joined by `,` (`b1c3,c3d5`). */
 export function queueText(queue: Action[]): string {
@@ -33,10 +39,12 @@ export function queuesOf(stage: StageState, config: GenConfig): Action[][] {
   for (const from of squares) {
     const bonus = hasBonusMove(stage.board[from]!, config);
     for (const to of legalPlayerMoves(stage, from, config)) {
-      out.push([move(from, to)]);
+      const first = move(stage, from, to, config);
+      out.push([first]);
+      // A bonus-move piece (the Legendary knight) is never a pawn, so its first move never promotes.
       if (!bonus) continue;
       const mid: StageState = { ...stage, board: applyPlayerMove(stage.board, from, to, config).board };
-      for (const c of legalPlayerMoves(mid, to, config)) out.push([move(from, to), move(to, c)]);
+      for (const c of legalPlayerMoves(mid, to, config)) out.push([first, move(mid, to, c, config)]);
     }
   }
   return out;

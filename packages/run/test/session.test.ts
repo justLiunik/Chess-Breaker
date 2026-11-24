@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { commitQueue, hash } from '@checkbreaker/engine';
-import type { Action, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, PieceInstance, PromotionType, RunState, StageState } from '@checkbreaker/engine';
 import {
   abandon, buy, commit, cut, expectedSeed, leave, merge, newRun, provideStage, repair, requestFor, reroll, sell, start,
 } from '../src/session';
@@ -15,7 +15,8 @@ import {
 
 const SEED = '7F3A-2210';
 const KING_ROOK = [{ instanceId: 'p_king_01', to: 'd1' }, { instanceId: ROOK_ID, to: 'e1' }];
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 
 const value = (r: RunResult): { session: RunSession; events: RunEvent[] } => {
   if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r.error)}`);
@@ -186,7 +187,7 @@ describe('start and commit', () => {
   it('a turn that does not end the stage stays in action and folds salvage into the tally', () => {
     // the promotion stage: turn 1 promotes, nothing captured
     const action = deploy(rookRun(), promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     expect(t1.phase).toBe('action');
     expect(t1.stage!.turnsUsed).toBe(1);
     expect(t1.tally).toEqual({ startCoins: 0, salvage: 0, piecesLost: 0 });
@@ -284,7 +285,7 @@ describe('the chooser (Review Focus 4)', () => {
     const start8 = fullDeck(THREE_MORE);
     expect(nonKing(start8.run)).toBe(8);
     const action = deploy(start8, promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     const won = value(commit(t1, mv('e1', 'e8'), c));
     expect(won.session).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 1 }, shop: null, next: null, stage: null });
     expect(nonKing(won.session.run)).toBe(9);
@@ -312,8 +313,8 @@ describe('the chooser (Review Focus 4)', () => {
 
   it('overflow 2 needs two removals; the chooser stays open after the first', () => {
     const action = deploy(fullDeck(THREE_MORE), doublePromotionStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const t2 = value(commit(t1, mv('c7', 'c8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    const t2 = value(commit(t1, mv('c7', 'c8', 'knight'), c)).session;
     const won = value(commit(t2, mv('e1', 'e8'), c)).session;
     expect(won).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 2 } });
     expect(nonKing(won.run)).toBe(10);
@@ -329,8 +330,8 @@ describe('the chooser (Review Focus 4)', () => {
 
   it('a merge (3 → 1) clears an overflow of 2 in one action', () => {
     const action = deploy(fullDeck(THREE_MORE), doublePromotionStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const t2 = value(commit(t1, mv('c7', 'c8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    const t2 = value(commit(t1, mv('c7', 'c8', 'knight'), c)).session;
     const won = value(commit(t2, mv('e1', 'e8'), c)).session;
     const ids = ['p_knight_02', 'p_knight_03', 'p_fill_01'];
     const { session, events } = value(merge(won, ids, c));
@@ -344,7 +345,7 @@ describe('the chooser (Review Focus 4)', () => {
 
   it('chooser refusals are typed and change nothing', () => {
     const action = deploy(fullDeck(THREE_MORE), promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     const won = value(commit(t1, mv('e1', 'e8'), c)).session;
     expect(error(sell(won, 'p_king_01', c))).toEqual({ kind: 'cannot_sell', instanceId: 'p_king_01', reason: 'king' });
     expect(error(cut(won, 'p_king_01', c))).toEqual({ kind: 'cannot_cut', instanceId: 'p_king_01', reason: 'king' });
@@ -467,7 +468,7 @@ describe('abandon', () => {
   it('in action before a turn writes no record; after a turn writes a loss record', () => {
     const action = deploy(rookRun(), promotionOverflowStage);
     expect(value(abandon(action)).session.run.history).toEqual([]);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     const { session } = value(abandon(t1));
     expect(session.run.history).toEqual([{
       stageSeed: expectedSeed(SEED, 0, 0), templateId: 'tpl-act1-open-field', outcome: 'loss', turnsUsed: 1, coinsEarned: 0, piecesLost: 0,
@@ -502,7 +503,7 @@ describe('wrong_phase', () => {
     const awaiting = fullDeck(THREE_MORE);
     const deployment = value(provideStage(awaiting, promotionOverflowStage(seedOf(awaiting)), c)).session;
     const action = value(start(deployment, KING_ROOK, c)).session;
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     const chooser = value(commit(t1, mv('e1', 'e8'), c)).session;
     const shop = value(sell(chooser, 'p_fill_02', c)).session;
     const ended = value(abandon(shop)).session;

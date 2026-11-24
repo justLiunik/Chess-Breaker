@@ -6,7 +6,7 @@ import { applyPlayerMove } from '../src/queue';
 import { hasBonusMove } from '../src/abilities';
 import { rng, hash } from '../src/rng';
 import { toSquare } from '../src/square';
-import type { Action, BoardPiece, PieceInstance, RunState, Square, StageState } from '../src/types';
+import type { Action, BoardPiece, PieceInstance, PromotionType, RunState, Square, StageState } from '../src/types';
 import { config, runOf, stageOf } from './helpers';
 
 export interface Case { run: RunState; stage: StageState; queue: Action[]; credits: number }
@@ -169,28 +169,35 @@ export function makeCase(label: string, i: number): Case {
       const multi = legal.filter((m) => m.via >= 0);
       const bonusMover = legal.filter((m) => hasBonusMove(board[toSquare(m.from)]!, config));
       const roll = sub(10);
-      let move: { from: Square; to: Square } | null = null;
+      // A promoting move carries the type of the generated move it came from (queen, rook, bishop or knight).
+      const asMove = (m: Move): { from: Square; to: Square; promotion?: PromotionType } =>
+        ({ from: toSquare(m.from), to: toSquare(m.to), ...(m.promotion !== null && { promotion: m.promotion }) });
+      let move: { from: Square; to: Square; promotion?: PromotionType } | null = null;
       if (roll === 0) {
         move = { from: toSquare(sub(64)), to: toSquare(sub(64)) };
       } else if (roll <= 2 || legal.length === 0) {
         // M1 pseudo-legal moves: some leave the king in check.
         const pseudo = pseudoMoves(cb, 'white');
         const m = pseudo.length > 0 ? pseudo[sub(pseudo.length)]! : null;
-        move = m && { from: toSquare(m.from), to: toSquare(m.to) };
+        move = m && asMove(m);
       } else {
         const pool: Move[] = again.length > 0 && sub(4) > 0 ? again
           : bonusMover.length > 0 && sub(2) === 0 ? bonusMover
           : multi.length > 0 && sub(4) > 0 ? multi
           : legal;
-        const m = pool[sub(pool.length)]!;
-        move = { from: toSquare(m.from), to: toSquare(m.to) };
+        move = asMove(pool[sub(pool.length)]!);
       }
       if (move === null) continue;
+      const atStep = queue.length;
       queue.push({ type: 'MOVE', ...move });
       const mover: BoardPiece | undefined = board[move.from];
       lastKnight = mover?.color === 'white' && mover.pieceType === 'knight' ? move.to : null;
       if (mover?.color === 'white' && legal.some((m) => toSquare(m.from) === move.from && toSquare(m.to) === move.to)) {
-        board = applyPlayerMove(board, move.from, move.to, config).board;
+        const promotion = move.promotion === undefined ? undefined
+          : { pieceType: move.promotion, instanceId: 'p_' + hash(stage.stageSeed, stage.turnsUsed, atStep, move.to).toString(16) };
+        board = applyPlayerMove(board, move.from, move.to, config, promotion).board;
+        // The promoted piece may move again later in the queue; a knight among them may earn a bonus move.
+        if (promotion !== undefined) lastKnight = promotion.pieceType === 'knight' ? move.to : null;
       }
     }
     return { run: runOf({ seed: `F${hash(label, i)}`, loadout, deck }), stage, queue, credits };

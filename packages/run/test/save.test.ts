@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Action, PieceInstance, StageState } from '@checkbreaker/engine';
+import type { Action, PieceInstance, PromotionType, StageState } from '@checkbreaker/engine';
 import * as runPackage from '../src';
 import { abandon, buy, commit, expectedSeed, leave, newRun, provideStage, repair, reroll, sell, start } from '../src/session';
 import { SAVE_VERSION, loadSave, memoryStorage, serializeSave } from '../src/save';
@@ -13,7 +13,8 @@ const SEED = 'C0DE-5A7E';
 const SAVED_AT = '2026-11-16T09:30:00.000Z';
 const KING_ROOK = [{ instanceId: 'p_king_01', to: 'd1' }, { instanceId: ROOK_ID, to: 'e1' }];
 const ALL_PHASES: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'];
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 const nonKing = (s: RunSession): number => s.run.deck.filter(p => p.pieceType !== 'king').length;
 const normal = (id: string, pieceType: PieceInstance['pieceType']): PieceInstance => ({
   instanceId: id, pieceType, rarity: 'normal', durability: 2, durabilityMax: 2,
@@ -65,7 +66,7 @@ type Step = [label: string, act: (s: RunSession) => RunResult];
 const SCRIPT: Step[] = [
   ['provide stage I-1', s => provideStage(s, stub(promotionOverflowStage)(s), c)],
   ['deploy king + rook', s => start(s, KING_ROOK, c)],
-  ['promote b7-b8: the deck overflows mid-stage', s => commit(s, mv('b7', 'b8'), c)],
+  ['promote b7-b8: the deck overflows mid-stage', s => commit(s, mv('b7', 'b8', 'knight'), c)],
   ['mate: the chooser opens', s => commit(s, mv('e1', 'e8'), c)],
   ['sell in the chooser: the shop opens', s => sell(s, 'p_fill_01', c)],
   ['sell in the shop for room', s => sell(s, 'p_fill_02', c)],

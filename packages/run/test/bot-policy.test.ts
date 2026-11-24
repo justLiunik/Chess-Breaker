@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIERS, commitQueue, simulate, spawnCostOf, startStage } from '@checkbreaker/engine';
-import type { Action, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, PieceInstance, PromotionType, RunState, StageState } from '@checkbreaker/engine';
 import {
   applyChooserMove, applyShopMove, chooseChooserAction, chooseShopAction, fallbackPlacements, fallbackQueue,
 } from '../src/bot-policy';
@@ -73,7 +73,8 @@ const rookRun = (extra: PieceInstance[] = []): RunSession => {
   const s = newRun(SEED, c);
   return { ...s, run: { ...runWithRook(s.run), deck: [...runWithRook(s.run).deck, ...extra] } };
 };
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 
 describe('chooseShopAction', () => {
   it('merges a valid triple before buying', () => {
@@ -197,8 +198,8 @@ describe('chooseChooserAction', () => {
   it('clears a real overflow (promotion at a full deck) with accepted moves', () => {
     const extra = [piece('p_fill_01', 'knight'), piece('p_fill_02', 'bishop'), piece('p_fill_03', 'bishop')];
     const t0 = deployed(rookRun(extra), doublePromotionStage);
-    const t1 = ok(commit(t0, mv('b7', 'b8'), c));
-    const t2 = ok(commit(t1, mv('c7', 'c8'), c));
+    const t1 = ok(commit(t0, mv('b7', 'b8', 'knight'), c));
+    const t2 = ok(commit(t1, mv('c7', 'c8', 'knight'), c));
     let s = ok(commit(t2, mv('e1', 'e8'), c));
     expect(s.phase).toBe('chooser');
     for (let i = 0; i < 10 && s.phase === 'chooser'; i++) s = ok(applyChooserMove(s, chooseChooserAction(s, NONE, c), c));

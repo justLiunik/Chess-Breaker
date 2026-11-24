@@ -1,4 +1,6 @@
-import { TIERS, legalPlayerMoves, simulate, spawnCostOf, startStage, toIndex } from '@checkbreaker/engine';
+import {
+  TIERS, legalPlayerMoves, promotionChoices, simulate, spawnCostOf, startStage, toIndex,
+} from '@checkbreaker/engine';
 import type { Action, EngineConfig, PieceInstance, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
 import type { RunResult, RunSession } from './types';
@@ -132,7 +134,7 @@ export function applyChooserMove(s: RunSession, m: ChooserMove, c: RunConfig): R
  * The fallback turn for a stage without a usable solution: a single MOVE that mates if `simulate` finds one,
  * else the first single MOVE the engine accepts, pieces by square index and targets by square index
  * (`legalPlayerMoves` lists targets without the end-of-queue check rule, so each candidate is simulated).
- * Empty when no single MOVE is accepted.
+ * A pawn reaching rank 8 promotes to a queen. Empty when no single MOVE is accepted.
  */
 export function fallbackQueue(run: RunState, stage: StageState, c: EngineConfig): Action[] {
   const froms = Object.keys(stage.board)
@@ -142,7 +144,11 @@ export function fallbackQueue(run: RunState, stage: StageState, c: EngineConfig)
   for (const from of froms) {
     const targets = legalPlayerMoves(stage, from, c).sort((a, b) => toIndex(a) - toIndex(b));
     for (const to of targets) {
-      const queue: Action[] = [{ type: 'MOVE', from, to }];
+      const promotes = stage.board[from]!.pieceType === 'pawn' && to.endsWith('8')
+        && promotionChoices(stage, from, to, c) !== null;
+      const queue: Action[] = [!promotes
+        ? { type: 'MOVE', from, to }
+        : { type: 'MOVE', from, to, promotion: 'queen' }];
       const r = simulate(run, stage, queue, c);
       if (!r.ok) continue;
       if (r.value.stage.status === 'won') return queue;

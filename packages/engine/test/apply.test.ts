@@ -35,32 +35,29 @@ describe('applyPlayerMove', () => {
     expect(r.events.map((e) => e.type)).toEqual(['move']);
   });
 
-  it('white pawn c7 to c8 vanishes and reports the promotion (resolveQueue emits pawn_promoted)', () => {
+  it('white pawn c7 to c8 becomes the chosen Hero Piece with the pawn rarity and reports the promotion', () => {
     const s = stageOf({ e1: 'K', c7: 'P', h8: 'k' });
-    const r = applyPlayerMove(s.board, 'c7', 'c8', config);
-    expect(r.board['c8']).toBeUndefined();
+    const r = applyPlayerMove(s.board, 'c7', 'c8', config, { pieceType: 'knight', instanceId: 'p_new' });
+    expect(r.board['c8']).toEqual({ pieceType: 'knight', color: 'white', rarity: 'normal', instanceId: 'p_new' });
     expect(r.board['c7']).toBeUndefined();
     expect(r.events).toEqual([
       { type: 'move', from: 'c7', to: 'c8', pieceType: 'pawn', color: 'white' },
+      { type: 'pawn_promoted', square: 'c8', pieceType: 'knight', rarity: 'normal', instanceId: 'p_new' },
     ]);
-    expect(r.promoted).toEqual({ square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' } });
+    expect(r.promoted).toMatchObject({ instanceId: 'p_new', pieceType: 'knight', rarity: 'normal', pricePaid: 0 });
   });
 
-  it('pawn capturing onto rank 8 emits move, capture and reports the promotion', () => {
+  it('pawn capturing onto rank 8 emits move, capture, pawn_promoted and keeps the new piece', () => {
     const s = stageOf({ e1: 'K', c7: 'P', d8: 'r', h8: 'k' });
-    const r = applyPlayerMove(s.board, 'c7', 'd8', config);
-    expect(r.board['d8']).toBeUndefined();
-    expect(r.events.map((e) => e.type)).toEqual(['move', 'capture']);
-    expect(r.promoted?.square).toBe('d8');
+    const r = applyPlayerMove(s.board, 'c7', 'd8', config, { pieceType: 'queen', instanceId: 'p_new' });
+    expect(r.board['d8']).toMatchObject({ pieceType: 'queen', color: 'white', instanceId: 'p_new' });
+    expect(r.events.map((e) => e.type)).toEqual(['move', 'capture', 'pawn_promoted']);
     expect(r.salvage).toBe(1);
   });
 
-  it('white pawn without promotesTo still leaves the board, move event only', () => {
+  it('a pawn reaching rank 8 without a promotion is not a move it can play', () => {
     const s = stageOf({ e1: 'K', c7: 'P', h8: 'k' });
-    const bare = { ...s.board, c7: { pieceType: 'pawn' as const, color: 'white' as const } };
-    const r = applyPlayerMove(bare, 'c7', 'c8', config);
-    expect(r.board['c8']).toBeUndefined();
-    expect(r.events.map((e) => e.type)).toEqual(['move']);
+    expect(() => applyPlayerMove(s.board, 'c7', 'c8', config)).toThrow(/needs a promotion/);
   });
 
   it('salvage disabled: capture event still emitted with salvage 0', () => {

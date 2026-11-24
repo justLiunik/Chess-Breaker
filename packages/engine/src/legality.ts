@@ -1,5 +1,5 @@
 import type {
-  AbilityTable, Color, EngineConfig, MoveRejection, Square, StageState,
+  AbilityTable, Color, EngineConfig, MoveRejection, PromotionType, Square, StageState,
 } from './types';
 import * as position from './position';
 import { isSquare, toIndex, toSquare } from './square';
@@ -10,9 +10,10 @@ import type { Move } from './movegen';
 // Imported bindings are copied into module constants once: vitest's module runner turns every use
 // of an imported binding into a getter call, which made the search's hot loops ~1.8x slower under
 // test than under plain Node.
-const { KING, PAWN, QUEEN, fromBoard, tiersOf } = position;
+const { KING, PAWN, fromBoard, tiersOf } = position;
 const {
-  attackedAfterMove, attackedBy, onLine, pieceTargets, promotionOf, pseudoMoves, targetsInto,
+  attackedAfterMove, attackedBy, onLine, pieceTargets, promotionOf, pseudoMoves, pushMoves, targetsInto,
+  WHITE_PROMOTIONS,
 } = movegen;
 const { abilityAttacked, abilityTargets, abilityTargetsInto, hasTiers } = abilities;
 
@@ -39,9 +40,9 @@ export function inCheck(b: Int8Array, color: Color, tiers?: Tiers): boolean {
 
 /**
  * What a side's moves need for a cheap legality test, filled by `analyse`. When the side has one
- * king and it is not in check, a move by any other piece can only expose the king through a square
- * the move empties: its own `from`, or `to` when the moving pawn vanished (a White pawn reaching
- * rank 8). A move whose emptied squares share no line with the king is legal without being tried;
+ * king and it is not in check, a move by any other piece can only expose the king through the one
+ * square the move empties, its own `from` (a promoting pawn's piece stands on `to` like the pawn
+ * would). A move whose `from` shares no line with the king is legal without being tried;
  * the rest are tried with `attackedAfterMove`. King moves, and every move when the side is in check
  * or has no single king, are tried in full, as `inCheck` would judge them.
  */
@@ -79,7 +80,8 @@ export function analyse(b: Int8Array, s: number, out: Safety): void {
  * its king safe. With `sf.t`, a Black move is judged against White's abilities: a move that empties
  * no square on a line through the king still exposes nothing (an extra leaper's attack needs no
  * empty line, and the mover only blocks more where it lands); the rest are tried with
- * `abilityAttacked`.
+ * `abilityAttacked`. A promotion is judged once for every choice: what the pawn becomes never
+ * changes whether the opponent attacks the mover's king, so the pawn is tried on `to`.
  */
 export function safeMove(
   b: Int8Array, sf: Safety, s: number, from: number, to: number,
@@ -88,11 +90,9 @@ export function safeMove(
   if (k < 0) return true;
   const code = b[from]!;
   const captured = b[to]!;
-  const promotion = code === PAWN * s ? promotionOf(s, to) : null;
-  const vanishes = promotion === 'removed';
   const kingMove = code === KING * s;
-  if (!sf.tryAll && !kingMove && !onLine(k, from) && !(vanishes && onLine(k, to))) return true;
-  b[to] = promotion === 'queen' ? -QUEEN : vanishes ? 0 : code;
+  if (!sf.tryAll && !kingMove && !onLine(k, from)) return true;
+  b[to] = code;
   b[from] = 0;
   let ok: boolean;
   if (s < 0 && sf.t !== null) {
@@ -163,10 +163,7 @@ function abilityLegalMovesInPlace(b: Int8Array, sf: Safety, out: Move[]): Move[]
       const to = ABILITY_TO[i]!;
       const via = ABILITY_VIA[i]!;
       if (!safeMoveVia(b, sf, 1, from, to, via)) continue;
-      out.push({
-        from, to, captured: b[to]!, promotion: code === PAWN ? promotionOf(1, to) : null,
-        via, viaCaptured: via >= 0 ? b[via]! : 0,
-      });
+      pushMoves(out, 1, from, to, b[to]!, code === PAWN && promotionOf(1, to), via, via >= 0 ? b[via]! : 0);
     }
   }
   return out;
@@ -186,7 +183,8 @@ export function legalMoves(b: Int8Array, color: Color, frozen?: Uint8Array, tier
 /**
  * Counts the legal moves of the side `s` on `b` without building them; also counts, into
  * `COUNTS.king`, those made by the piece on `kingFrom`. Uses `b` as scratch and restores it. With
- * `sf.t`, counts what `legalMovesInPlace` would list.
+ * `sf.t`, counts what `legalMovesInPlace` would list, except that a White promotion counts once, not
+ * once per choice (the evaluation counts Black's moves only, whose promotions are one move each).
  */
 export function countLegalInPlace(b: Int8Array, s: number, kingFrom: number, sf: Safety = SAFETY): number {
   analyse(b, s, sf);
@@ -232,12 +230,16 @@ function playerTargets(b: Int8Array, t: Int8Array, from: number, config: EngineC
   return [...byTo.values()];
 }
 
+const PROMOTION_TYPES: ReadonlySet<unknown> = new Set(WHITE_PROMOTIONS);
+
 /**
  * Judges a player's `MOVE` and, when it is legal, names the square it captures first: the `via` of
- * a multi-capture ending on `to` (docs/02 §2.3), else null.
+ * a multi-capture ending on `to` (docs/02 §2.3), else null. A move that brings a pawn to rank 8
+ * needs a `promotion` (docs/02 §2.2: `promotion_required`, also for a value that is not a type); any
+ * other move must not carry one (`promotion_not_allowed`).
  */
 export function planPlayerMove(
-  board: StageState['board'], from: Square, to: Square, config: EngineConfig,
+  board: StageState['board'], from: Square, to: Square, config: EngineConfig, promotion?: PromotionType,
 ): { reason: MoveRejection | null; via: Square | null } {
   const refuse = (reason: MoveRejection) => ({ reason, via: null });
   if (!isSquare(from)) return refuse('no_piece');
@@ -255,13 +257,16 @@ export function planPlayerMove(
   if (dest && dest.color === 'white') return refuse('own_piece');
   const target = playerTargets(b, t, f, config).find((m) => m.to === x);
   if (target === undefined) return refuse('unreachable');
+  const promotes = b[f] === PAWN && promotionOf(1, x);
+  if (promotes && !PROMOTION_TYPES.has(promotion)) return refuse('promotion_required');
+  if (!promotes && promotion !== undefined) return refuse('promotion_not_allowed');
   return { reason: null, via: target.via >= 0 ? toSquare(target.via) : null };
 }
 
 export function checkPlayerMove(
-  board: StageState['board'], from: Square, to: Square, config: EngineConfig,
+  board: StageState['board'], from: Square, to: Square, config: EngineConfig, promotion?: PromotionType,
 ): MoveRejection | null {
-  return planPlayerMove(board, from, to, config).reason;
+  return planPlayerMove(board, from, to, config, promotion).reason;
 }
 
 export function legalPlayerMoves(stage: StageState, from: Square, config: EngineConfig): Square[] {

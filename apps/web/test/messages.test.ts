@@ -82,7 +82,9 @@ describe('error messages', () => {
   });
 
   it('distinguishes sub-reasons', () => {
-    const reasons = ['no_piece', 'not_your_piece', 'unreachable', 'own_piece', 'king_square'] as const;
+    const reasons = [
+      'no_piece', 'not_your_piece', 'unreachable', 'own_piece', 'king_square', 'promotion_required', 'promotion_not_allowed',
+    ] as const;
     checkTable(reasons.map((reason) => commitErrorText({ kind: 'illegal_move', atStep: 0, from: 'a2', to: 'a3', reason })));
     const merge = ['count', 'mismatch', 'durability', 'legendary', 'ceiling', 'king', 'not_in_deck'] as const;
     checkTable(merge.map((reason) => runErrorText({ kind: 'merge_invalid', reason })));

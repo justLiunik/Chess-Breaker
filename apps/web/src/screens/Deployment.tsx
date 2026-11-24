@@ -109,8 +109,8 @@ export function Deployment() {
   }
 
   const stagePieces = Object.entries(stage.board)
-    .filter(([, p]) => p.color === 'white' && p.promotesTo)
-    .map(([sq, p]) => `${PIECE_NAME[p.pieceType]} on ${sq} promotes to ${PIECE_NAME[p.promotesTo!.pieceType]} (${p.promotesTo!.rarity})`);
+    .filter(([, p]) => p.color === 'white' && p.pieceType === 'pawn')
+    .map(([sq, p]) => `${RARITY_NAME[p.rarity ?? 'normal']} pawn on ${sq}, promotes to any piece`);
   const problem = latest === 'local' ? message : error;
 
   return (

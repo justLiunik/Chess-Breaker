@@ -1,4 +1,4 @@
-import type { Color } from './types';
+import type { Color, PromotionType } from './types';
 import * as position from './position';
 
 // Imported bindings are copied into module constants once: vitest's module runner turns every use
@@ -10,7 +10,8 @@ export type Move = {
   from: number;
   to: number;
   captured: number;
-  promotion: 'queen' | 'removed' | null;
+  /** What a pawn reaching the last rank becomes (Black's always 'queen'), else null. */
+  promotion: PromotionType | null;
   /** A multi-capture's first captured square (the mover ends on `to`, directly beyond it), else -1. */
   via: number;
   /** The code captured on `via`, else 0. */
@@ -102,8 +103,8 @@ function sliderBeyond(b: Int8Array, k: number, e: number, s: number): boolean {
 /**
  * Whether `k` is attacked by side `s` (1 White, -1 Black) after that side's move from `from` to `to`,
  * given that it was not attacked before the move and `b` is the board after it. Only the piece now on
- * `to` can be a new attacker, or an unmoved slider whose line to `k` crosses a square the move
- * emptied (`from`, or `to` when the moving pawn vanished): the same answer as `attackedBy`.
+ * `to` can be a new attacker (a promoted pawn attacks as its new type), or an unmoved slider whose
+ * line to `k` crosses `from`, the one square the move emptied: the same answer as `attackedBy`.
  */
 export function attackedAfterMove(b: Int8Array, k: number, s: number, from: number, to: number): boolean {
   const c = b[to]! * s;
@@ -130,8 +131,7 @@ export function attackedAfterMove(b: Int8Array, k: number, s: number, from: numb
       }
     }
   }
-  if (sliderBeyond(b, k, from, s)) return true;
-  return c === 0 && sliderBeyond(b, k, to, s);
+  return sliderBeyond(b, k, from, s);
 }
 
 const sign = (c: Color): number => (c === 'white' ? 1 : -1);
@@ -204,10 +204,30 @@ export function pieceTargets(b: Int8Array, from: number): number[] {
   return Array.from(TARGETS.subarray(0, n));
 }
 
-/** What a pawn of colour sign `s` moving to `to` becomes: 'queen' (Black, rank 1), 'removed' (White, rank 8). */
-export function promotionOf(s: number, to: number): Move['promotion'] {
-  if (s < 0) return to < 8 ? 'queen' : null;
-  return to > 55 ? 'removed' : null;
+/** Whether a pawn of colour sign `s` moving to `to` promotes: Black on rank 1, White on rank 8. */
+export function promotionOf(s: number, to: number): boolean {
+  return s < 0 ? to < 8 : to > 55;
+}
+
+/** White's promotion choices, in the order moves list them (docs/02 §2.2). */
+export const WHITE_PROMOTIONS: readonly PromotionType[] = ['queen', 'rook', 'bishop', 'knight'];
+
+/**
+ * Appends the move from `from` to `to` (captured code `captured`) to `out`: one move when it does not
+ * promote, one per WHITE_PROMOTIONS type for a White promotion, and a queen for a Black one.
+ */
+export function pushMoves(
+  out: Move[], s: number, from: number, to: number, captured: number, promotes: boolean, via: number, viaCaptured: number,
+): void {
+  if (!promotes) {
+    out.push({ from, to, captured, promotion: null, via, viaCaptured });
+  } else if (s < 0) {
+    out.push({ from, to, captured, promotion: 'queen', via, viaCaptured });
+  } else {
+    for (let i = 0; i < WHITE_PROMOTIONS.length; i++) {
+      out.push({ from, to, captured, promotion: WHITE_PROMOTIONS[i]!, via, viaCaptured });
+    }
+  }
 }
 
 export function pseudoMoves(b: Int8Array, color: Color): Move[] {
@@ -220,9 +240,7 @@ export function pseudoMoves(b: Int8Array, color: Color): Move[] {
     const n = targetsInto(b, from, TARGETS);
     for (let i = 0; i < n; i++) {
       const to = TARGETS[i]!;
-      moves.push({
-        from, to, captured: b[to]!, promotion: isPawn ? promotionOf(s, to) : null, via: -1, viaCaptured: 0,
-      });
+      pushMoves(moves, s, from, to, b[to]!, isPawn && promotionOf(s, to), -1, 0);
     }
   }
   return moves;
@@ -266,23 +284,29 @@ export function isAttacked(b: Int8Array, sq: number, by: Color): boolean {
   return attackedBy(b, sq, sign(by));
 }
 
+/** The absolute piece code of a promotion type. */
+export function promotionCode(p: PromotionType): number {
+  return p === 'queen' ? QUEEN : p === 'rook' ? ROOK : p === 'bishop' ? BISHOP : KNIGHT;
+}
+
 export function makeMove(b: Int8Array, m: Move): void {
   const code = b[m.from]!;
   if (m.via >= 0) b[m.via] = 0;
-  b[m.to] = m.promotion === 'queen' ? -QUEEN : m.promotion === 'removed' ? 0 : code;
+  const p = m.promotion;
+  b[m.to] = p === null ? code : code > 0 ? promotionCode(p) : -promotionCode(p);
   b[m.from] = 0;
 }
 
 export function unmakeMove(b: Int8Array, m: Move): void {
-  const moved = m.promotion === 'queen' ? -PAWN : m.promotion === 'removed' ? PAWN : b[m.to]!;
+  const moved = m.promotion === null ? b[m.to]! : b[m.to]! > 0 ? PAWN : -PAWN;
   b[m.from] = moved;
   b[m.to] = m.captured;
   if (m.via >= 0) b[m.via] = m.viaCaptured;
 }
 
 /**
- * `makeMove` on `b` and the tier array `t` beside it: the tier moves with the piece (and is dropped
- * when the piece vanishes), captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
+ * `makeMove` on `b` and the tier array `t` beside it: the tier moves with the piece (a promoted pawn's
+ * piece keeps the pawn's tier), captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
  * needs to restore `t` exactly: from, to and via, two bits each.
  */
 export function makeMoveTiered(b: Int8Array, t: Int8Array, m: Move): number {

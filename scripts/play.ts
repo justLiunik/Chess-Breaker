@@ -2,9 +2,9 @@
 // endStage on a win. `npm run play`.
 import { createInterface } from 'node:readline';
 import { loadEngineConfig, loadTemplates } from '@checkbreaker/content';
-import { commitQueue, endStage, simulate, stageEconomy, startStage } from '@checkbreaker/engine';
+import { commitQueue, endStage, promotionChoices, simulate, stageEconomy, startStage } from '@checkbreaker/engine';
 import type {
-  Action, BoardPiece, CommitError, GameEvent, PieceInstance, PieceType, RunState, Square, StageState,
+  Action, BoardPiece, CommitError, GameEvent, PieceInstance, PieceType, PromotionType, RunState, Square, StageState,
 } from '@checkbreaker/engine';
 
 const config = loadEngineConfig();
@@ -25,10 +25,7 @@ function buildStage(): StageState {
   }
   // No White Hero Pieces yet: the player places them in the Deployment phase.
   for (const sq of ['c3', 'f3']) {
-    board[sq] = {
-      pieceType: 'pawn', color: 'white', spawned: true, rarity: 'normal',
-      promotesTo: { pieceType: 'knight', rarity: 'normal' },
-    };
+    board[sq] = { pieceType: 'pawn', color: 'white', spawned: true, rarity: 'normal' };
   }
   // Stage Pieces get stageIds s01, s02, ... in square-index order (a1 first).
   const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
@@ -108,7 +105,7 @@ function eventText(e: GameEvent): string {
   switch (e.type) {
     case 'move': return `${e.color} ${e.pieceType} ${e.from}-${e.to}`;
     case 'capture': return `capture on ${e.square}: ${e.color} ${e.pieceType}` + (e.salvage ? ` (salvage ${e.salvage})` : '');
-    case 'pawn_promoted': return `pawn reaches the last rank at ${e.square}; promotes to ${e.promotesTo.pieceType} (${e.promotesTo.rarity})`;
+    case 'pawn_promoted': return `pawn reaches the last rank at ${e.square}; promotes to ${e.pieceType} (${e.rarity})`;
     case 'enemy_promoted': return `enemy pawn promoted on ${e.square}`;
     case 'check': return `check on the ${e.king} king (${e.square})`;
     case 'stage_won': return `stage won: ${e.award.coins} coins (base ${e.award.base} + par bonus ${e.award.parBonus} + interest ${e.award.interest})`;
@@ -136,8 +133,11 @@ function errorText(err: CommitError): string {
   return `refused: ${kind}${detail ? ` (${detail})` : ''}`;
 }
 
+const PROMOTION_LETTERS: Record<string, PromotionType> = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
+
 const HELP = [
   'Type a move as from+to, e.g. f1d3, then answer y or n to the commit prompt.',
+  'A pawn reaching rank 8 promotes to a queen; add q, r, b or n to choose (e.g. c7c8n).',
   'Commands: help | undo-plan (discard the pending move) | quit',
 ].join('\n');
 
@@ -220,9 +220,11 @@ function main(): void {
       return;
     }
 
-    const m = /^([a-h][1-8])([a-h][1-8])$/.exec(line);
+    const m = /^([a-h][1-8])([a-h][1-8])([qrbn])?$/.exec(line);
     if (!m) { console.log(`not a move: '${line}' (try f1d3, or help)`); prompt(); return; }
-    const queue: Action[] = [{ type: 'MOVE', from: m[1]!, to: m[2]! }];
+    const promotes = promotionChoices(stage, m[1]!, m[2]!, config) !== null;
+    const promotion: PromotionType | undefined = m[3] !== undefined ? PROMOTION_LETTERS[m[3]]! : promotes ? 'queen' : undefined;
+    const queue: Action[] = [{ type: 'MOVE', from: m[1]!, to: m[2]!, ...(promotion !== undefined && { promotion }) }];
     const sim = simulate(run, stage, queue, config);
     if (!sim.ok) { console.log(errorText(sim.error)); prompt(); return; }
     console.log('preview:');

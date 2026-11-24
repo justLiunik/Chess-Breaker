@@ -29,7 +29,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { loadFormations, loadGenConfig, loadTemplates } from '@checkbreaker/content';
 import type { GenConfig } from '@checkbreaker/content';
 import { durabilityMaxOf, hash } from '@checkbreaker/engine';
-import type { Action, BoardPiece, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, BoardPiece, PieceInstance, Rarity, RunState, StageState } from '@checkbreaker/engine';
 import { generateWith } from '../../src/generate';
 import { deploymentCandidates } from '../../src/solver/deployment';
 import type { Placement } from '../../src/types';
@@ -161,17 +161,20 @@ function meets(name: Name, run: RunState, stage: StageState, placements: Placeme
  * The hand-built promotion mate in 2 (Act II Fortress fields, its board replaced; deck King + rook).
  * Black Ka8 Bb8, pawns b7 b6 f6; White spawned pawns a7 c7; the King on e1, the rook on d1 (the
  * stage's first deployment candidate). The a7 pawn blocks the a-file and can leave it only by
- * capturing on b8, where it vanishes: 1. a7xb8 (pawn_promoted), any reply (Ka7, b5 or f5), 2. Rd1-a1
+ * capturing on b8, where it promotes. Frozen under the M5 rule, where the pawn vanished there:
+ * 1. a7xb8 (pawn_promoted), any reply (Ka7, b5 or f5), 2. Rd1-a1
  * mate (b8 is covered by c7, b7 and b6 hold Black's own pawns, the king's other squares lie on the
  * a-file). Without the promotion the a-file stays shut and the rook has no check: no deployment
- * candidate mates within 2 turns. The f6 pawn only keeps Black from being stalemated.
+ * candidate mates within 2 turns. The f6 pawn only keeps Black from being stalemated. Under M5.1
+ * (docs/02 §2.2) a7xb8=Q mates at once, on turn 1, below `minSolveTurns`, so the oracle still proves
+ * only the turn-2 line; re-freezing with the solver's promotion choices is M5.1 Task 4.
  */
 function handBuiltPromotion(): Omit<Fixture, 'deploymentRanks'> {
   const run = smallRun('7F3A-2210', 1, 0, [instance('p_rook_07', 'rook', 'normal')]);
   const { stage: generated } = generateWith({ run, actIndex: 1, stageIndex: 0 }, content, config, neverProves);
   const black = (pieceType: BoardPiece['pieceType'], stageId: string): BoardPiece => ({ pieceType, color: 'black', stageId });
-  const pawn = (stageId: string, promotesTo: BoardPiece['promotesTo']): BoardPiece => ({
-    pieceType: 'pawn', color: 'white', spawned: true, stageId, rarity: 'normal', promotesTo,
+  const pawn = (stageId: string, rarity: Rarity): BoardPiece => ({
+    pieceType: 'pawn', color: 'white', spawned: true, stageId, rarity,
   });
   const board: Record<string, BoardPiece> = {
     b6: black('pawn', 's01'),
@@ -179,8 +182,8 @@ function handBuiltPromotion(): Omit<Fixture, 'deploymentRanks'> {
     b7: black('pawn', 's03'),
     a8: black('king', 's04'),
     b8: black('bishop', 's05'),
-    a7: pawn('s06', { pieceType: 'rook', rarity: 'rare' }),
-    c7: pawn('s07', { pieceType: 'knight', rarity: 'rare' }),
+    a7: pawn('s06', 'rare'),
+    c7: pawn('s07', 'rare'),
   };
   const { provenance: _, ...rest } = generated;
   const stage: StageState = { ...rest, board, mateIn: 2 };

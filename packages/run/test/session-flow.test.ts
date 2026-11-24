@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { interestOf } from '@checkbreaker/engine';
-import type { Action, Award, PieceInstance, StageState } from '@checkbreaker/engine';
+import type { Action, Award, PieceInstance, PromotionType, StageState } from '@checkbreaker/engine';
 import { commit, expectedSeed, leave, newRun, provideStage, repair, sell, start } from '../src/session';
 import type { RunEvent, RunResult, RunSession } from '../src/types';
 import { ROOK_ID, deepFreeze, mateInOneStage, promotionOverflowStage, runConfig as c, runWithRook } from './fixtures';
 
 const SEED = 'B0B0-1234';
 const KING_ROOK = [{ instanceId: 'p_king_01', to: 'd1' }, { instanceId: ROOK_ID, to: 'e1' }];
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 
 const value = (r: RunResult): { session: RunSession; events: RunEvent[] } => {
   if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r.error)}`);
@@ -104,7 +105,7 @@ describe('a whole run from a stub generator', () => {
     });
     const room = c.deck.capacity - s.run.deck.filter(p => p.pieceType !== 'king').length;
     s = deepFreeze({ ...s, run: { ...s.run, deck: [...s.run.deck, ...Array.from({ length: room }, (_, k) => fill(k))] } });
-    s = playStage(s, 8, log, promotionOverflowStage, [mv('b7', 'b8'), mv('e1', 'e8')]);
+    s = playStage(s, 8, log, promotionOverflowStage, [mv('b7', 'b8', 'knight'), mv('e1', 'e8')]);
     expect(s).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 1 } });
     expect(s.run.status).toBe('in_progress');
     expect(s.run.history).toHaveLength(9);

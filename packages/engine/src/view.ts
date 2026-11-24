@@ -2,14 +2,16 @@ import { spawnCostOf } from './abilities';
 import {
   boardWith, checkPlacement, spawnCostOfPlaced, type Placed,
 } from './deployment';
-import { inCheck } from './legality';
+import { inCheck, planPlayerMove } from './legality';
 import { interestOf, pendingBase, stageEconomy } from './economy';
 import { beginQueue, resolveStep } from './queue';
 import { simulate } from './rules';
-import { DIAG_R, KING_T, KNIGHT_T, ORTHO_R } from './movegen';
+import { DIAG_R, KING_T, KNIGHT_T, ORTHO_R, WHITE_PROMOTIONS } from './movegen';
 import { BISHOP, KING, KNIGHT, PAWN, QUEEN, ROOK, fromBoard } from './position';
 import { toSquare } from './square';
-import type { Action, Award, CommitError, EngineConfig, GameEvent, RunState, Square, StageState } from './types';
+import type {
+  Action, Award, CommitError, EngineConfig, GameEvent, PromotionType, RunState, Square, StageState,
+} from './types';
 
 /**
  * Read-only answers for the UI (M5 §7.3), so that it computes no rules itself. Pure; they never
@@ -160,6 +162,18 @@ export function previewSteps(
   }
   const sim = simulate(run, stage, queue, config);
   return sim.ok ? { steps, error: null, result: sim.value } : { steps, error: sim.error, result: null };
+}
+
+/**
+ * The promotion picker's choices for the MOVE from `from` to `to` on `stage`'s board: every
+ * `PromotionType`, queen, rook, bishop, knight, when the move is legal and brings a pawn to rank 8
+ * (the engine refuses it without a choice, `promotion_required`); null for any other move, legal or
+ * not (docs/02 §2.2).
+ */
+export function promotionChoices(
+  stage: StageState, from: Square, to: Square, config: EngineConfig,
+): PromotionType[] | null {
+  return planPlayerMove(stage.board, from, to, config).reason === 'promotion_required' ? [...WHITE_PROMOTIONS] : null;
 }
 
 /** Why a skill cannot be activated at all at a point of the queue (the engine's `skill_unavailable` reasons). */

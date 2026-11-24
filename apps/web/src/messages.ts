@@ -9,6 +9,8 @@ const REJECTION: Record<Extract<CommitError, { kind: 'illegal_move' }>['reason']
   unreachable: 'that piece cannot reach the target square',
   own_piece: 'your own piece is on the target square',
   king_square: 'the target square holds a King, which cannot be captured',
+  promotion_required: 'a pawn reaching the last rank must choose a piece to promote to',
+  promotion_not_allowed: 'only a pawn reaching the last rank can promote',
 };
 
 const DEPLOY_REASON: Record<Extract<CommitError, { kind: 'invalid_deployment' }>['reason'], string> = {

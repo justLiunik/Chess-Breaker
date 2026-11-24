@@ -37,10 +37,7 @@ export function stageOf(
     if (letter === letter.toLowerCase()) {
       board[sq] = { pieceType, color: 'black' };
     } else if (pieceType === 'pawn') {
-      board[sq] = {
-        pieceType, color: 'white', spawned: true, rarity: 'normal',
-        promotesTo: { pieceType: 'knight', rarity: 'normal' },
-      };
+      board[sq] = { pieceType, color: 'white', spawned: true, rarity: 'normal' };
     } else {
       board[sq] = { pieceType, color: 'white', instanceId: `p_${pieceType}_${sq}` };
     }

@@ -7,7 +7,9 @@ export { hasLegalQueue } from './legal-queue';
 export * from './enemy/policy';
 export { TIERS, compileAbilities, durabilityMaxOf, spawnCostOf } from './abilities';
 export { startStage } from './deployment';
-export { deploymentStatus, hudEconomy, previewSteps, skillUnavailable, threatMap } from './view';
+export {
+  deploymentStatus, hudEconomy, previewSteps, promotionChoices, skillUnavailable, threatMap,
+} from './view';
 export type { DeploymentStatus, DropRefusal, SkillUnavailable } from './view';
 export * from './stage-end';
 export { pickWeighted, retainTier, rollTier } from './rarity-roll';

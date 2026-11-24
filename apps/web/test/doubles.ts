@@ -12,7 +12,7 @@ function deploymentStage(pieces: Record<Square, string>, overrides: Partial<Stag
     const pieceType = LETTERS[letter.toLowerCase()]!;
     board[sq] = letter === letter.toLowerCase()
       ? { pieceType, color: 'black' }
-      : { pieceType, color: 'white', spawned: true, rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' } };
+      : { pieceType, color: 'white', spawned: true, rarity: 'normal' };
   }
   const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
   let n = 0;

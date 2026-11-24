@@ -251,10 +251,6 @@ function checkBoardPiece(v: unknown, path: string): BoardPiece {
   put(out, 'stageId', p, path, str);
   put(out, 'spawned', p, path, exactly(true as const));
   put(out, 'rarity', p, path, tier);
-  put(out, 'promotesTo', p, path, (x, at) => {
-    const t = obj(x, at);
-    return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, DECK_TYPES), rarity: tier(own(t, 'rarity'), `${at}.rarity`) };
-  });
   put(out, 'transformed', p, path, (x, at) => {
     const t = obj(x, at);
     return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, PIECE_TYPES), modifierId: str(own(t, 'modifierId'), `${at}.modifierId`) };

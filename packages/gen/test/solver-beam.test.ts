@@ -166,8 +166,7 @@ describe('minSolveTurns', () => {
     const id = () => `s${String(++n).padStart(2, '0')}`;
     for (const w of black.split(' ')) out[w.slice(1)] = { pieceType: TYPES[w[0]!]!, color: 'black', stageId: id() };
     out[spawned] = {
-      pieceType: 'pawn', color: 'white', spawned: true, stageId: id(),
-      rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' },
+      pieceType: 'pawn', color: 'white', spawned: true, stageId: id(), rarity: 'normal',
     };
     return out;
   }

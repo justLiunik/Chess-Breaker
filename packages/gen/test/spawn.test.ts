@@ -70,7 +70,7 @@ describe('placeSpawnedPawns', () => {
         expect(attacksKing(sq, ks)).toBe(false);
         expect(p.color).toBe('white');
         expect(p.instanceId).toBeUndefined();
-        expect(p.promotesTo).toBeUndefined();
+        expect('promotesTo' in p).toBe(false);
         expect(Number(p.stageId!.slice(1))).toBeGreaterThan(enemyN);
       }
       expect(pawns).toBeGreaterThanOrEqual(2);
@@ -113,7 +113,7 @@ describe('bonus pawn', () => {
     expect(p.spawned).toBe(true);
     expect(p.pieceType).toBe('pawn');
     expect(TIERS).toContain(p.rarity as Rarity);
-    expect(p.promotesTo).toBeUndefined();
+    expect('promotesTo' in p).toBe(false);
   });
 });
 
