@@ -140,7 +140,7 @@ export type CommitError =
   | {
       kind: 'invalid_deployment';
       to: Square;
-      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate';
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'gives_check' | 'queen_limit' | 'not_in_deck' | 'duplicate';
     }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'once_per_turn' }

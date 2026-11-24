@@ -18,6 +18,8 @@ const DEPLOY_REASON: Record<Extract<CommitError, { kind: 'invalid_deployment' }>
   outside_zone: 'that square is outside your deployment zone',
   king_missing: 'your King must be placed first',
   king_in_check: 'the King would start in check',
+  gives_check: 'a piece there would give check to the enemy King at the start',
+  queen_limit: 'only one Queen can be summoned per stage',
   not_in_deck: 'that piece is not in your deck',
   duplicate: 'that piece is already placed',
 };
@@ -161,6 +163,8 @@ const DROP_REASON: Record<DropRefusal, string> = {
   occupied: DEPLOY_REASON.occupied,
   outside_zone: DEPLOY_REASON.outside_zone,
   king_in_check: DEPLOY_REASON.king_in_check,
+  gives_check: DEPLOY_REASON.gives_check,
+  queen_limit: DEPLOY_REASON.queen_limit,
   not_in_deck: DEPLOY_REASON.not_in_deck,
   duplicate: DEPLOY_REASON.duplicate,
   spawn_points_exceeded: 'there are not enough spawn points left for that piece',

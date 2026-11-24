@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CommitError } from '@checkbreaker/engine';
+import type { CommitError, DropRefusal } from '@checkbreaker/engine';
 import type { RunError, SaveError } from '@checkbreaker/run';
-import { commitErrorText, runErrorText, saveErrorText } from '../src/messages';
+import { commitErrorText, dropRefusalText, runErrorText, saveErrorText } from '../src/messages';
 
 const commit: Record<CommitError['kind'], CommitError> = {
   king_in_check_at_end: { kind: 'king_in_check_at_end', square: 'e1', checkers: ['e8'], afterRevert: false },
@@ -88,5 +88,18 @@ describe('error messages', () => {
     checkTable(reasons.map((reason) => commitErrorText({ kind: 'illegal_move', atStep: 0, from: 'a2', to: 'a3', reason })));
     const merge = ['count', 'mismatch', 'durability', 'legendary', 'ceiling', 'king', 'not_in_deck'] as const;
     checkTable(merge.map((reason) => runErrorText({ kind: 'merge_invalid', reason })));
+  });
+
+  it('names the deployment reasons, including the M5.1 ones', () => {
+    const reasons = [
+      'occupied', 'outside_zone', 'king_missing', 'king_in_check', 'gives_check', 'queen_limit', 'not_in_deck', 'duplicate',
+    ] as const;
+    checkTable(reasons.map((reason) => commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason })));
+    expect(commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason: 'gives_check' })).toMatch(/check/i);
+    expect(commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason: 'queen_limit' })).toMatch(/queen/i);
+    const drops: DropRefusal[] = [
+      'occupied', 'outside_zone', 'king_in_check', 'gives_check', 'queen_limit', 'not_in_deck', 'duplicate', 'spawn_points_exceeded',
+    ];
+    checkTable(drops.map(dropRefusalText));
   });
 });

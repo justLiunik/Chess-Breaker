@@ -1,6 +1,6 @@
 import { spawnCostOf } from './abilities';
 import {
-  boardWith, checkPlacement, spawnCostOfPlaced, type Placed,
+  boardWith, checkPlacement, queenLimitExceeded, spawnCostOfPlaced, startCheckSquare, type Placed,
 } from './deployment';
 import { inCheck, planPlayerMove } from './legality';
 import { interestOf, pendingBase, stageEconomy } from './economy';
@@ -61,13 +61,14 @@ export function threatMap(
 }
 
 export type DropRefusal =
-  | 'occupied' | 'outside_zone' | 'king_in_check' | 'not_in_deck' | 'duplicate' | 'spawn_points_exceeded';
+  | 'occupied' | 'outside_zone' | 'king_in_check' | 'gives_check' | 'queen_limit' | 'not_in_deck' | 'duplicate'
+  | 'spawn_points_exceeded';
 
 export type DeploymentStatus = {
   spawnUsed: number;
   spawnBudget: number;
   startCost: { instanceId: string; from: number; to: number }[];
-  tray: Record<string, { placeable: boolean; reason?: 'spent' | 'too_expensive' | 'placed' }>;
+  tray: Record<string, { placeable: boolean; reason?: 'spent' | 'too_expensive' | 'placed' | 'queen_limit' }>;
   drop(instanceId: string, to: Square): { ok: true } | { ok: false; reason: DropRefusal };
 };
 
@@ -77,7 +78,10 @@ export type DeploymentStatus = {
  * square. It runs `startStage`'s own per-placement and cost checks (`checkPlacement`,
  * `spawnCostOfPlaced`), so it cannot disagree with START. Placements that fail those checks are
  * ignored. `drop` judges the new placement after the existing ones; a King's check is judged on the
- * board so far, so drop the King after its blockers (a non-King never changes it for the worse).
+ * board so far, so drop the King after its blockers (a non-King never changes it for the worse). A
+ * summon that gives check to the Black King (`gives_check`, I16) and a queen past the limit
+ * (`queen_limit`) are judged on the board after this placement, as START judges them; the tray marks
+ * every unplaced queen `queen_limit` once the limit of queens is placed.
  */
 export function deploymentStatus(
   run: RunState, stage: StageState, placements: { instanceId: string; to: Square }[], config: EngineConfig,
@@ -96,12 +100,15 @@ export function deploymentStatus(
   });
 
   const remaining = stage.spawnPoints - spawnUsed;
+  const placedQueens = placed.filter((p) => p.instance.pieceType === 'queen').length;
   const tray: DeploymentStatus['tray'] = {};
   for (const inst of run.deck) {
     if (placed.some((p) => p.instance.instanceId === inst.instanceId)) {
       tray[inst.instanceId] = { placeable: false, reason: 'placed' };
     } else if (inst.status !== 'in_deck' || (inst.pieceType !== 'king' && (inst.durability ?? 0) < 1)) {
       tray[inst.instanceId] = { placeable: false, reason: 'spent' };
+    } else if (inst.pieceType === 'queen' && placedQueens >= config.deployment.maxQueenSummons) {
+      tray[inst.instanceId] = { placeable: false, reason: 'queen_limit' };
     } else if (inst.pieceType !== 'king' && spawnCostOf(inst.pieceType, inst.rarity ?? 'normal', config) > remaining) {
       tray[inst.instanceId] = { placeable: false, reason: 'too_expensive' };
     } else {
@@ -116,13 +123,17 @@ export function deploymentStatus(
     if (!r.ok) {
       const e = r.error;
       return { ok: false, reason: e.kind === 'invalid_deployment' && e.reason !== 'king_missing' && e.reason !== 'king_in_check'
+        && e.reason !== 'gives_check' && e.reason !== 'queen_limit'
         ? e.reason : 'not_in_deck' };
     }
     const next = [...placed, { instance: r.value, to }];
     if (spawnCostOfPlaced(next, config) > stage.spawnPoints) return { ok: false, reason: 'spawn_points_exceeded' };
-    if (r.value.pieceType === 'king' && inCheck(fromBoard(boardWith(stage, next)), 'white')) {
+    if (queenLimitExceeded(next, config)) return { ok: false, reason: 'queen_limit' };
+    const board = boardWith(stage, next);
+    if (r.value.pieceType === 'king' && inCheck(fromBoard(board), 'white')) {
       return { ok: false, reason: 'king_in_check' };
     }
+    if (startCheckSquare(board, config) !== null) return { ok: false, reason: 'gives_check' };
     return { ok: true };
   };
 

@@ -67,6 +67,32 @@ describe('startStage refusals (each spends nothing; inputs are frozen)', () => {
   });
 });
 
+describe('no check at START and one queen summon (M5.1 I16, P10)', () => {
+  const withQueens = (rarities: ('normal' | 'unique')[]): RunState => {
+    const run = runOf();
+    const queens = rarities.map((rarity, i) => ({
+      ...run.deck[1]!, instanceId: `p_queen_${i + 7}`, pieceType: 'queen' as const, rarity,
+    }));
+    return deepFreeze({ ...run, deck: [...run.deck, ...queens] });
+  };
+  it('START refuses a summon that gives check (I16)', () => {
+    // The playtest board: bishop c4 sees f7 along d5, e6.
+    refused(runOf(), deploymentStageOf({ f7: 'k' }), [K, P('p_bishop_04', 'c4')],
+      { kind: 'invalid_deployment', to: 'c4', reason: 'gives_check' });
+  });
+  it('START accepts the same bishop once the line is blocked', () => {
+    const r = startStage(runOf(), deploymentStageOf({ f7: 'k', e6: 'p' }), [K, P('p_bishop_04', 'c4')], config);
+    expect(r.ok).toBe(true);
+  });
+  it('START refuses a second summoned queen of any rarity', () => {
+    const s = deploymentStageOf({ e8: 'k' }, { spawnPoints: 40 });
+    refused(withQueens(['normal', 'unique']), s, [K, P('p_queen_7', 'a1'), P('p_queen_8', 'b1')],
+      { kind: 'invalid_deployment', to: 'b1', reason: 'queen_limit' });
+    const one = startStage(withQueens(['normal', 'unique']), s, [K, P('p_queen_7', 'a1')], config);
+    expect(one.ok).toBe(true);
+  });
+});
+
 describe('startStage check order (spec 7.2: the earlier failure wins)', () => {
   const withDeck = (f: (d: RunState['deck']) => RunState['deck']): RunState => {
     const run = runOf();
@@ -164,7 +190,7 @@ describe('startStage success', () => {
 describe('invalid_deployment reasons', () => {
   it('are typed as the spec §5.3 union (checked by npm run typecheck)', () => {
     expectTypeOf<Extract<CommitError, { kind: 'invalid_deployment' }>['reason']>().toEqualTypeOf<
-      'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate'
+      'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'gives_check' | 'queen_limit' | 'not_in_deck' | 'duplicate'
     >();
   });
 });

@@ -1,7 +1,8 @@
 import { spawnCostOf } from './abilities';
-import { fromBoard } from './position';
+import { KING, PAWN, fromBoard, tiersOf } from './position';
 import { inCheck } from './legality';
-import { isSquare } from './square';
+import { abilityAttacked } from './abilities';
+import { isSquare, toSquare } from './square';
 import type {
   BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, Square, StageState,
 } from './types';
@@ -60,6 +61,36 @@ export function boardWith(stage: StageState, placed: Placed[]): Record<Square, B
 }
 
 /**
+ * The square of a White piece giving check to the Black King on `board`, or null when none does (I16).
+ * Judged as the engine judges Black's check, with rarity abilities (`abilityAttacked`). With several
+ * checkers the answer is the first in square order (lowest index: a1, b1 ... h8). To name it each
+ * White piece is tried alone, the other White pieces left on the board as blockers only, so a piece
+ * hidden behind another White piece is not named; if no piece qualifies (cannot happen by the plain
+ * attack rule) the first White piece in square order is named.
+ */
+export function startCheckSquare(board: Record<Square, BoardPiece>, config: EngineConfig): Square | null {
+  const b = fromBoard(board);
+  const t = tiersOf(board);
+  const k = b.indexOf(-KING);
+  if (k < 0 || !abilityAttacked(b, t, k, config.abilities)) return null;
+  const whites: number[] = [];
+  for (let i = 0; i < 64; i++) if (b[i]! > 0) whites.push(i);
+  for (const i of whites) {
+    const alone = b.slice();
+    const tAlone = new Int8Array(64);
+    for (const j of whites) if (j !== i) alone[j] = -PAWN; // a blocker, never an attacker of the King
+    tAlone[i] = t[i]!;
+    if (abilityAttacked(alone, tAlone, k, config.abilities)) return toSquare(i);
+  }
+  return toSquare(whites[0]!);
+}
+
+/** Whether `placed` summons more queens than `config.deployment.maxQueenSummons` allows. */
+export function queenLimitExceeded(placed: Placed[], config: EngineConfig): boolean {
+  return placed.filter((p) => p.instance.pieceType === 'queen').length > config.deployment.maxQueenSummons;
+}
+
+/**
  * The Deployment phase: place Hero Pieces from the deck, pay their durability, start the Action phase.
  * Every check runs before any change, so a refusal spends nothing (spec §7.2). The loadout is left
  * as it is: skills are single use, and nothing refills them (M4).
@@ -93,10 +124,18 @@ export function startStage(
     return refuse({ kind: 'spawn_points_exceeded', budget: stage.spawnPoints, cost });
   }
 
+  if (queenLimitExceeded(placed, config)) {
+    // `to` is the first queen over the limit, in placement order.
+    const queens = placed.filter((p) => p.instance.pieceType === 'queen');
+    return refuse({ kind: 'invalid_deployment', to: queens[config.deployment.maxQueenSummons]!.to, reason: 'queen_limit' });
+  }
+
   const board = boardWith(stage, placed);
   if (inCheck(fromBoard(board), 'white')) {
     return refuse({ kind: 'invalid_deployment', to: kings[0]!.to, reason: 'king_in_check' });
   }
+  const checker = startCheckSquare(board, config);
+  if (checker !== null) return refuse({ kind: 'invalid_deployment', to: checker, reason: 'gives_check' });
 
   const deck = run.deck.map((p): PieceInstance => {
     if (!seen.has(p.instanceId)) return p;

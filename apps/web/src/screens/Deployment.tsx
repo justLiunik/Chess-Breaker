@@ -13,7 +13,7 @@ import { useRun } from '../state/store';
 
 type Placement = { instanceId: string; to: Square };
 
-const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'placed (click to pick up)' } as const;
+const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'placed (click to pick up)', queen_limit: 'one Queen per stage' } as const;
 
 const tierName = (i: PieceInstance): string => (i.rarity ? RARITY_NAME[i.rarity] : 'King');
 
