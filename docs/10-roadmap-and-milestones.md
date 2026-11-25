@@ -430,7 +430,7 @@ decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start
 - **Not in scope:** economy prices, par values, enemy strength (decision P7: tuned after the replay).
 
 **Acceptance criteria**
-- [ ] Engine tests:
+- [x] Engine tests:
   - promotion to each of the four types stays on the board with the pawn's rarity and joins the deck;
   - `promotion_required` and `promotion_not_allowed`;
   - a promoted piece captured later in the stage is lost;
@@ -438,18 +438,47 @@ decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start
   - I16 is refused at START, and `deploymentStatus` reports `gives_check`;
   - a second summoned queen is refused (`queen_limit`), and a promotion to a queen in the same stage
     is allowed.
-- [ ] Generation: 100% of stages satisfy `no_start_check`; the 1,000-stage bulk run still passes; the
-      par curve (solver mating turn against par per template) is re-measured with `gen:report` and
-      recorded, without re-tuning.
-- [ ] Run: no chooser phase; `deck_over_capacity` refuses the next stage at 9 and allows it at 8; a
-      pre-M5.1 save is refused with the version message.
-- [ ] Web:
+
+  Evidence: `packages/engine/test/promotion.test.ts` and `packages/engine/test/deployment.test.ts`,
+  which also covers a Unique bishop checking through its own pawn, and a summoned queen plus a queen
+  promotion. The enemy-search bench now has a promotion position: depth-4 median about 6 ms, against
+  the 50 ms bound.
+- [x] Generation: 100% of stages satisfy `no_start_check`. `bulk.test.ts` asserts this for all
+      1,000 stages, including `validationFailed` ones, and the 1,000-stage run passes. Spawned pawns
+      are capped at rank 6 (schema plus validator), so G5 cannot miss a turn-1 promotion mate.
+      `gen:report --workers 1 --stages 40` (2026-11-25) gives proven within par, median mating turn
+      against par, and wall-time median / p95:
+
+      | Template | Proven within par | Mating turn vs par | Wall median / p95 |
+      |---|---|---|---|
+      | Gatehouse | 40/40 | 3.0 vs 4 | 1.1 s / 8.9 s |
+      | First Steps | 40/40 | 3.5 vs 4 | 0.9 s / 6.9 s |
+      | Open Field | 40/40 | 4.0 vs 5 | 0.2 s / 1.0 s |
+      | Citadel | 40/40 | 3.0 vs 4 | 0.8 s / 5.9 s |
+      | Fortress | 39/40 | 3.0 vs 4 | 2.5 s / 9.0 s |
+      | Redoubt | 33/40 | 2.0 vs 2 | 1.1 s / 7.1 s |
+      | Last Line | 39/40 | 2.0 vs 3 | 1.8 s / 6.5 s |
+
+      Overall 271/280 = 96.8%, against the 95% target. Redoubt's 5 and Last Line's 1 validation
+      failures are all `no_first_turn_mate`. Every template now meets the M3 time target (median
+      ≤ 3 s, p95 ≤ 15 s) in this Node run. Nothing was re-tuned (P7).
+- [x] Run: no chooser phase; `deck_over_capacity` refuses the next stage at 9 and allows it at 8; a
+      pre-M5.1 save is refused with the version message (`packages/run/test/session.test.ts`,
+      `save.test.ts`). A 20-run bot (2026-11-25) gave 1 win and 19 losses, against M4's 0/20.
+      Every loss was `out_of_coins` on a fallback stage, mostly at stage 7. The bot had 0 crashes
+      and 0 invariant breaches.
+- [x] Web:
   - the promotion picker appears for a move to rank 8, and the preview shows the promoted piece;
   - `gives_check` squares are marked;
   - the shop gate reads and works as described;
   - the full-run test is updated and passes.
-- [ ] Data, schemas and the validator agree. `npm test`, `typecheck`, `validate`, `check:links` and
-      `build` pass.
+
+  Evidence: `apps/web/test/action.test.tsx` (the picker, including a pawn advanced earlier in the
+  queue, and the picker being modal), `deployment.test.tsx`, `screens.test.tsx` (the gate, and a real
+  version-1 save under `checkbreaker.save.1`) and `full-run.test.tsx`.
+- [x] Data, schemas and the validator agree. `npm test`, `typecheck`, `validate`, `check:links` and
+      `build` pass: 86 files / 1,108 tests, 74 validator checks, 0 broken links, main chunk 125.37 kB
+      gzip (2026-11-25).
 - [ ] The user plays again and says whether the stages and the economy now feel right (the input for a
       later tuning pass).
 
