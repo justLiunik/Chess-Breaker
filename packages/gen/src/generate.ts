@@ -92,7 +92,10 @@ export function generateWith(
     return emit(first, { proven: false, bonusPawn: false }, null);
   }
   if (!last) throw new Error(`no enemy board for act ${actIndex + 1} ${tier}`);
-  return emit(last, { proven: false, bonusPawn: false, validationFailed: true }, null); // all templates failed G5
+  // All templates failed G5: the last board is emitted, flagged. It still passes no_start_check (I16), so
+  // the player can START: its only White pieces are spawned pawns, and G4 never puts one on a square from
+  // which it attacks the Black king (spawn.ts, freeSpawnSquares). bulk.test asserts it for every stage.
+  return emit(last, { proven: false, bonusPawn: false, validationFailed: true }, null);
 }
 
 export function generateStage(

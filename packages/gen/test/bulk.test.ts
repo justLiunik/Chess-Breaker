@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { TIERS } from '@checkbreaker/engine';
+import { KING, abilityAttacked, fromBoard, tiersOf } from '@checkbreaker/engine/internal';
 import { loadFormations, loadTemplates } from '@checkbreaker/content';
 import type { ActKey } from '@checkbreaker/content';
 import { checkPreconditions } from '../src/preconditions';
@@ -73,6 +74,13 @@ describe('1,000-stage CI run', () => {
       const failed = checkPreconditions(run, stage, tpl, { extraPawns: 0 }, config);
       if (provenance.validationFailed) expect(failed, where).not.toBeNull();
       else expect(failed, where).toBeNull();
+      // I16: every stage, validationFailed included, passes no_start_check, and no White piece attacks
+      // the Black king as startStage judges it (rarity abilities included), so START is never refused
+      // before a piece is placed. G4 never spawns a pawn that attacks the king (final review I-1).
+      const startOnly = { ...tpl, preconditions: ['no_start_check' as const] };
+      expect(checkPreconditions(run, stage, startOnly, { extraPawns: 0 }, config), where).toBeNull();
+      const b = fromBoard(stage.board);
+      expect(abilityAttacked(b, tiersOf(stage.board), b.indexOf(-KING), config.abilities), `${where} opens in check`).toBe(false);
       for (const p of pieces) {
         if (p.color === 'black') expect(p.rarity, where).toBeUndefined();
         if (p.spawned) {
