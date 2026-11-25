@@ -139,7 +139,7 @@ This is the signature UI and the game's main skill-expression surface.
 - **A queue needs a move.** An empty queue, or one holding only skills, blocks COMMIT (`Add a move —
   there is no pass`).
 - **Promotion picker** (M5.1, as on lichess): the moment a planned move puts a spawned pawn on rank
-  8, a picker opens on that square offering **Q / R / B / N**, each at the pawn's rarity. The choice
+  8, a promotion picker opens offering **Q / R / B / N**, each at the pawn's rarity. The choice
   is part of building the queue: it is stored in that `MOVE`, the queue entry shows the chosen piece
   (`♙ e7→e8 = ♕ Rare`), and the ghost preview shows the promoted piece on the board — so the preview
   still equals the outcome (I10). Cancelling the picker drops the move. The picker offers exactly what

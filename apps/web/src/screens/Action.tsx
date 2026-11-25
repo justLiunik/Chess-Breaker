@@ -128,8 +128,8 @@ export function Action() {
       else if (canCommit) { if (loss) setConfirming(true); else startCommit(); }
     },
     undo: () => { if (!locked && !picking && q.queue.length > 0) { q.undo(); reset(); } },
-    stepPrev: () => { if (!locked && q.stepIndex > 0) q.setStep(q.stepIndex - 1); },
-    stepNext: () => { if (!locked && q.queue.length > 0) q.setStep(q.stepIndex + 1); },
+    stepPrev: () => { if (!locked && !picking && q.stepIndex > 0) q.setStep(q.stepIndex - 1); },
+    stepNext: () => { if (!locked && !picking && q.queue.length > 0) q.setStep(q.stepIndex + 1); },
     escape: () => { if (picking) setPromoting(null); else if (confirming) setConfirming(false); else reset(); },
   };
 
@@ -180,8 +180,8 @@ export function Action() {
             onPlanMark={(square, color) => setPlan((p) => toggleMark(p, { square, color }))}
             onPlanClear={() => setPlan((p) => (p.arrows.length || p.marks.length ? clearPlan() : p))}
             reducedMotion={motionReduced}
-            draggable={(sq) => !locked && planStage.board[sq]?.color === 'white'}
-            onDragStart={(sq, e) => { setSelected(sq); e.dataTransfer?.setData('text/plain', sq); }}
+            draggable={(sq) => !locked && !picking && planStage.board[sq]?.color === 'white'}
+            onDragStart={(sq, e) => { if (picking) return; setSelected(sq); e.dataTransfer?.setData('text/plain', sq); }}
             onDrop={(sq) => onSquare(sq)}
           />
         )}
@@ -199,7 +199,7 @@ export function Action() {
                   <button
                     key={id}
                     type="button"
-                    disabled={locked || why !== null}
+                    disabled={locked || picking || why !== null}
                     aria-pressed={pendingSkill === id}
                     onClick={() => {
                       if (!def || def.target.kind === 'none') q.append({ type: 'ACTIVATE_SKILL', skillId: id });
@@ -219,15 +219,15 @@ export function Action() {
             stage={stage}
             preview={preview}
             stepIndex={q.stepIndex}
-            locked={locked}
-            onRemove={(i) => { q.removeAt(i); reset(); }}
-            onMove={q.move}
-            onShow={q.setStep}
+            locked={locked || picking}
+            onRemove={(i) => { if (picking) return; q.removeAt(i); reset(); }}
+            onMove={(f, t) => { if (!picking) q.move(f, t); }}
+            onShow={(i) => { if (!picking) q.setStep(i); }}
           />
           <p>
-            <button type="button" disabled={locked || q.queue.length === 0} onClick={() => { q.undo(); reset(); }}>Undo</button>
+            <button type="button" disabled={locked || picking || q.queue.length === 0} onClick={() => { q.undo(); reset(); }}>Undo</button>
             {' '}
-            <button type="button" disabled={locked || q.queue.length === 0} onClick={() => { q.clear(); reset(); }}>Clear</button>
+            <button type="button" disabled={locked || picking || q.queue.length === 0} onClick={() => { q.clear(); reset(); }}>Clear</button>
           </p>
           {queueError && <p role="alert" className="error" data-testid="queue-error">{queueError}</p>}
           {error && <p role="alert" className="error" data-testid="run-error">{error}</p>}
@@ -243,7 +243,7 @@ export function Action() {
           {stage.turnsUsed === 0 && (
             <button
               type="button"
-              disabled={locked}
+              disabled={locked || picking}
               onClick={() => { q.clear(); reset(); dispatch({ type: 'restart' }); }}
             >
               Restart stage

@@ -342,6 +342,43 @@ describe('Action screen', () => {
       expect(picker()).not.toBeNull();
     });
 
+    it('with the picker open a skill click does not append', async () => {
+      await setup(withPawn(), ['twin_step']);
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      const skill = screen.getByRole('button', { name: /Twin Step/ });
+      expect((skill as HTMLButtonElement).disabled).toBe(true);
+      await u.click(skill);
+      expect(screen.queryByTestId('queue-entry-0')).toBeNull();
+    });
+
+    it('with the picker open a queue reorder does not happen', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'e1', 'e2');
+      await playMove(u, 'a3', 'b2');
+      await playMove(u, 'a7', 'a8');
+      const dataTransfer = { setData: () => undefined, getData: () => '', effectAllowed: '' };
+      fireEvent.dragStart(entry(1), { dataTransfer });
+      fireEvent.dragOver(entry(0), { dataTransfer });
+      fireEvent.drop(entry(0), { dataTransfer });
+      await u.click(within(entry(1)).getByRole('button', { name: /^Move step 2 earlier/ }));
+      expect(entry(0).textContent).toContain('e1→e2');
+      expect(entry(1).textContent).toContain('a3→b2');
+    });
+
+    it('with the picker open the arrow keys do not change the shown step', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'e1', 'e2');
+      await playMove(u, 'a3', 'b2');
+      await playMove(u, 'a7', 'a8');
+      expect(entry(1).getAttribute('data-current')).not.toBeNull();
+      await u.keyboard('{ArrowLeft}');
+      expect(entry(1).getAttribute('data-current')).not.toBeNull();
+      expect(entry(0).getAttribute('data-current')).toBeNull();
+    });
+
     it('COMMIT after a promotion shows the piece on the board', async () => {
       await setup(withPawn());
       const u = user();
