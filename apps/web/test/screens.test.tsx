@@ -11,7 +11,7 @@ import type { StageState } from '@checkbreaker/engine';
 import { App } from '../src/App';
 import { runConfig } from '../src/config';
 import { saveErrorText } from '../src/messages';
-import { DEV_KEY } from '../src/storage';
+import { DEV_KEY, SAVE_KEY } from '../src/storage';
 import type { StageSource } from '../src/state/stageSource';
 import { STARTER_MATE, starterMateStage, testStageSource } from './doubles';
 
@@ -77,18 +77,25 @@ describe('Title', () => {
   });
 
   it('an old version 1 save shows the version message once and New run replaces it', async () => {
-    const storage = memoryStorage();
-    storage.write(JSON.stringify({ version: 1, savedAt: at, session: {} }));
-    const old = loadSave(storage.read()!, c);
+    expect(SAVE_KEY).toBe('checkbreaker.save.1');
+    // A real session saved as version 1, under the real storage key and the real localStorage-backed storage.
+    const v1 = serializeSave(wonSession(), at).replace(`"version":${SAVE_VERSION}`, '"version":1');
+    expect(JSON.parse(v1).version).toBe(1);
+    localStorage.setItem(SAVE_KEY, v1);
+    const old = loadSave(v1, c);
     if (old.ok) throw new Error('a version 1 save must be refused');
     expect(old.error.kind).toBe('unknown_version');
-    const { u } = await mount(null, testStageSource(), storage);
-    expect(screen.getAllByText(saveErrorText(old.error))).toHaveLength(1);
+    render(<App source={testStageSource()} />);
+    const u = userEvent.setup();
+    const message = saveErrorText(old.error);
+    expect(message).toMatch(/version 1.*version 2/);
+    expect(screen.getAllByText(message)).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /^Continue/ })).toBeNull();
     await u.click(screen.getByRole('button', { name: 'New run' }));
     await flush();
-    expect(screen.queryByText(saveErrorText(old.error))).toBeNull();
-    expect(loadSave(storage.read()!, c).ok).toBe(true);
+    expect(screen.queryByText(message)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(SAVE_KEY)!).version).toBe(SAVE_VERSION);
+    expect(SAVE_VERSION).toBe(2);
   });
 
   it('asks before New run replaces a valid save; Cancel keeps it', async () => {
