@@ -1,7 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { startStage } from '../src/deployment';
+import { commitQueue } from '../src/rules';
 import { config, deepFreeze, deploymentStageOf, runOf } from './helpers';
-import type { CommitError, RunState, StageState } from '../src/types';
+import type { Action, CommitError, RunState, StageState } from '../src/types';
 
 const stage = (): StageState => deploymentStageOf({ e8: 'k' });
 const P = (instanceId: string, to: string) => ({ instanceId, to });
@@ -84,12 +85,36 @@ describe('no check at START and one queen summon (M5.1 I16, P10)', () => {
     const r = startStage(runOf(), deploymentStageOf({ f7: 'k', e6: 'p' }), [K, P('p_bishop_04', 'c4')], config);
     expect(r.ok).toBe(true);
   });
+  it('START names a Unique bishop that gives check by leaping an ally, not another piece (I16)', () => {
+    // c4 bishop, d5 spawned pawn, f7 king: a Unique bishop captures after leaping its own pieces, so it
+    // attacks f7 through d5. A Rare one does not, and START accepts it (rarity abilities, docs/06 §4).
+    const at = (rarity: 'rare' | 'unique'): RunState => {
+      const run = runOf();
+      return deepFreeze({ ...run, deck: run.deck.map((p) => (p.instanceId === 'p_bishop_04' ? { ...p, rarity } : p)) });
+    };
+    const s = deploymentStageOf({ f7: 'k', d5: 'P' });
+    refused(at('unique'), s, [K, P('p_bishop_04', 'c4')], { kind: 'invalid_deployment', to: 'c4', reason: 'gives_check' });
+    expect(startStage(at('rare'), s, [K, P('p_bishop_04', 'c4')], config).ok).toBe(true);
+  });
   it('START refuses a second summoned queen of any rarity', () => {
     const s = deploymentStageOf({ e8: 'k' }, { spawnPoints: 40 });
     refused(withQueens(['normal', 'unique']), s, [K, P('p_queen_7', 'a1'), P('p_queen_8', 'b1')],
       { kind: 'invalid_deployment', to: 'b1', reason: 'queen_limit' });
     const one = startStage(withQueens(['normal', 'unique']), s, [K, P('p_queen_7', 'a1')], config);
     expect(one.ok).toBe(true);
+  });
+  it('a summoned queen and a promotion to a queen in the same stage are both allowed (P10)', () => {
+    // The limit counts summons only: g7-g8=Q adds a second White queen after START (M5.1 spec §8).
+    const started = startStage(withQueens(['normal']), deploymentStageOf({ h5: 'k', g7: 'P' }), [K, P('p_queen_7', 'a1')], config);
+    if (!started.ok) throw new Error(JSON.stringify(started.error));
+    const promote: Action = { type: 'MOVE', from: 'g7', to: 'g8', promotion: 'queen' };
+    const r = commitQueue(started.value.run, started.value.stage, [promote], config);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    const board = r.value.stage.board;
+    expect(Object.keys(board).filter((sq) => board[sq]!.color === 'white' && board[sq]!.pieceType === 'queen').sort())
+      .toEqual(['a1', 'g8']);
+    expect(r.value.run.deck.filter((p) => p.pieceType === 'queen').map((p) => [p.origin, p.status]))
+      .toEqual([['starter', 'deployed'], ['promotion', 'in_deck']]);
   });
 });
 

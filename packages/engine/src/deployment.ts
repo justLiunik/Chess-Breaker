@@ -1,7 +1,7 @@
-import { spawnCostOf } from './abilities';
+import { abilityAttacked, markAbilityAttacks, spawnCostOf } from './abilities';
 import { KING, PAWN, fromBoard, tiersOf } from './position';
 import { inCheck } from './legality';
-import { abilityAttacked } from './abilities';
+import { attackedBy } from './movegen';
 import { isSquare, toSquare } from './square';
 import type {
   BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, Square, StageState,
@@ -63,10 +63,11 @@ export function boardWith(stage: StageState, placed: Placed[]): Record<Square, B
 /**
  * The square of a White piece giving check to the Black King on `board`, or null when none does (I16).
  * Judged as the engine judges Black's check, with rarity abilities (`abilityAttacked`). With several
- * checkers the answer is the first in square order (lowest index: a1, b1 ... h8). To name it each
- * White piece is tried alone, the other White pieces left on the board as blockers only, so a piece
- * hidden behind another White piece is not named; if no piece qualifies (cannot happen by the plain
- * attack rule) the first White piece in square order is named.
+ * checkers the answer is the first in square order (lowest index: a1, b1 ... h8). Each White piece is
+ * tested on the real board for what `abilityAttacked` counts for it: its plain attack, the other White
+ * pieces left as blockers only, and for a tiered piece its ability attacks (`markAbilityAttacks`, which
+ * passes allies it may leap: a Unique bishop checks through its own pawn). So the named square always
+ * holds a real checker; the fallback to the first White piece cannot be reached.
  */
 export function startCheckSquare(board: Record<Square, BoardPiece>, config: EngineConfig): Square | null {
   const b = fromBoard(board);
@@ -75,12 +76,15 @@ export function startCheckSquare(board: Record<Square, BoardPiece>, config: Engi
   if (k < 0 || !abilityAttacked(b, t, k, config.abilities)) return null;
   const whites: number[] = [];
   for (let i = 0; i < 64; i++) if (b[i]! > 0) whites.push(i);
+  const marks = new Uint8Array(64);
   for (const i of whites) {
+    if (t[i]! > 0) {
+      marks.fill(0);
+      if (markAbilityAttacks(b, t, i, config.abilities, marks) && marks[k] === 1) return toSquare(i);
+    }
     const alone = b.slice();
-    const tAlone = new Int8Array(64);
     for (const j of whites) if (j !== i) alone[j] = -PAWN; // a blocker, never an attacker of the King
-    tAlone[i] = t[i]!;
-    if (abilityAttacked(alone, tAlone, k, config.abilities)) return toSquare(i);
+    if (attackedBy(alone, k, 1)) return toSquare(i);
   }
   return toSquare(whites[0]!);
 }
