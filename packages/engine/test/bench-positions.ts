@@ -102,6 +102,15 @@ export const GAME_FENS: string[] = [
 ];
 
 /**
+ * A promotion in the search tree (M5.1): GAME_FENS[0] with a White (spawned) pawn on h7 and h8 empty,
+ * Black to move. No Black reply stops it, so after every one White's replies include h7-h8 four ways
+ * (h8=Q and h8=R give check). Kept out of GAME_FENS: it has no M1 baseline.
+ */
+export const PROMOTION_FENS: string[] = [
+  '4k3/ppp2ppP/2n5/8/2P5/5P2/8/RB2K3 b - - 0 1',
+];
+
+/**
  * The rarity benchmark positions: each GAME_FEN with every White knight, bishop, rook and queen
  * (all Hero Pieces) at Rare, at Unique and at Legendary. Build one with `rarityStage`.
  */
