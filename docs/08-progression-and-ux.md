@@ -155,8 +155,9 @@ This is the signature UI and the game's main skill-expression surface.
   the ghost preview, and never in the threat or rule-breaking accent colours, so they cannot be read
   as engine information.
 
-**Deliberate non-feature:** no auto-solver, no "hint: play Rxf7." Hints describe *intent*
-([§7](#7-hints-and-chess-literacy)).
+**Deliberate non-feature:** no auto-solver, no "hint: play Rxf7." Hints about moves describe *intent*
+([§7](#7-hints-and-chess-literacy)). The one exception is the **placement clue** on the Deployment
+screen (§7), which shows *where* pieces go in a proven setup, never what to play.
 
 ### 3.4 Deployment interaction
 
@@ -265,6 +266,19 @@ mis-chosen deployment; a mis-clicked plan is fixed with UNDO before COMMIT.
 
 ## 7. Hints and chess literacy
 
+- **Placement clue** (M5.1 addition, user decision 2026-11-25;
+  [design](superpowers/specs/2026-11-25-placement-clue-design.md)):
+  - **The button.** The Deployment screen has a **Show a winning setup** button. One click marks
+    every piece's square in the solver's proven deployment, all at once.
+  - **How it looks.** The marks are translucent ghost pieces in their own clue colour, separate from
+    the threat, plan-arrow and rule colours. The player still places each piece; there is no
+    auto-place.
+  - **Cost.** The clue is free: no coins, and the award is unaffected.
+  - **Unproven stages.** A stage the solver could not prove disables the button with the reason "No
+    proven solution for this stage".
+  - **A piece that is gone.** If the clue uses a piece that was sold, cut or merged in the shop after
+    the stage was generated, its square is still marked and labelled "you no longer have this piece".
+  - **Moves stay hidden.** The clue never shows moves.
 - **Hints land in M6** (they need a hint generator); M5 has none.
 - **Two hints per stage**, each a sentence of intent: "Your rook is doing nothing. The enemy queen
   is the only defender of f6."

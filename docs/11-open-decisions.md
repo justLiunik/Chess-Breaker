@@ -296,6 +296,31 @@ queen is a deck piece and counts like any other.
 counting promoted queens too (would make the promotion picker refuse a type, against P2).
 **Trigger:** the M6 balance pass, if queen-heavy decks still dominate Act III.
 
+## W. Placement clue (M5.1 addition)
+
+**Question:** may the player see a deployment that is proven to mate? Docs/08 had ruled out solver
+hints.
+**Decided (2026-11-25):** yes, placement only.
+- The Deployment button **Show a winning setup** marks every piece of the solver's proven deployment
+  at once.
+- It is **free**: no coins and no effect on the award.
+- It is disabled on unproven stages.
+- Moves are never shown; move hints stay intent-only (M6).
+
+See the [design](superpowers/specs/2026-11-25-placement-clue-design.md) and
+[08 §7](08-progression-and-ux.md#7-hints-and-chess-literacy).
+
+**Why:** the only playtester could not find mates with knights and bishops from a blank deployment.
+
+**Alternatives:**
+- reveal one piece per click;
+- an area hint with no exact square;
+- forfeit the par bonus, or charge coins;
+- a dev-only tool.
+
+**Trigger:** the M6 balance pass. If the clue makes stages trivial, consider the par-bonus forfeit or
+the step-by-step reveal.
+
 ---
 
 ## Deferred-by-design (not open, just later)

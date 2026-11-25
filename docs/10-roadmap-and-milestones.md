@@ -427,6 +427,9 @@ decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start
   candidates skip checks and respect the queen limit.
 - Web: promotion picker (Q/R/B/N) while building the queue, `gives_check` and `queen_limit` marks in
   Deployment, the shop's deck gate, no Chooser screen. Save version bumped; older saves are refused.
+- Placement clue (added 2026-11-25,
+  [design](superpowers/specs/2026-11-25-placement-clue-design.md)): Deployment's free **Show a winning
+  setup** marks the solver's proven deployment; unproven stages disable it; moves are never shown.
 - **Not in scope:** economy prices, par values, enemy strength (decision P7: tuned after the replay).
 
 **Acceptance criteria**
@@ -479,6 +482,13 @@ decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start
 - [x] Data, schemas and the validator agree. `npm test`, `typecheck`, `validate`, `check:links` and
       `build` pass: 86 files / 1,108 tests, 74 validator checks, 0 broken links, main chunk 125.37 kB
       gzip (2026-11-25).
+- [ ] Placement clue:
+  - the worker and the `StageSource` double pass the clue, and an unproven stage gives `null`;
+  - the run layer keeps it across `restartStage` and save/load, clears it at stage end, and
+    `loadSave` refuses a malformed clue;
+  - the Deployment button marks every clue square with the right piece, is disabled with its reason
+    on an unproven stage, and labels a piece that has since been sold;
+  - the marks change no `deploymentStatus` verdict.
 - [ ] The user plays again and says whether the stages and the economy now feel right (the input for a
       later tuning pass).
 
