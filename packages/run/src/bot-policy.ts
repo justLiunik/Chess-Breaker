@@ -1,7 +1,9 @@
-import { TIERS, legalPlayerMoves, simulate, spawnCostOf, startStage, toIndex } from '@checkbreaker/engine';
+import {
+  TIERS, legalPlayerMoves, promotionChoices, simulate, spawnCostOf, startStage, toIndex,
+} from '@checkbreaker/engine';
 import type { Action, EngineConfig, PieceInstance, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { RunResult, RunSession } from './types';
+import type { RunResult, RunSession, ShopState } from './types';
 import { mergePieces } from './deck';
 import { sellPrice } from './prices';
 import { buy, leave, merge, repair, reroll, sell } from './session';
@@ -12,12 +14,11 @@ import { buy, leave, merge, repair, reroll, sell } from './session';
 
 export type ShopMove =
   | { kind: 'merge'; ids: string[] }
+  | { kind: 'sell'; id: string }
   | { kind: 'repair'; id: string }
   | { kind: 'buy'; slot: number }
   | { kind: 'reroll' }
   | { kind: 'leave' };
-
-export type ChooserMove = { kind: 'merge'; ids: string[] } | { kind: 'sell'; id: string };
 
 /** The placement shape `startStage` takes. */
 export type BotPlacement = { instanceId: string; to: Square };
@@ -25,19 +26,13 @@ export type BotPlacement = { instanceId: string; to: Square };
 const byId = (a: PieceInstance, b: PieceInstance): number => (a.instanceId < b.instanceId ? -1 : a.instanceId > b.instanceId ? 1 : 0);
 const nonKingCount = (run: RunState): number => run.deck.filter(p => p.pieceType !== 'king').length;
 
-/** The act and stage number (0-8) of the stage just cleared: the shop's, or the run's in the chooser. */
-function clearedStage(s: RunSession, c: RunConfig): { act: 1 | 2 | 3; stageNumber: number } {
-  if (s.shop) return { act: s.shop.act, stageNumber: s.shop.stageNumber };
-  const stageNumber = s.run.actIndex * c.run.stagesPerAct + s.run.stageIndex;
-  return { act: (Math.floor(stageNumber / c.run.stagesPerAct) + 1) as 1 | 2 | 3, stageNumber };
-}
-
 /**
- * The first triple the run layer would merge, none of it protected: groups of the same type and rarity in a
- * fixed order (deck types, then tiers), the three lowest-durability members of a group (ties by instanceId).
+ * The first triple the run layer would merge, none of it protected, at the shop's act and stage: groups of the
+ * same type and rarity in a fixed order (deck types, then tiers), the three lowest-durability members of a
+ * group (ties by instanceId).
  */
-function findMerge(s: RunSession, protectedIds: ReadonlySet<string>, c: RunConfig): string[] | null {
-  const { act, stageNumber } = clearedStage(s, c);
+function findMerge(s: RunSession, shop: ShopState, protectedIds: ReadonlySet<string>, c: RunConfig): string[] | null {
+  const { act, stageNumber } = shop;
   const n = c.run.merge.inputs;
   const pool = s.run.deck.filter(p =>
     p.pieceType !== 'king' && p.status === 'in_deck' && (p.durability ?? 0) >= 1 && !protectedIds.has(p.instanceId));
@@ -65,16 +60,35 @@ function mostDamaged(run: RunState): PieceInstance | null {
 }
 
 /**
+ * The sellable piece with the lowest sale price (ties by instanceId), a protected one only when nothing else
+ * can go. A promoted piece paid nothing, so it sells for 0 and goes first.
+ */
+function cheapestSale(run: RunState, act: 1 | 2 | 3, protectedIds: ReadonlySet<string>, c: RunConfig): PieceInstance | null {
+  const sellable = run.deck
+    .filter(p => p.pieceType !== 'king' && p.status === 'in_deck')
+    .sort((a, b) => sellPrice(a, act, c) - sellPrice(b, act, c) || byId(a, b));
+  return sellable.find(p => !protectedIds.has(p.instanceId)) ?? sellable[0] ?? null;
+}
+
+/**
  * The bot's next shop move, in the fixed order of spec section 9.2: merge any valid triple (never a protected
- * piece); repair the most damaged piece while coins cover a repair; buy the cheapest affordable piece if the
- * deck has room; buy the cheapest affordable skill if a loadout slot is free; one free reroll when no offer is
- * affordable; else leave. Ties between offers go to the lower slot. The bot never sells or cuts in the shop.
+ * piece); while a promotion has the deck over capacity, sell the lowest-priced piece (never a protected one
+ * while another is left), since `leave` refuses the next stage until the deck fits (the deck gate, M5.1);
+ * repair the most damaged piece while coins cover a repair; buy the cheapest affordable piece if the deck has
+ * room; buy the cheapest affordable skill if a loadout slot is free; one free reroll when no offer is
+ * affordable; else leave. Ties between offers go to the lower slot. The bot never cuts, and sells only to
+ * pass the gate.
  */
 export function chooseShopAction(s: RunSession, protectedIds: ReadonlySet<string>, c: RunConfig): ShopMove {
   const shop = s.shop;
   if (s.phase !== 'shop' || !shop) return { kind: 'leave' };
-  const ids = findMerge(s, protectedIds, c);
+  const ids = findMerge(s, shop, protectedIds, c);
   if (ids) return { kind: 'merge', ids };
+  if (nonKingCount(s.run) > c.deck.capacity) {
+    const pick = cheapestSale(s.run, shop.act, protectedIds, c);
+    if (!pick) throw new Error('shop: the deck is over capacity with no piece to merge or sell');
+    return { kind: 'sell', id: pick.instanceId };
+  }
 
   const coins = s.run.coins;
   const damaged = mostDamaged(s.run);
@@ -96,26 +110,11 @@ export function chooseShopAction(s: RunSession, protectedIds: ReadonlySet<string
   return { kind: 'leave' };
 }
 
-/**
- * The bot's next chooser move: merge a valid triple if one exists (never a protected piece), else sell the
- * sellable piece with the lowest sale price (ties by instanceId), a protected one only when nothing else can go.
- */
-export function chooseChooserAction(s: RunSession, protectedIds: ReadonlySet<string>, c: RunConfig): ChooserMove {
-  const ids = findMerge(s, protectedIds, c);
-  if (ids) return { kind: 'merge', ids };
-  const { act } = clearedStage(s, c);
-  const sellable = s.run.deck
-    .filter(p => p.pieceType !== 'king' && p.status === 'in_deck')
-    .sort((a, b) => sellPrice(a, act, c) - sellPrice(b, act, c) || byId(a, b));
-  const pick = sellable.find(p => !protectedIds.has(p.instanceId)) ?? sellable[0];
-  if (!pick) throw new Error('chooser: no piece to merge or sell');
-  return { kind: 'sell', id: pick.instanceId };
-}
-
 /** Plays a shop move through the run layer. */
 export function applyShopMove(s: RunSession, m: ShopMove, c: RunConfig): RunResult {
   switch (m.kind) {
     case 'merge': return merge(s, m.ids, c);
+    case 'sell': return sell(s, m.id, c);
     case 'repair': return repair(s, m.id, c);
     case 'buy': return buy(s, m.slot, {}, c);
     case 'reroll': return reroll(s, c);
@@ -123,15 +122,11 @@ export function applyShopMove(s: RunSession, m: ShopMove, c: RunConfig): RunResu
   }
 }
 
-/** Plays a chooser move through the run layer. */
-export function applyChooserMove(s: RunSession, m: ChooserMove, c: RunConfig): RunResult {
-  return m.kind === 'merge' ? merge(s, m.ids, c) : sell(s, m.id, c);
-}
-
 /**
  * The fallback turn for a stage without a usable solution: a single MOVE that mates if `simulate` finds one,
  * else the first single MOVE the engine accepts, pieces by square index and targets by square index
  * (`legalPlayerMoves` lists targets without the end-of-queue check rule, so each candidate is simulated).
+ * A pawn reaching rank 8 always promotes to a queen (the bot never under-promotes; a solution's line may).
  * Empty when no single MOVE is accepted.
  */
 export function fallbackQueue(run: RunState, stage: StageState, c: EngineConfig): Action[] {
@@ -142,7 +137,11 @@ export function fallbackQueue(run: RunState, stage: StageState, c: EngineConfig)
   for (const from of froms) {
     const targets = legalPlayerMoves(stage, from, c).sort((a, b) => toIndex(a) - toIndex(b));
     for (const to of targets) {
-      const queue: Action[] = [{ type: 'MOVE', from, to }];
+      const promotes = stage.board[from]!.pieceType === 'pawn' && to.endsWith('8')
+        && promotionChoices(stage, from, to, c) !== null;
+      const queue: Action[] = [!promotes
+        ? { type: 'MOVE', from, to }
+        : { type: 'MOVE', from, to, promotion: 'queen' }];
       const r = simulate(run, stage, queue, c);
       if (!r.ok) continue;
       if (r.value.stage.status === 'won') return queue;
@@ -162,8 +161,9 @@ function deploymentOrder(c: EngineConfig): Square[] {
 /**
  * The fallback Deployment: the King on the first empty square of the deployment order whose placement
  * `startStage` accepts (it is not in check), then the cheapest summons (spawn cost, ties by instanceId) that
- * still fit `stage.spawnPoints`, each on the next free square. Pieces below 1 durability are not summoned.
- * Empty when the deck has no King or no square is safe for it.
+ * still fit `stage.spawnPoints`, each on the next free square. A summon `startStage` refuses there (a second
+ * queen past `deployment.maxQueenSummons`, or a piece that would give check at START) is left out. Pieces
+ * below 1 durability are not summoned. Empty when the deck has no King or no square is safe for it.
  */
 export function fallbackPlacements(run: RunState, stage: StageState, c: EngineConfig): BotPlacement[] {
   const king = run.deck.find(p => p.pieceType === 'king' && p.status === 'in_deck');
@@ -183,8 +183,10 @@ export function fallbackPlacements(run: RunState, stage: StageState, c: EngineCo
     const to = squares[placements.length - 1];
     if (to === undefined) break;
     if (cost(p) > budget) continue;
+    const placement = { instanceId: p.instanceId, to };
+    if (!startStage(run, stage, [...placements, placement], c).ok) continue;
     budget -= cost(p);
-    placements.push({ instanceId: p.instanceId, to });
+    placements.push(placement);
   }
   return placements;
 }

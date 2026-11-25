@@ -19,8 +19,10 @@ type Subset = { counts: number[]; value: number; text: string };
 /**
  * §9.2: a bounded, ranked set of deployments for the solver to try, best first. Every candidate
  * places the King, and every one passes `startStage`. The summons are the maximal type-and-tier
- * subsets that fit the spawn points (the highest total piece value first); the King goes on one of
- * the safe squares (none safe gives `[]`); each summon goes on one of its top-scored squares.
+ * subsets that fit the spawn points and hold at most `deployment.maxQueenSummons` queens (the highest
+ * total piece value first); the King goes on one of the safe squares (none safe gives `[]`); each
+ * summon goes on one of its top-scored squares. A placement `startStage` refuses (one that gives
+ * check, I16) is skipped and the next one in the round-robin is tried.
  */
 export function deploymentCandidates(run: RunState, stage: StageState, config: GenConfig): Placement[][] {
   const opts = config.gen.solver.deployment;
@@ -30,7 +32,7 @@ export function deploymentCandidates(run: RunState, stage: StageState, config: G
   if (king === undefined) return [];
 
   const groups = deckGroups(run, stage, config);
-  const subsets = maximalSubsets(groups, stage.spawnPoints).slice(0, opts.maxSubsets);
+  const subsets = maximalSubsets(groups, stage.spawnPoints, config.deployment.maxQueenSummons).slice(0, opts.maxSubsets);
 
   const b = fromBoard(stage.board);
   const t = tiersOf(stage.board);
@@ -91,25 +93,33 @@ function deckGroups(run: RunState, stage: StageState, config: GenConfig): Group[
   return groups.filter((g) => g.cost <= stage.spawnPoints);
 }
 
-/** Every maximal multiset of groups within `budget` (no unused piece still fits), best total value first, then text. */
-function maximalSubsets(groups: Group[], budget: number): Subset[] {
+/**
+ * Every maximal multiset of groups within `budget` that summons at most `maxQueens` queens of any
+ * rarity (`deployment.maxQueenSummons`, as `startStage` counts them), best total value first, then
+ * text. Maximal: no unused piece still fits, where a queen fits only while the subset holds fewer
+ * than `maxQueens`.
+ */
+function maximalSubsets(groups: Group[], budget: number, maxQueens: number): Subset[] {
   const out: Subset[] = [];
   const counts: number[] = [];
-  const walk = (g: number, left: number, value: number): void => {
+  const walk = (g: number, left: number, value: number, queens: number): void => {
     if (g === groups.length) {
-      if (groups.some((x, i) => counts[i]! < x.ids.length && x.cost <= left)) return;
+      const fits = (x: Group, i: number): boolean =>
+        counts[i]! < x.ids.length && x.cost <= left && (x.type !== 'queen' || queens < maxQueens);
+      if (groups.some(fits)) return;
       const text = groups.map((x, i) => `${x.type}${x.tier}x${counts[i]}`).join(',');
       out.push({ counts: [...counts], value, text });
       return;
     }
     const grp = groups[g]!;
-    for (let n = 0; n <= grp.ids.length && n * grp.cost <= left; n++) {
+    const most = grp.type === 'queen' ? Math.min(grp.ids.length, Math.max(0, maxQueens - queens)) : grp.ids.length;
+    for (let n = 0; n <= most && n * grp.cost <= left; n++) {
       counts[g] = n;
-      walk(g + 1, left - n * grp.cost, value + n * grp.value);
+      walk(g + 1, left - n * grp.cost, value + n * grp.value, queens + (grp.type === 'queen' ? n : 0));
     }
     counts.length = g;
   };
-  walk(0, budget, 0);
+  walk(0, budget, 0, 0);
   return out.sort((a, b) => b.value - a.value || byText(a.text, b.text));
 }
 

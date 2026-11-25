@@ -5,7 +5,6 @@ import { DeckOverlay } from './overlays/DeckOverlay';
 import { useShortcuts } from './input/shortcuts';
 import { Action } from './screens/Action';
 import { Building } from './screens/Building';
-import { Chooser } from './screens/Chooser';
 import { Deployment } from './screens/Deployment';
 import { EndPlayback } from './screens/EndPlayback';
 import { RunMap } from './screens/RunMap';
@@ -32,14 +31,13 @@ function Screens() {
     if (!session) return <Title />;
     const mapKey = `${session.run.seed}:${session.run.actIndex}:${session.run.stageIndex}`;
     // A stage that just ended plays back first: a win shows its results, a loss replays the position and the reply.
-    if (lastCommit && (session.phase === 'chooser' || session.phase === 'shop' || session.phase === 'ended')) {
+    if (lastCommit && (session.phase === 'shop' || session.phase === 'ended')) {
       return lastCommit.won ? <StageResults /> : <EndPlayback />;
     }
     switch (session.phase) {
       case 'awaiting_stage': return <Building />;
       case 'deployment': return mapSeen === mapKey ? <Deployment /> : <RunMap onContinue={() => setMapSeen(mapKey)} />;
       case 'action': return <Action />;
-      case 'chooser': return <Chooser />;
       case 'shop': return <Shop />;
       case 'ended': return <RunResults />;
     }

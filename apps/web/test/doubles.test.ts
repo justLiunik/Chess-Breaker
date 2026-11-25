@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { commit, expectedSeed, newRun, provideStage, start } from '@checkbreaker/run';
 import { runConfig } from '../src/config';
+import { clueOf } from '../src/state/stageSource';
 import { STARTER_MATE, starterMateStage, testStageSource } from './doubles';
 
 describe('STARTER_MATE', () => {
@@ -26,5 +27,23 @@ describe('testStageSource', () => {
     const later = { ...s.next!.request, actIndex: 1, stageIndex: 2 };
     const b = await src.request(2, later);
     expect(b.ok && b.stage.stageSeed).toBe(expectedSeed('7F3A-2210', 1, 2));
+  });
+
+  it('testStageSource gives stage 0 the starter clue and later stages none', async () => {
+    const src = testStageSource();
+    const s = newRun('7F3A-2210', runConfig);
+    const a = await src.request(1, s.next!.request);
+    expect(a.ok && a.clue).toEqual(STARTER_MATE.placements);
+    const b = await src.request(2, { ...s.next!.request, actIndex: 1, stageIndex: 2 });
+    expect(b.ok && b.clue).toBeNull();
+  });
+});
+
+describe('clueOf', () => {
+  it('keeps only instanceId and to', () => {
+    expect(clueOf(null)).toBeNull();
+    const out = clueOf({ placements: [{ instanceId: 'p_king_01', to: 'e1', extra: 1 } as never], line: [[]] } as never);
+    expect(out).toEqual([{ instanceId: 'p_king_01', to: 'e1' }]);
+    expect(Object.keys(out![0]!)).toEqual(['instanceId', 'to']);
   });
 });

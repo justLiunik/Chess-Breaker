@@ -11,7 +11,6 @@ const c = runConfig;
 const STAGES = c.run.acts * c.run.stagesPerAct;
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 const square = (sq: string) => screen.getByRole('button', { name: new RegExp(`^${sq},`) });
-const has = (id: string) => screen.queryByTestId(id) !== null;
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -63,11 +62,7 @@ describe('M5 acceptance: a whole run in the browser UI', () => {
       }
       await flush();
 
-      // After a win: cut while the chooser is open, then the shop (or, after stage 9, the run Results).
-      while (has('chooser')) {
-        await u.click(within(screen.getByTestId('chooser')).getAllByRole('button', { name: /^Cut/ })[0]!);
-        await flush();
-      }
+      // After a win: the shop (or, after stage 9, the run Results). No stage here promotes, so the deck gate never shows.
       if (stage === STAGES - 1) break;
       await screen.findByTestId('shop');
       shops++;

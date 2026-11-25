@@ -4,10 +4,14 @@ import type {
   RunState, StageState,
 } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
+import type { ClueSquare, GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
 
-/** The save file's format version (spec section 8.5); `loadSave` reads this version only. */
-export const SAVE_VERSION = 1;
+/**
+ * The save file's format version (spec section 8.5); `loadSave` reads this version only. 2 from M5.1: the
+ * stage-end deck phase is gone and promoted pieces carry `pricePaid: 0`. A version 1 save is refused with
+ * `unknown_version`, never migrated (M5.1 spec decision P8).
+ */
+export const SAVE_VERSION = 2;
 
 export type SaveError =
   | { kind: 'malformed'; detail: string }
@@ -43,8 +47,9 @@ export function serializeSave(s: RunSession, savedAt?: string): string {
  * Reads a save written by `serializeSave`. Never throws: text that is not a JSON save object is `malformed`,
  * a version other than SAVE_VERSION is `unknown_version`, and a session of the wrong shape or breaking an
  * invariant is `invalid_session` (spec section 8.5): exactly one King; the non-king deck within
- * `deck.capacity` except in action, the chooser, or a run lost mid-stage (promotions join the deck during a
- * stage and only the chooser trims them); the loadout within `run.loadoutSlots`; each phase has its fields.
+ * `deck.capacity` except in action, the shop, or a run that ended (promotions join the deck during a stage,
+ * the shop's deck gate trims it before the next stage, and after the run the size no longer matters); the
+ * loadout within `run.loadoutSlots`; each phase has its fields.
  */
 export function loadSave(text: string, c: RunConfig): Result<RunSession, SaveError> {
   let parsed: unknown;
@@ -96,7 +101,7 @@ class Invalid extends Error {}
  * a compile-time check that it misses none: a union member absent from its list turns the paired constant
  * into `never`, which `true` is not assignable to.
  */
-const PHASES = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'] as const satisfies readonly RunPhase[];
+const PHASES = ['awaiting_stage', 'deployment', 'action', 'shop', 'ended'] as const satisfies readonly RunPhase[];
 const _phases: Exclude<RunPhase, typeof PHASES[number]> extends never ? true : never = true;
 const PIECE_TYPES = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'] as const satisfies readonly PieceType[];
 const _pieceTypes: Exclude<PieceType, typeof PIECE_TYPES[number]> extends never ? true : never = true;
@@ -251,10 +256,6 @@ function checkBoardPiece(v: unknown, path: string): BoardPiece {
   put(out, 'stageId', p, path, str);
   put(out, 'spawned', p, path, exactly(true as const));
   put(out, 'rarity', p, path, tier);
-  put(out, 'promotesTo', p, path, (x, at) => {
-    const t = obj(x, at);
-    return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, DECK_TYPES), rarity: tier(own(t, 'rarity'), `${at}.rarity`) };
-  });
   put(out, 'transformed', p, path, (x, at) => {
     const t = obj(x, at);
     return { pieceType: oneOf(own(t, 'pieceType'), `${at}.pieceType`, PIECE_TYPES), modifierId: str(own(t, 'modifierId'), `${at}.modifierId`) };
@@ -360,6 +361,31 @@ function checkShop(v: unknown, path: string, c: RunConfig): ShopState {
   };
 }
 
+/** `session.clue` / `next.clue`: the placements must be distinct pieces on distinct squares of the player's deployment ranks. */
+function checkClue(v: unknown, path: string, c: RunConfig): ClueSquare[] {
+  const ids = new Set<string>();
+  const squares = new Set<string>();
+  return arr(v, path).map((x, i) => {
+    const at = `${path}[${i}]`;
+    const e = obj(x, at);
+    const instanceId = str(own(e, 'instanceId'), `${at}.instanceId`);
+    const to = str(own(e, 'to'), `${at}.to`);
+    if (!isSquare(to) || !c.rules.deploymentRanks.includes(Number(to[1]))) {
+      bad(`${at}.to`, `expected a square on ranks ${c.rules.deploymentRanks.join(', ')}`);
+    }
+    if (ids.has(instanceId)) bad(`${at}.instanceId`, `${instanceId} appears twice`);
+    if (squares.has(to)) bad(`${at}.to`, `${to} appears twice`);
+    ids.add(instanceId);
+    squares.add(to);
+    const out: ClueSquare = { instanceId, to, pieceType: oneOf(own(e, 'pieceType'), `${at}.pieceType`, INSTANCE_TYPES) };
+    put(out, 'rarity', e, at, tier);
+    return out;
+  });
+}
+/** A clue key absent from the file (a version 2 save written before the clue) loads as null. */
+const clueOf = (o: Obj, path: string, c: RunConfig): ClueSquare[] | null =>
+  Object.hasOwn(o, 'clue') ? nullable(own(o, 'clue'), `${path}.clue`, (x, at) => checkClue(x, at, c)) : null;
+
 function checkSession(v: unknown, c: RunConfig): RunSession {
   const s = obj(v, 'session');
   const session: RunSession = {
@@ -368,6 +394,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
     phase: oneOf(own(s, 'phase'), 'session.phase', PHASES),
     stage: nullable(own(s, 'stage'), 'session.stage', checkStage),
     entryStage: nullable(own(s, 'entryStage'), 'session.entryStage', checkStage),
+    clue: clueOf(s, 'session', c),
     tally: nullable(own(s, 'tally'), 'session.tally', (x, at) => {
       const t = obj(x, at);
       return {
@@ -376,9 +403,6 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
         piecesLost: num(own(t, 'piecesLost'), `${at}.piecesLost`),
       };
     }),
-    chooser: nullable(own(s, 'chooser'), 'session.chooser', (x, at) => (
-      { overCapacity: int(own(obj(x, at), 'overCapacity'), `${at}.overCapacity`, 1) }
-    )),
     shop: nullable(own(s, 'shop'), 'session.shop', (x, at) => checkShop(x, at, c)),
     next: nullable(own(s, 'next'), 'session.next', (x, at) => {
       const n = obj(x, at);
@@ -389,7 +413,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
         stageIndex: int(own(rq, 'stageIndex'), `${at}.request.stageIndex`, 0, c.run.stagesPerAct - 1),
       };
       put(request, 'previousTemplateId', rq, `${at}.request`, str);
-      return { request, stage: nullable(own(n, 'stage'), `${at}.stage`, checkStage) };
+      return { request, stage: nullable(own(n, 'stage'), `${at}.stage`, checkStage), clue: clueOf(n, at, c) };
     }),
     outcome: nullable(own(s, 'outcome'), 'session.outcome', (x, at) => {
       const o = obj(x, at);
@@ -406,19 +430,20 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
   const kings = deck.filter(p => p.pieceType === 'king').length;
   if (kings !== 1) bad('session.run.deck', `expected exactly one King, found ${kings}`);
   const nonKing = deck.length - kings;
-  const midStage = phase === 'action' || phase === 'chooser' || (phase === 'ended' && session.outcome?.result === 'lost');
-  if (!midStage && nonKing > c.deck.capacity) {
+  const mayOverflow = phase === 'action' || phase === 'shop' || phase === 'ended';
+  if (!mayOverflow && nonKing > c.deck.capacity) {
     bad('session.run.deck', `${nonKing} non-king pieces exceed the capacity of ${c.deck.capacity} in phase ${phase}`);
   }
   const loadout = run.loadout.length;
   if (loadout > c.run.loadoutSlots) bad('session.run.loadout', `${loadout} skills exceed the ${c.run.loadoutSlots} loadout slots`);
   const needs: Partial<Record<RunPhase, (keyof RunSession)[]>> = {
-    awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], chooser: ['chooser'], shop: ['shop', 'next'], ended: ['outcome'],
+    awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], shop: ['shop', 'next'], ended: ['outcome'],
   };
   const inStage = phase === 'deployment' || phase === 'action';
   if (inStage !== (session.entryStage !== null)) {
     bad('session.entryStage', inStage ? `phase ${phase} needs it set` : `must be null in phase ${phase}`);
   }
+  if (!inStage && session.clue !== null) bad('session.clue', `must be null in phase ${phase}`);
   for (const field of needs[phase] ?? []) {
     if (session[field] === null) bad(`session.${field}`, `phase ${phase} needs it set`);
   }

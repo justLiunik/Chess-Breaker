@@ -3,13 +3,15 @@ import { resolve } from 'node:path';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { abandon, commit, expectedSeed, loadSave, memoryStorage, newRun, provideStage, serializeSave, start } from '@checkbreaker/run';
+import {
+  SAVE_VERSION, abandon, commit, expectedSeed, loadSave, memoryStorage, newRun, provideStage, serializeSave, start,
+} from '@checkbreaker/run';
 import type { RunSession, RunStorage } from '@checkbreaker/run';
 import type { StageState } from '@checkbreaker/engine';
 import { App } from '../src/App';
 import { runConfig } from '../src/config';
 import { saveErrorText } from '../src/messages';
-import { DEV_KEY } from '../src/storage';
+import { DEV_KEY, SAVE_KEY } from '../src/storage';
 import type { StageSource } from '../src/state/stageSource';
 import { STARTER_MATE, starterMateStage, testStageSource } from './doubles';
 
@@ -29,7 +31,7 @@ function actionSession(mut?: (s: RunSession) => void, stage?: (s: StageState) =>
   mut?.(s);
   return s;
 }
-/** The same after the mate: the Shop (or the Chooser when the mutation left the deck over capacity). */
+/** The same after the mate: the Shop, even when the mutation left the deck over capacity. */
 function wonSession(mut?: (s: RunSession) => void): RunSession {
   return ok(commit(actionSession(mut), [STARTER_MATE.move], c)).session;
 }
@@ -62,7 +64,7 @@ describe('Title', () => {
 
   it('shows a corrupt save once, and New run replaces it', async () => {
     const storage = memoryStorage();
-    storage.write('{"version":1,"session":{"nope":true}}');
+    storage.write(JSON.stringify({ version: SAVE_VERSION, session: { nope: true } }));
     const bad = loadSave(storage.read()!, c);
     if (bad.ok) throw new Error('fixture should be corrupt');
     const { u } = await mount(null, testStageSource(), storage);
@@ -72,6 +74,28 @@ describe('Title', () => {
     await flush();
     expect(screen.queryByText(saveErrorText(bad.error))).toBeNull();
     expect(loadSave(storage.read()!, c).ok).toBe(true);
+  });
+
+  it('an old version 1 save shows the version message once and New run replaces it', async () => {
+    expect(SAVE_KEY).toBe('checkbreaker.save.1');
+    // A real session saved as version 1, under the real storage key and the real localStorage-backed storage.
+    const v1 = serializeSave(wonSession(), at).replace(`"version":${SAVE_VERSION}`, '"version":1');
+    expect(JSON.parse(v1).version).toBe(1);
+    localStorage.setItem(SAVE_KEY, v1);
+    const old = loadSave(v1, c);
+    if (old.ok) throw new Error('a version 1 save must be refused');
+    expect(old.error.kind).toBe('unknown_version');
+    render(<App source={testStageSource()} />);
+    const u = userEvent.setup();
+    const message = saveErrorText(old.error);
+    expect(message).toMatch(/version 1.*version 2/);
+    expect(screen.getAllByText(message)).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Continue/ })).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'New run' }));
+    await flush();
+    expect(screen.queryByText(message)).toBeNull();
+    expect(JSON.parse(localStorage.getItem(SAVE_KEY)!).version).toBe(SAVE_VERSION);
+    expect(SAVE_VERSION).toBe(2);
   });
 
   it('asks before New run replaces a valid save; Cancel keeps it', async () => {
@@ -268,15 +292,38 @@ describe('Shop', () => {
   });
 });
 
-describe('Chooser', () => {
-  it('shows the over-capacity count and closes when the deck fits', async () => {
+describe('a deck over capacity after a win (no Chooser screen, M5.1)', () => {
+  it('a shop save at 9 pieces opens the Shop; a cut there brings the deck back to 8', async () => {
     const s = wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); });
-    expect(s.phase).toBe('chooser');
-    const { u } = await mount(s);
-    expect(screen.getByTestId('chooser').textContent).toMatch(/1 piece over/);
-    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Cut/ }));
+    expect(s.phase).toBe('shop');
+    expect(s.run.deck.filter((p) => p.pieceType !== 'king')).toHaveLength(c.deck.capacity + 1);
+    const { u, storage } = await mount(s);
     expect(screen.queryByTestId('chooser')).toBeNull();
     expect(screen.getByTestId('shop')).toBeTruthy();
+    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Cut/ }));
+    expect(screen.getByTestId('shop')).toBeTruthy();
+    const saved = loadSave(storage.read()!, c);
+    if (!saved.ok) throw new Error('save');
+    expect(saved.value.run.deck.filter((p) => p.pieceType !== 'king')).toHaveLength(c.deck.capacity);
+  });
+});
+
+describe('the shop deck gate (M5.1)', () => {
+  const overfull = () => wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); });
+
+  it('the shop disables next stage at 9 pieces and names why', async () => {
+    await mount(overfull());
+    const leave = screen.getByRole('button', { name: 'Leave shop' });
+    expect(leave.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTestId('deck-gate').textContent).toBe('Deck 9/8: sell, merge or cut to continue');
+    expect(leave.getAttribute('title')).toBe('Deck 9/8: sell, merge or cut to continue');
+  });
+
+  it('selling down to 8 enables it', async () => {
+    const { u } = await mount(overfull());
+    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Sell/ }));
+    expect(screen.getByRole('button', { name: 'Leave shop' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByTestId('deck-gate')).toBeNull();
   });
 });
 
@@ -534,7 +581,6 @@ describe('resume', () => {
     ['deployment', () => ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session, 'run-map'],
     ['action', () => actionSession(), 'action-screen'],
     ['shop', () => wonSession(), 'shop'],
-    ['chooser', () => wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); }), 'chooser'],
     ['awaiting_stage', () => newRun(SEED, c), 'building', never],
     ['ended', () => ok(abandon(wonSession())).session, 'run-results'],
   ];

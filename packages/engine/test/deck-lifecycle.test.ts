@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { commitQueue, simulate } from '../src/rules';
 import { hash } from '../src/rng';
 import { config, deepFreeze, runOf, stageOf } from './helpers';
-import type { Action, BoardPiece, PieceInstance, Rarity, RunState, StageState } from '../src/types';
+import type { Action, BoardPiece, PieceInstance, PromotionType, Rarity, RunState, StageState } from '../src/types';
 
-const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
+const mv = (from: string, to: string, promotion?: PromotionType): Action =>
+  ({ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) });
 
 function ok<T, E>(r: { ok: true; value: T } | { ok: false; error: E }): T {
   if (!r.ok) throw new Error(JSON.stringify(r.error));
@@ -90,8 +91,8 @@ describe('enemy captures (R5)', () => {
   it('leaves the deck alone when the enemy captures nothing, and simulate agrees', () => {
     const stage = stageOf({ e1: 'K', h8: 'k', a7: 'P' });
     const run = runOf();
-    const c = ok(commitQueue(run, stage, [mv('a7', 'a8')], config));
-    const s = ok(simulate(run, stage, [mv('a7', 'a8')], config));
+    const c = ok(commitQueue(run, stage, [mv('a7', 'a8', 'knight')], config));
+    const s = ok(simulate(run, stage, [mv('a7', 'a8', 'knight')], config));
     expect(c.events.some((e) => e.type === 'capture' && e.color === 'white')).toBe(false);
     expect(c.run.deck).toEqual(s.run.deck);
   });
@@ -122,15 +123,15 @@ describe('capture event ids', () => {
 });
 
 describe('promotion adds an instance', () => {
-  const pawn = (pieceType: 'knight' | 'bishop' | 'rook' | 'queen', rarity: Rarity): BoardPiece => ({
-    pieceType: 'pawn', color: 'white', spawned: true, rarity: 'normal', promotesTo: { pieceType, rarity }, stageId: 's09',
+  const pawn = (rarity: Rarity): BoardPiece => ({
+    pieceType: 'pawn', color: 'white', spawned: true, rarity, stageId: 's09',
   });
   const promote = (rarity: Rarity, run: RunState = runOf()) => {
-    const stage = withPieces(stageOf({ e1: 'K', h8: 'k' }), { a7: pawn('queen', rarity) });
-    return ok(simulate(run, stage, [mv('a7', 'a8')], config));
+    const stage = withPieces(stageOf({ e1: 'K', h8: 'k' }), { a7: pawn(rarity) });
+    return ok(simulate(run, stage, [mv('a7', 'a8', 'queen')], config));
   };
 
-  it('adds exactly promotesTo at full durability: Rare queen 2, Legendary queen 1', () => {
+  it('adds the chosen type with the pawn rarity at full durability: Rare queen 2, Legendary queen 1', () => {
     for (const [rarity, dur] of [['rare', 2], ['legendary', 1]] as const) {
       const run = runOf({ actIndex: 1, stageIndex: 2 });
       const v = promote(rarity, run);
@@ -139,10 +140,10 @@ describe('promotion adds an instance', () => {
       expect(added).toEqual({
         instanceId: 'p_' + hash('9C41-0B77', 0, 0, 'a8').toString(16),
         pieceType: 'queen', rarity, durability: dur, durabilityMax: dur,
-        origin: 'promotion', acquiredAtStage: 5, status: 'in_deck',
+        origin: 'promotion', acquiredAtStage: 5, pricePaid: 0, status: 'in_deck',
       });
       expect(v.events).toContainEqual({
-        type: 'pawn_promoted', square: 'a8', promotesTo: { pieceType: 'queen', rarity }, instanceId: added.instanceId,
+        type: 'pawn_promoted', square: 'a8', pieceType: 'queen', rarity, instanceId: added.instanceId,
       });
     }
   });
@@ -151,30 +152,33 @@ describe('promotion adds an instance', () => {
     expect(promote('rare').run.deck).toEqual(promote('rare').run.deck);
   });
 
-  it('a pawn without promotesTo adds nothing', () => {
+  it('a pawn without a rarity promotes to a Normal piece', () => {
     const stage = withPieces(stageOf({ e1: 'K', h8: 'k' }), { a7: { pieceType: 'pawn', color: 'white', stageId: 's09' } });
     const run = runOf();
-    expect(ok(simulate(run, stage, [mv('a7', 'a8')], config)).run.deck).toEqual(run.deck);
+    const v = ok(simulate(run, stage, [mv('a7', 'a8', 'rook')], config));
+    expect(v.run.deck.slice(run.deck.length)).toMatchObject([{ pieceType: 'rook', rarity: 'normal' }]);
+    expect(v.stage.board['a8']).toMatchObject({ pieceType: 'rook', rarity: 'normal' });
   });
 
   it('gives two pawns promoting on e8 in one turn two distinct ids', () => {
     const stage = withPieces(
       stageOf({ e1: 'K', h8: 'k', e8: 'r' }),
-      { d7: pawn('knight', 'normal'), e7: pawn('knight', 'normal') },
-      { moveCredits: 2 },
+      { d7: pawn('normal'), e7: pawn('normal') },
+      { moveCredits: 3 },
     );
     const run = runOf();
-    const v = ok(simulate(run, stage, [mv('d7', 'e8'), mv('e7', 'e8')], config));
+    // The first promoted knight leaves e8 so that the second pawn can promote there too.
+    const v = ok(simulate(run, stage, [mv('d7', 'e8', 'knight'), mv('e8', 'f6'), mv('e7', 'e8', 'knight')], config));
     const added = v.run.deck.slice(run.deck.length);
     expect(added).toHaveLength(2);
     expect(new Set(added.map((i) => i.instanceId)).size).toBe(2);
-    expect(added.map((i) => i.instanceId)).toEqual([0, 1].map((n) => 'p_' + hash('9C41-0B77', 0, n, 'e8').toString(16)));
+    expect(added.map((i) => i.instanceId)).toEqual([0, 2].map((n) => 'p_' + hash('9C41-0B77', 0, n, 'e8').toString(16)));
   });
 
   it('commitQueue keeps the promoted instance and agrees with simulate', () => {
-    const stage = withPieces(stageOf({ e1: 'K', h8: 'k' }), { a7: pawn('queen', 'rare') });
-    const c = ok(commitQueue(runOf(), stage, [mv('a7', 'a8')], config));
-    const s = ok(simulate(runOf(), stage, [mv('a7', 'a8')], config));
+    const stage = withPieces(stageOf({ e1: 'K', h8: 'k' }), { a7: pawn('rare') });
+    const c = ok(commitQueue(runOf(), stage, [mv('a7', 'a8', 'queen')], config));
+    const s = ok(simulate(runOf(), stage, [mv('a7', 'a8', 'queen')], config));
     expect(c.run.deck).toEqual(s.run.deck);
   });
 });

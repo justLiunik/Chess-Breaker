@@ -8,7 +8,8 @@ const start = (stage: ReturnType<typeof mateInOneStage>, placements: { instanceI
   if (!r.ok) throw new Error(JSON.stringify(r.error));
   return r.value;
 };
-const mv = (from: string, to: string) => [{ type: 'MOVE' as const, from, to }];
+const mv = (from: string, to: string, promotion?: 'queen' | 'rook' | 'bishop' | 'knight') =>
+  [{ type: 'MOVE' as const, from, to, ...(promotion !== undefined && { promotion }) }];
 
 describe('run fixtures play through the engine', () => {
   it('starterRun matches the starter deck', () => {
@@ -31,7 +32,7 @@ describe('run fixtures play through the engine', () => {
 
   it('promotionOverflowStage: promotion on turn 1, mate on turn 2', () => {
     const v = start(promotionOverflowStage('AAAA-0003'), place(['p_king_01', 'd1'], [ROOK_ID, 'e1']));
-    const t1 = commitQueue(v.run, v.stage, mv('b7', 'b8'), runConfig);
+    const t1 = commitQueue(v.run, v.stage, mv('b7', 'b8', 'knight'), runConfig);
     expect(t1.ok).toBe(true);
     if (!t1.ok) return;
     expect(t1.value.events.some((e) => e.type === 'pawn_promoted')).toBe(true);

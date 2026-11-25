@@ -116,21 +116,13 @@
           "color": "white",
           "spawned": true,
           "stageId": "s13",
-          "rarity": "rare",
-          "promotesTo": {
-            "pieceType": "knight",
-            "rarity": "unique"
-          }
+          "rarity": "rare"
         },
         "b4": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
           "rarity": "normal",
-          "promotesTo": {
-            "pieceType": "bishop",
-            "rarity": "rare"
-          },
           "stageId": "s14"
         }
       },
@@ -291,21 +283,13 @@
           "color": "white",
           "spawned": true,
           "stageId": "s13",
-          "rarity": "normal",
-          "promotesTo": {
-            "pieceType": "bishop",
-            "rarity": "rare"
-          }
+          "rarity": "normal"
         },
         "e5": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
           "rarity": "rare",
-          "promotesTo": {
-            "pieceType": "knight",
-            "rarity": "unique"
-          },
           "stageId": "s14"
         }
       },
@@ -451,21 +435,13 @@
           "color": "white",
           "spawned": true,
           "stageId": "s12",
-          "rarity": "rare",
-          "promotesTo": {
-            "pieceType": "bishop",
-            "rarity": "unique"
-          }
+          "rarity": "rare"
         },
         "f5": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
           "rarity": "normal",
-          "promotesTo": {
-            "pieceType": "queen",
-            "rarity": "rare"
-          },
           "stageId": "s13"
         }
       },
@@ -572,27 +548,24 @@
           "color": "black",
           "stageId": "s05"
         },
+        "h8": {
+          "pieceType": "rook",
+          "color": "black",
+          "stageId": "s06"
+        },
         "a7": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
-          "stageId": "s06",
-          "rarity": "normal",
-          "promotesTo": {
-            "pieceType": "rook",
-            "rarity": "rare"
-          }
+          "stageId": "s07",
+          "rarity": "rare"
         },
         "c7": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
-          "stageId": "s07",
-          "rarity": "normal",
-          "promotesTo": {
-            "pieceType": "knight",
-            "rarity": "rare"
-          }
+          "stageId": "s08",
+          "rarity": "rare"
         }
       },
       "turnsUsed": 0,

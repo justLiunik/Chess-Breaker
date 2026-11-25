@@ -114,7 +114,7 @@
       }
     },
     {
-      "$comment": "Pawns are stage-only: never sold, no durability, no rarity abilities (their rarity only sets the promotion result).",
+      "$comment": "Pawns are stage-only: never sold, no durability, no rarity abilities (their rarity only sets the rarity of the piece they promote into; the player chooses its type).",
       "if": { "properties": { "pieceType": { "const": "pawn" } }, "required": ["pieceType"] },
       "then": {
         "properties": {

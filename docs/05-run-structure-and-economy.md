@@ -28,6 +28,12 @@ ACT I                    ACT II                   ACT III
 
 The last stage of the run is followed by a results screen, not a shop.
 
+After every other won stage the run goes **straight to the shop**; there is no stage-end chooser. If a
+promotion pushed the deck above 8 pieces ([02 §2.2](02-rules-framework.md#22-promotion)), the shop
+works as usual — except that buying a piece is refused, and **leaving for the next stage is refused**
+(`deck_over_capacity`) until selling, merging or cutting brings the deck back to 8 (I9). Cutting is
+always possible, so the gate cannot lock a run. After the final stage the deck size no longer matters.
+
 ## 2. Income: stage reward + turns → coins
 
 Checkmate is the only way to clear a stage ([02 §7](02-rules-framework.md#7-stage-end-evaluation)).
@@ -152,9 +158,11 @@ A tier that adds power adds cost, which keeps the coins-per-durability column ho
 bishop (24 base) costs more than a Normal queen (16) and 5 spawn points to summon instead of 3. The full
 price grid is in [07 §2.2](07-shop-phase.md#22-prices-by-rarity).
 
-Promotion is the other source of tiers: a spawned pawn that reaches rank 8 becomes a deck piece,
-usually one tier above the pawn ([02 §2.2](02-rules-framework.md#22-promotion)). It costs no coins —
-it costs the turns spent pushing the pawn, which the coin preview prices at one rate step per turn.
+Promotion is the other way to gain a piece: a spawned pawn that reaches rank 8 becomes the piece the
+player chooses — knight, bishop, rook or queen — at the **pawn's rarity**, stays on the board for the
+rest of the stage, and joins the deck ([02 §2.2](02-rules-framework.md#22-promotion)). It costs no
+coins — it costs the turns spent pushing the pawn, which the coin preview prices at one rate step per
+turn — and it pays at once, on the board, as well as in later stages.
 
 ### Services
 
@@ -166,14 +174,15 @@ it costs the turns spent pushing the pawn, which the coin preview prices at one 
 
 **Selling is a release valve, not a profit.** Buying and selling loses half. Using a piece once and
 selling it nets 4 coins per summon for a Normal knight — exactly the repair rate, so selling never
-beats keeping a piece alive. A promoted piece has no purchase price; selling it converts the turns
-spent promoting into coins at roughly the coin-bonus rate those turns cost. The sell factor may
+beats keeping a piece alive. A promoted piece joins the deck with `pricePaid: 0`, so it **sells for
+0** — selling it is in effect a cut. Promotion is never a coin source; it pays in board strength (M5.1,
+to be revisited in the tuning pass after the next playtest). The sell factor may
 never exceed the recovery discount (both 0.5), or buying the discounted recovery piece and selling
 it back would print coins — the validator enforces this. Act inflation alone could still do it (a
 recovery knight bought for 4 in Act I would sell for 5 in Act II or III), so a shop-bought
 piece remembers what it cost (`pricePaid`) and **never sells for more**:
-`sell = min(floor(0.5 × current price), pricePaid)`. Starter, promoted and merged pieces cost no
-coins and are not capped.
+`sell = min(floor(0.5 × current price), pricePaid)`. Starter and merged pieces cost no coins and
+are not capped; a promoted piece is capped at its `pricePaid` of 0.
 
 ### Income vs. expenditure sanity check
 
@@ -232,7 +241,7 @@ levers, in order of precedence:
 |---|---|---|---|
 | 1 | **Base reward** | Overtime is paid from the stage's base reward before the wallet | A slow clear spends its own prize before the run's savings |
 | 2 | **Salvage** | Captures pay coins | Aggressive recovery self-funds |
-| 3 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes a deck piece | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
+| 3 | **Spawned pawns** | Every stage gives the player free pawns, and a pawn that promotes becomes the piece the player chooses, on the board and in the deck | A broke player still gets free pieces on the board every stage, and a coin-free way to rebuild the deck |
 | 4 | **Recovery offer** | If pieces were lost in the stage just cleared and the non-king deck is now < 4, the shop guarantees one discounted replacement (50% off) | Insurance against one catastrophic stage — not a reward for merging down |
 | 5 | **Bank & skip** | Shop may be skipped to accumulate; savings earn interest (§2, up to 5 a stage) | Early banking enables a mid-run power spike, and the wallet buffers overtime |
 | 6 | **Par** | Difficulty does not increase with a weak deck | The run's difficulty comes from deck quality, so the player controls it |
@@ -280,8 +289,7 @@ lose. They are only forced to play well.
 | `rarity.pool.{act}.weights` | 75/25 · 50/38/12 · 30/40/24/6 | Makes higher tiers commoner in that act (shop and spawned pawns) |
 | `rarity.pool.{act}.ceiling` | rare · unique · legendary | Unlocks higher tiers earlier (Act I must stay at `rare`) |
 | `rarity.priceMultiplier` | 1 / 1.5 / 2 / 3 | Makes higher tiers costlier; must never fall with tier |
-| `promotion.tierUpChance` | 0.75 | Makes promotion a stronger reward |
-| `promotion.resultTypeWeights` | N35 B35 R20 Q10 | Shifts promotion toward bigger pieces |
+| `deployment.maxQueenSummons` | 1 | Lets more queens be summoned into one stage ([02 §5](02-rules-framework.md#5-deployment)) |
 | `deck.merge.inputs` | 3 | Makes merging rarer and costlier in pieces (2 = cheaper merges) |
 | `services.sell.priceFactor` | 0.5 | Makes selling pay more; must stay ≤ `shop.recoveryDiscount` |
 | `rarity.retention.queen.legendary` | 0.2 | Makes Legendary queens less rare (1.0 = as common as other Legendaries) |

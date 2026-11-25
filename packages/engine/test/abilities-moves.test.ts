@@ -175,7 +175,7 @@ describe('tiersOf and hasTiers', () => {
     const t = tiersOf(withExtras);
     const at = (sq: Square) => t[toIndex(sq)];
     expect([at('a1'), at('b1'), at('c1'), at('d1'), at('e1')]).toEqual([1, 2, 3, 0, 0]);
-    expect(at('a2')).toBe(0); // spawned pawn: rarity only sets promotesTo
+    expect(at('a2')).toBe(0); // spawned pawn: no tier (its rarity passes to the piece it promotes to)
     expect(at('g8')).toBe(0); // enemy pieces are Normal
     expect(at('h1')).toBe(0); // not a Hero Piece
     expect(at('h2')).toBe(0); // transforms suspend rarity

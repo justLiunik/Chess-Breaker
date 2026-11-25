@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { commitQueue, simulate, startStage } from '@checkbreaker/engine';
+import { commitQueue, legalPlayerMoves, simulate, startStage } from '@checkbreaker/engine';
 import type { Action, BoardPiece, GameEvent, PieceInstance, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { GenConfig } from '@checkbreaker/content';
 import { solveStage } from '../src/solver';
 import { queueText, queuesOf } from '../src/solver/beam';
 import { deploymentCandidates } from '../src/solver/deployment';
+import { replayLine } from '../src/solver/replay';
 import { buildStage } from '../src/stage';
 import type { Placement, SolveResult } from '../src/types';
 import { config, deepFreeze, tpl } from './helpers';
-import { bruteQueues } from './solver/brute';
+import { bruteQueues, bruteSearch } from './solver/brute';
+import type { BruteFilter } from './solver/brute';
 
 type Name = 'mate2' | 'mate3' | 'bonus' | 'promotion';
 type Fixture = {
@@ -126,7 +128,62 @@ describe('solveStage on the frozen fixtures', () => {
   }, TIMEOUT);
 });
 
+/** A Deployment-phase test stage (`tpl-test`, Act I normal): Black pieces as `Kh5 Pg6`, and the squares of White's Normal spawned pawns. */
+function testStage(black: string, white: string, mateIn: number): StageState {
+  const TYPES: Record<string, BoardPiece['pieceType']> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight', P: 'pawn' };
+  const out: Record<Square, BoardPiece> = {};
+  for (const w of black.split(' ')) out[w.slice(1)] = { pieceType: TYPES[w[0]!]!, color: 'black', stageId: '' };
+  for (const sq of white.split(' ')) out[sq] = { pieceType: 'pawn', color: 'white', spawned: true, stageId: '', rarity: 'normal' };
+  const index = (sq: string): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
+  Object.keys(out).sort((a, b) => index(a) - index(b)).forEach((sq, i) => { out[sq]!.stageId = `s${String(i + 1).padStart(2, '0')}`; });
+  return deepFreeze(buildStage(tpl({ id: 'tpl-test' }), out, 'act1', 'normal', 'TEST-0001', mateIn, config));
+}
+
+const testKing: PieceInstance = {
+  instanceId: 'king', pieceType: 'king', rarity: null, durability: null, durabilityMax: null,
+  origin: 'starter', acquiredAtStage: 0, status: 'in_deck',
+};
+const testPiece = (instanceId: string, pieceType: 'knight' | 'bishop' | 'rook' | 'queen'): PieceInstance => ({
+  instanceId, pieceType, rarity: 'normal', durability: 2, durabilityMax: 2, origin: 'starter', acquiredAtStage: 0, status: 'in_deck',
+});
+/** An Act I run whose deck is the King and `pieces`. */
+const testRun = (pieces: PieceInstance[]): RunState => deepFreeze({
+  version: 1, seed: 'TEST-0001', actIndex: 0, stageIndex: 0, coins: 0, deckCapacity: 8,
+  deck: [testKing, ...pieces], loadout: [], history: [], rngCursor: 0, status: 'in_progress',
+} as RunState);
+
+/** The Action-phase stage after deploying `placements`. */
+function startedOf(run: RunState, stage: StageState, placements: Placement[], cfg: GenConfig = config) {
+  const s = startStage(run, stage, placements, cfg);
+  if (!s.ok) throw new Error(JSON.stringify(s.error));
+  return s.value;
+}
+
 describe('queuesOf', () => {
+  it('queuesOf branches a promoting pawn move into four queues', () => {
+    // White pawn e7 can push to e8 or take the knight on d8; both promote.
+    const run = testRun([]);
+    const stage = testStage('Kh8 Ph7 Nd8', 'e7', 3);
+    const s = startedOf(run, stage, deploymentCandidates(run, stage, config)[0]!).stage;
+    const targets = legalPlayerMoves(s, 'e7', config);
+    expect([...targets].sort()).toEqual(['d8', 'e8']);
+    const fromE7 = queuesOf(s, config).filter((q) => q[0]!.type === 'MOVE' && q[0]!.from === 'e7');
+    expect(fromE7.map(queueText)).toEqual(targets.flatMap((to) => ['Q', 'R', 'B', 'N'].map((l) => `e7${to}=${l}`)));
+    for (const q of fromE7) {
+      expect(q).toHaveLength(1);
+      expect(simulate(run, s, q, config).ok).toBe(true);
+    }
+    expect(fromE7.map((q) => (q[0]!.type === 'MOVE' ? q[0]!.promotion : null)))
+      .toEqual(targets.flatMap(() => ['queen', 'rook', 'bishop', 'knight']));
+    // A move that does not promote carries no promotion, and its text is unchanged.
+    const others = queuesOf(s, config).filter((q) => q[0]!.type === 'MOVE' && q[0]!.from !== 'e7');
+    expect(others.length).toBeGreaterThan(0);
+    for (const q of others) {
+      expect(q[0]!.type === 'MOVE' && 'promotion' in q[0]!).toBe(false);
+      expect(queueText(q)).toMatch(/^[a-h][1-8][a-h][1-8]$/);
+    }
+  });
+
   it("is the oracle's full queue set, in the same order (bonus pairs and pawns to rank 8 included)", () => {
     for (const name of ['bonus', 'promotion', 'mate3'] as const) {
       const f = fixture(name);
@@ -138,6 +195,39 @@ describe('queuesOf', () => {
       expect(new Set(ours).size).toBe(ours.length);
     }
   });
+});
+
+describe('promotion choices', () => {
+  // Black Kh5 behind its own pawn g6; White spawned pawns e7, f3 and g3; the deck is the King and two
+  // bishops, which the solver places on e3 and e4. The King's squares are all covered (g4 by f3, h4 by
+  // g3, g5 and h6 by the e3 bishop), so ...g6-g5 is Black's only move. A queen (or bishop) on e8 pins
+  // g6 to the king along e8-h5: Black has no move, a stalemate, which loses the stage. A rook on e8
+  // pins nothing, ...g5 follows, and Re8-h8 mates (g6 is the e4 bishop's, h4 g3's, g4 f3's).
+  const run = testRun([testPiece('bishop-1', 'bishop'), testPiece('bishop-2', 'bishop')]);
+  const stage = testStage('Kh5 Pg6', 'e7 f3 g3', 2);
+  const queenOnly: BruteFilter = (_s, q) => q.every((a) => a.type !== 'MOVE' || a.promotion === undefined || a.promotion === 'queen');
+
+  it('the solver finds a mate that needs an under-promotion', () => {
+    const r = solveStage(run, stage, config);
+    expect(r.win).not.toBeNull();
+    const win = r.win!;
+    expect(win.mateTurn).toBe(2);
+    const promotions = win.line.flat().flatMap((a) => (a.type === 'MOVE' && a.promotion !== undefined ? [a.promotion] : []));
+    expect(promotions).toEqual(['rook']);
+    expect(replayLine(run, stage, win, config)).toBe(true);
+    const { stage: end, events } = replay(run, stage, win, config);
+    expect(end.endReason).toBe('checkmate');
+    expect(events).toContainEqual(expect.objectContaining({ type: 'pawn_promoted', square: 'e8', pieceType: 'rook' }));
+
+    // The same promotion to a queen, from the solver's deployment, stalemates Black at once.
+    const s = startedOf(run, stage, win.placements);
+    const queen = simulate(s.run, s.stage, [{ type: 'MOVE', from: 'e7', to: 'e8', promotion: 'queen' }], config);
+    expect(queen.ok && [queen.value.stage.status, queen.value.stage.endReason]).toEqual(['lost', 'enemy_stalemated']);
+    // And no line that promotes only to queens mates within the par, from any deployment candidate.
+    for (const c of deploymentCandidates(run, stage, config)) {
+      expect(bruteSearch(run, stage, c, stage.mateIn, { bonus: true, pawnToRank8: true }, config, queenOnly).mate).toBeNull();
+    }
+  }, TIMEOUT);
 });
 
 describe('nodeBudget', () => {
@@ -166,8 +256,7 @@ describe('minSolveTurns', () => {
     const id = () => `s${String(++n).padStart(2, '0')}`;
     for (const w of black.split(' ')) out[w.slice(1)] = { pieceType: TYPES[w[0]!]!, color: 'black', stageId: id() };
     out[spawned] = {
-      pieceType: 'pawn', color: 'white', spawned: true, stageId: id(),
-      rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' },
+      pieceType: 'pawn', color: 'white', spawned: true, stageId: id(), rarity: 'normal',
     };
     return out;
   }

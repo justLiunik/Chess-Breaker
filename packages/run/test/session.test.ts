@@ -2,20 +2,21 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 import { commitQueue, hash } from '@checkbreaker/engine';
-import type { Action, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, PieceInstance, PromotionType, RunState, StageState } from '@checkbreaker/engine';
 import {
   abandon, buy, commit, cut, expectedSeed, leave, merge, newRun, provideStage, repair, requestFor, reroll, sell, start,
 } from '../src/session';
 import { sellPrice } from '../src/prices';
 import type { RunError, RunEvent, RunPhase, RunResult, RunSession } from '../src/types';
 import {
-  ROOK_ID, deepFreeze, doublePromotionStage, losingStage, mateInOneStage, promotionOverflowStage, runConfig as c,
-  runWithRook,
+  ROOK_ID, deepFreeze, doublePromotionStage, losingStage, mateInOneStage, promotionCapturedStage, promotionOverflowStage,
+  runConfig as c, runWithRook,
 } from './fixtures';
 
 const SEED = '7F3A-2210';
 const KING_ROOK = [{ instanceId: 'p_king_01', to: 'd1' }, { instanceId: ROOK_ID, to: 'e1' }];
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 
 const value = (r: RunResult): { session: RunSession; events: RunEvent[] } => {
   if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r.error)}`);
@@ -63,8 +64,9 @@ describe('newRun', () => {
 
   it('waits for stage 0 with a request shaped like gen input', () => {
     const s = newRun(SEED, c);
-    expect(s).toMatchObject({ version: 1, phase: 'awaiting_stage', stage: null, tally: null, chooser: null, shop: null, outcome: null });
-    expect(s.next).toEqual({ request: { run: s.run, actIndex: 0, stageIndex: 0 }, stage: null });
+    expect(s).toMatchObject({ version: 1, phase: 'awaiting_stage', stage: null, tally: null, shop: null, outcome: null });
+    expect('chooser' in s).toBe(false);
+    expect(s.next).toEqual({ request: { run: s.run, actIndex: 0, stageIndex: 0 }, stage: null, clue: null });
     expect('previousTemplateId' in s.next!.request).toBe(false);
   });
 
@@ -145,7 +147,7 @@ describe('leave', () => {
     const shop = winOne(rookRun()).session;
     const ready = value(provideStage(shop, mateInOneStage(seedOf(shop)), c)).session;
     const { session, events } = value(leave(ready, c));
-    expect(session).toMatchObject({ phase: 'deployment', shop: null, next: null, chooser: null });
+    expect(session).toMatchObject({ phase: 'deployment', shop: null, next: null });
     expect(session.stage).toEqual(ready.next!.stage);
     expect(session.tally).toEqual({ startCoins: ready.run.coins, salvage: 0, piecesLost: 0 });
     expect(events).toEqual([{ type: 'stage_entered', stageNumber: 1 }]);
@@ -170,7 +172,7 @@ describe('start and commit', () => {
     expect(session.run.history).toEqual([{
       stageSeed: expectedSeed(SEED, 0, 0), templateId: 'tpl-act1-open-field', outcome: 'win', turnsUsed: 1, coinsEarned: 10, piecesLost: 0,
     }]);
-    expect(session).toMatchObject({ phase: 'shop', stage: null, tally: null, chooser: null, outcome: null });
+    expect(session).toMatchObject({ phase: 'shop', stage: null, tally: null, outcome: null });
     expect(session.shop).toMatchObject({ act: 1, stageNumber: 0, roll: 0, rerollsUsed: 0, recovery: false });
     expect(session.next!.stage).toBeNull();
     expect(session.next!.request).toMatchObject({ actIndex: 0, stageIndex: 1, previousTemplateId: 'tpl-act1-open-field' });
@@ -186,7 +188,7 @@ describe('start and commit', () => {
   it('a turn that does not end the stage stays in action and folds salvage into the tally', () => {
     // the promotion stage: turn 1 promotes, nothing captured
     const action = deploy(rookRun(), promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     expect(t1.phase).toBe('action');
     expect(t1.stage!.turnsUsed).toBe(1);
     expect(t1.tally).toEqual({ startCoins: 0, salvage: 0, piecesLost: 0 });
@@ -200,7 +202,7 @@ describe('start and commit', () => {
     if (!engine.ok) throw new Error('engine refused');
     expect(engine.value.stage.status).toBe('lost');
     const { session, events } = value(commit(action, mv('e1', 'f1'), c));
-    expect(session).toMatchObject({ phase: 'ended', stage: null, tally: null, shop: null, next: null, chooser: null });
+    expect(session).toMatchObject({ phase: 'ended', stage: null, tally: null, shop: null, next: null });
     expect(session.run.status).toBe('lost');
     expect(session.outcome).toEqual({ result: 'lost', endReason: engine.value.stage.endReason });
     expect(session.run.history).toEqual([{
@@ -279,76 +281,149 @@ describe('the stage tally', () => {
 const fullDeck = (extra: PieceInstance[]) => rookRun(extra);
 const THREE_MORE = [normal('p_fill_01', 'knight'), normal('p_fill_02', 'bishop'), normal('p_fill_03', 'bishop')];
 
-describe('the chooser (Review Focus 4)', () => {
-  it('deck at 8 + one promotion: chooser with overCapacity 1; one sale opens the shop and the coins are spendable', () => {
+describe('the deck gate in the shop (Review Focus 4)', () => {
+  /** Deck at 8, one promotion (b7-b8=N) on turn 1, the mate on turn 2: the shop at 9 pieces. */
+  const shopAtNine = () => {
     const start8 = fullDeck(THREE_MORE);
     expect(nonKing(start8.run)).toBe(8);
     const action = deploy(start8, promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const won = value(commit(t1, mv('e1', 'e8'), c));
-    expect(won.session).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 1 }, shop: null, next: null, stage: null });
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    return value(commit(t1, mv('e1', 'e8'), c));
+  };
+
+  it('a won stage with a promotion goes to the shop even at 9 pieces', () => {
+    const won = shopAtNine();
+    expect(won.session).toMatchObject({ phase: 'shop', stage: null, entryStage: null, tally: null, outcome: null });
+    expect('chooser' in won.session).toBe(false);
     expect(nonKing(won.session.run)).toBe(9);
-    expect(won.events.at(-1)).toEqual({ type: 'chooser_opened', overCapacity: 1 });
+    expect(won.session.shop).toMatchObject({ act: 1, stageNumber: 0, roll: 0, rerollsUsed: 0, recovery: false });
+    expect(won.session.next).toMatchObject({ stage: null, request: { actIndex: 0, stageIndex: 1 } });
+    expect(won.events.map(e => e.type)).not.toContain('chooser_opened');
+    expect(won.events.at(-1)).toEqual({ type: 'shop_opened', act: 1, recovery: false });
     expect(won.session.run.history).toHaveLength(1);
     expect(won.session.run.coins).toBe(10);
-
-    const victim = won.session.run.deck.find(p => p.instanceId === 'p_fill_01')!;
-    const coins = sellPrice(victim, 1, c);
-    expect(coins).toBeGreaterThan(0);
-    const sold = value(sell(won.session, 'p_fill_01', c));
-    expect(sold.session.phase).toBe('shop');
-    expect(sold.session.chooser).toBeNull();
-    expect(sold.session.run.coins).toBe(10 + coins);
-    expect(nonKing(sold.session.run)).toBe(8);
-    expect(sold.events).toEqual([
-      { type: 'piece_sold', instanceId: 'p_fill_01', coins },
-      { type: 'shop_opened', act: 1, recovery: false },
-    ]);
-    expect(sold.session.next!.request).toMatchObject({ actIndex: 0, stageIndex: 1 });
-    // the wallet the sale filled is the one the shop spends: repair the rook (4) out of 10 + sale
-    const repaired = value(repair(sold.session, ROOK_ID, c));
-    expect(repaired.session.run.coins).toBe(10 + coins - c.run.services.repair);
   });
 
-  it('overflow 2 needs two removals; the chooser stays open after the first', () => {
+  it('leave is refused with deck_over_capacity at 9 and allowed at 8', () => {
+    const won = shopAtNine().session;
+    const gate = { kind: 'deck_over_capacity', size: 9, capacity: c.deck.capacity };
+    expect(error(leave(won, c))).toEqual(gate);
+    // with the next stage ready, too
+    const ready = value(provideStage(won, mateInOneStage(seedOf(won)), c)).session;
+    expect(error(leave(ready, c))).toEqual(gate);
+    // buying a piece is refused as before
+    const rich = deepFreeze({ ...ready, run: { ...ready.run, coins: 500 } });
+    const slot = rich.shop!.slots.findIndex(o => o.kind === 'piece') + 1;
+    expect(error(buy(rich, slot, {}, c))).toEqual({ kind: 'deck_full' });
+
+    const victim = ready.run.deck.find(p => p.instanceId === 'p_fill_01')!;
+    const coins = sellPrice(victim, 1, c);
+    expect(coins).toBeGreaterThan(0);
+    const sold = value(sell(ready, 'p_fill_01', c));
+    expect(sold.session.phase).toBe('shop');
+    expect(sold.events).toEqual([{ type: 'piece_sold', instanceId: 'p_fill_01', coins }]);
+    expect(nonKing(sold.session.run)).toBe(8);
+    expect(sold.session.run.coins).toBe(10 + coins);
+    // the wallet the sale filled is the one the shop spends: repair the rook out of 10 + sale
+    const repaired = value(repair(sold.session, ROOK_ID, c)).session;
+    expect(repaired.run.coins).toBe(10 + coins - c.run.services.repair);
+    const { session, events } = value(leave(repaired, c));
+    expect(session.phase).toBe('deployment');
+    expect(events).toEqual([{ type: 'stage_entered', stageNumber: 1 }]);
+  });
+
+  it('selling a promoted piece pays 0', () => {
+    const won = shopAtNine().session;
+    const promoted = won.run.deck.find(p => p.origin === 'promotion')!;
+    expect(promoted).toMatchObject({ pieceType: 'knight', rarity: 'normal', pricePaid: 0, status: 'in_deck' });
+    expect(promoted.durability).toBe(promoted.durabilityMax);
+    const { session, events } = value(sell(won, promoted.instanceId, c));
+    expect(events).toEqual([{ type: 'piece_sold', instanceId: promoted.instanceId, coins: 0 }]);
+    expect(session.run.coins).toBe(won.run.coins);
+    expect(session.run.deck.some(p => p.instanceId === promoted.instanceId)).toBe(false);
+    expect(value(leave(session, c)).session.phase).toBe('awaiting_stage');
+  });
+
+  it('overflow 2 needs two removals; leave stays refused after the first', () => {
     const action = deploy(fullDeck(THREE_MORE), doublePromotionStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const t2 = value(commit(t1, mv('c7', 'c8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    const t2 = value(commit(t1, mv('c7', 'c8', 'knight'), c)).session;
     const won = value(commit(t2, mv('e1', 'e8'), c)).session;
-    expect(won).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 2 } });
+    expect(won.phase).toBe('shop');
     expect(nonKing(won.run)).toBe(10);
+    expect(error(leave(won, c))).toEqual({ kind: 'deck_over_capacity', size: 10, capacity: c.deck.capacity });
 
     const one = value(sell(won, 'p_fill_02', c));
-    expect(one.session).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 1 }, shop: null });
+    expect(one.session.phase).toBe('shop');
     expect(one.events.map(e => e.type)).toEqual(['piece_sold']);
+    expect(error(leave(one.session, c))).toEqual({ kind: 'deck_over_capacity', size: 9, capacity: c.deck.capacity });
     const two = value(cut(one.session, 'p_fill_03', c));
     expect(two.session.phase).toBe('shop');
-    expect(two.events).toEqual([{ type: 'piece_cut', instanceId: 'p_fill_03' }, { type: 'shop_opened', act: 1, recovery: false }]);
+    expect(two.events).toEqual([{ type: 'piece_cut', instanceId: 'p_fill_03' }]);
     expect(nonKing(two.session.run)).toBe(8);
+    expect(value(leave(two.session, c)).session.phase).toBe('awaiting_stage');
   });
 
   it('a merge (3 → 1) clears an overflow of 2 in one action', () => {
     const action = deploy(fullDeck(THREE_MORE), doublePromotionStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const t2 = value(commit(t1, mv('c7', 'c8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    const t2 = value(commit(t1, mv('c7', 'c8', 'knight'), c)).session;
     const won = value(commit(t2, mv('e1', 'e8'), c)).session;
     const ids = ['p_knight_02', 'p_knight_03', 'p_fill_01'];
     const { session, events } = value(merge(won, ids, c));
     expect(session.phase).toBe('shop');
     expect(nonKing(session.run)).toBe(8);
+    expect(events).toHaveLength(1);
     const made = events[0]!;
     expect(made).toMatchObject({ type: 'pieces_merged', inputs: ids });
     const result = session.run.deck.find(p => p.instanceId === (made as { result: string }).result)!;
     expect(result).toMatchObject({ pieceType: 'knight', rarity: 'rare', origin: 'merge', acquiredAtStage: 0 });
+    expect(value(leave(session, c)).session.phase).toBe('awaiting_stage');
   });
 
-  it('chooser refusals are typed and change nothing', () => {
-    const action = deploy(fullDeck(THREE_MORE), promotionOverflowStage);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const won = value(commit(t1, mv('e1', 'e8'), c)).session;
+  it('refusals at 9 are typed and change nothing', () => {
+    const won = shopAtNine().session;
     expect(error(sell(won, 'p_king_01', c))).toEqual({ kind: 'cannot_sell', instanceId: 'p_king_01', reason: 'king' });
     expect(error(cut(won, 'p_king_01', c))).toEqual({ kind: 'cannot_cut', instanceId: 'p_king_01', reason: 'king' });
     expect(error(merge(won, ['p_knight_02'], c))).toEqual({ kind: 'merge_invalid', reason: 'count' });
+  });
+
+  it('merge, sell and cut are refused outside the shop', () => {
+    const awaiting = fullDeck(THREE_MORE);
+    const deployment = value(provideStage(awaiting, promotionOverflowStage(seedOf(awaiting)), c)).session;
+    const action = value(start(deployment, KING_ROOK, c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    expect(nonKing(t1.run)).toBe(9);
+    const ended = value(abandon(t1)).session;
+    const ids = ['p_knight_02', 'p_knight_03', 'p_fill_01'];
+    for (const s of [awaiting, deployment, action, t1, ended]) {
+      for (const r of [merge(s, ids, c), sell(s, 'p_fill_02', c), cut(s, 'p_fill_03', c)]) {
+        expect(error(r), s.phase).toEqual({ kind: 'wrong_phase', expected: ['shop'] });
+      }
+    }
+  });
+
+  it('a promoted piece the enemy captures counts in piecesLost and can open the recovery offer', () => {
+    // deck: King, 2 knights, the rook (3 non-king). b7-b8=Q+ is answered by Nxb8 in the same COMMIT.
+    const fresh = rookRun();
+    const s = deepFreeze({ ...fresh, run: { ...fresh.run, deck: fresh.run.deck.filter(p => p.pieceType !== 'bishop') } });
+    const action = deploy(s, promotionCapturedStage);
+    const t1 = value(commit(action, mv('b7', 'b8', 'queen'), c));
+    const promoted = t1.events.find(e => e.type === 'pawn_promoted') as Extract<RunEvent, { type: 'pawn_promoted' }>;
+    expect(promoted).toMatchObject({ square: 'b8', pieceType: 'queen', rarity: 'normal' });
+    expect(t1.events).toContainEqual(expect.objectContaining({
+      type: 'capture', square: 'b8', color: 'white', pieceType: 'queen', instanceId: promoted.instanceId,
+    }));
+    expect(t1.session.phase).toBe('action');
+    expect(t1.session.tally).toEqual({ startCoins: 0, salvage: 0, piecesLost: 1 });
+    expect(t1.session.run.deck.some(p => p.instanceId === promoted.instanceId)).toBe(false);
+    expect(nonKing(t1.session.run)).toBe(3);
+
+    const { session, events } = value(commit(t1.session, mv('e1', 'e8'), c));
+    expect(session.run.history[0]).toMatchObject({ outcome: 'win', turnsUsed: 2, piecesLost: 1 });
+    expect(nonKing(session.run)).toBe(3);
+    expect(events.at(-1)).toEqual({ type: 'shop_opened', act: 1, recovery: true });
+    expect(session.shop!.slots[0]).toMatchObject({ kind: 'piece', rarity: 'normal', recovery: true });
   });
 });
 
@@ -457,7 +532,7 @@ describe('abandon', () => {
     const s = deepFreeze(newRun(SEED, c));
     const dep = value(provideStage(s, mateInOneStage(seedOf(s)), c)).session;
     const { session, events } = value(abandon(dep));
-    expect(session).toMatchObject({ phase: 'ended', stage: null, tally: null, next: null, shop: null, chooser: null });
+    expect(session).toMatchObject({ phase: 'ended', stage: null, tally: null, next: null, shop: null });
     expect(session.outcome).toEqual({ result: 'lost', endReason: 'abandoned' });
     expect(session.run.status).toBe('lost');
     expect(session.run.history).toEqual([]);
@@ -467,7 +542,7 @@ describe('abandon', () => {
   it('in action before a turn writes no record; after a turn writes a loss record', () => {
     const action = deploy(rookRun(), promotionOverflowStage);
     expect(value(abandon(action)).session.run.history).toEqual([]);
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
     const { session } = value(abandon(t1));
     expect(session.run.history).toEqual([{
       stageSeed: expectedSeed(SEED, 0, 0), templateId: 'tpl-act1-open-field', outcome: 'loss', turnsUsed: 1, coinsEarned: 0, piecesLost: 0,
@@ -483,14 +558,14 @@ describe('abandon', () => {
 });
 
 describe('wrong_phase', () => {
-  const NON_ENDED: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop'];
+  const NON_ENDED: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'shop'];
   const actions: [string, RunPhase[], (s: RunSession) => RunResult][] = [
     ['provideStage', ['awaiting_stage', 'shop'], s => provideStage(s, mateInOneStage('0000-0000'), c)],
     ['start', ['deployment'], s => start(s, KING_ROOK, c)],
     ['commit', ['action'], s => commit(s, mv('e1', 'e8'), c)],
-    ['merge', ['chooser', 'shop'], s => merge(s, ['p_knight_02', 'p_knight_03', 'p_fill_01'], c)],
-    ['sell', ['chooser', 'shop'], s => sell(s, 'p_bishop_04', c)],
-    ['cut', ['chooser', 'shop'], s => cut(s, 'p_bishop_05', c)],
+    ['merge', ['shop'], s => merge(s, ['p_knight_02', 'p_knight_03', 'p_fill_01'], c)],
+    ['sell', ['shop'], s => sell(s, 'p_bishop_04', c)],
+    ['cut', ['shop'], s => cut(s, 'p_bishop_05', c)],
     ['buy', ['shop'], s => buy(s, 1, {}, c)],
     ['repair', ['shop'], s => repair(s, ROOK_ID, c)],
     ['reroll', ['shop'], s => reroll(s, c)],
@@ -502,11 +577,10 @@ describe('wrong_phase', () => {
     const awaiting = fullDeck(THREE_MORE);
     const deployment = value(provideStage(awaiting, promotionOverflowStage(seedOf(awaiting)), c)).session;
     const action = value(start(deployment, KING_ROOK, c)).session;
-    const t1 = value(commit(action, mv('b7', 'b8'), c)).session;
-    const chooser = value(commit(t1, mv('e1', 'e8'), c)).session;
-    const shop = value(sell(chooser, 'p_fill_02', c)).session;
+    const t1 = value(commit(action, mv('b7', 'b8', 'knight'), c)).session;
+    const shop = value(commit(t1, mv('e1', 'e8'), c)).session;
     const ended = value(abandon(shop)).session;
-    return { awaiting_stage: awaiting, deployment, action, chooser, shop, ended };
+    return { awaiting_stage: awaiting, deployment, action, shop, ended };
   };
 
   it('every action outside its phases is refused with the phases it accepts', () => {

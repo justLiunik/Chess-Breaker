@@ -9,6 +9,8 @@ const REJECTION: Record<Extract<CommitError, { kind: 'illegal_move' }>['reason']
   unreachable: 'that piece cannot reach the target square',
   own_piece: 'your own piece is on the target square',
   king_square: 'the target square holds a King, which cannot be captured',
+  promotion_required: 'a pawn reaching the last rank must choose a piece to promote to',
+  promotion_not_allowed: 'only a pawn reaching the last rank can promote',
 };
 
 const DEPLOY_REASON: Record<Extract<CommitError, { kind: 'invalid_deployment' }>['reason'], string> = {
@@ -16,6 +18,8 @@ const DEPLOY_REASON: Record<Extract<CommitError, { kind: 'invalid_deployment' }>
   outside_zone: 'that square is outside your deployment zone',
   king_missing: 'your King must be placed first',
   king_in_check: 'the King would start in check',
+  gives_check: 'a piece there would give check to the enemy King at START; block the line first or choose another square',
+  queen_limit: 'only one Queen can be summoned per stage',
   not_in_deck: 'that piece is not in your deck',
   duplicate: 'that piece is already placed',
 };
@@ -76,7 +80,6 @@ const PHASE: Record<RunPhase, string> = {
   awaiting_stage: 'waiting for the next stage',
   deployment: 'deployment',
   action: 'the action phase',
-  chooser: 'the deck chooser',
   shop: 'the shop',
   ended: 'a finished run',
 };
@@ -105,6 +108,11 @@ export function runErrorText(e: RunError): string {
       return `Not enough coins: it costs ${e.price}, you have ${e.coins}.`;
     case 'deck_full':
       return 'Your deck is full. Sell or cut a piece first.';
+    case 'deck_over_capacity': {
+      const over = e.size - e.capacity;
+      return `Your deck holds ${e.size} pieces, over the limit of ${e.capacity}. `
+        + `Sell, merge or cut ${over === 1 ? 'a piece' : `${over} pieces`} before the next stage.`;
+    }
     case 'loadout_full':
       return 'Your skill loadout is full. Replace a skill instead.';
     case 'replace_not_needed':
@@ -159,6 +167,8 @@ const DROP_REASON: Record<DropRefusal, string> = {
   occupied: DEPLOY_REASON.occupied,
   outside_zone: DEPLOY_REASON.outside_zone,
   king_in_check: DEPLOY_REASON.king_in_check,
+  gives_check: DEPLOY_REASON.gives_check,
+  queen_limit: DEPLOY_REASON.queen_limit,
   not_in_deck: DEPLOY_REASON.not_in_deck,
   duplicate: DEPLOY_REASON.duplicate,
   spawn_points_exceeded: 'there are not enough spawn points left for that piece',
@@ -167,6 +177,11 @@ const DROP_REASON: Record<DropRefusal, string> = {
 /** Why `deploymentStatus(...).drop` refused a placement. */
 export function dropRefusalText(reason: DropRefusal): string {
   return `Cannot place it there: ${DROP_REASON[reason]}.`;
+}
+
+/** The shop's gate line for a refused `leave`, as in "Deck 9/8: sell, merge or cut to continue". */
+export function deckGateText(e: { size: number; capacity: number }): string {
+  return `Deck ${e.size}/${e.capacity}: sell, merge or cut to continue`;
 }
 
 function assertNever(x: never): never {

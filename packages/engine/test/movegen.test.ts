@@ -47,13 +47,36 @@ describe('movegen', () => {
     expect(targets(b, 'e4')).toEqual(['d5']);
   });
 
-  it('promotion', () => {
+  it('promotion: Black one queen move, White one move per type, queen first', () => {
     const b = board({ a2: 'p', e1: 'K', e8: 'k' });
-    const m = pseudoMoves(b, 'black').find((x) => x.from === toIndex('a2') && x.to === toIndex('a1'));
-    expect(m?.promotion).toBe('queen');
-    const w = board({ h7: 'P', e1: 'K', e8: 'k' });
-    const wm = pseudoMoves(w, 'white').find((x) => x.from === toIndex('h7') && x.to === toIndex('h8'));
-    expect(wm?.promotion).toBe('removed');
+    const ms = pseudoMoves(b, 'black').filter((x) => x.from === toIndex('a2') && x.to === toIndex('a1'));
+    expect(ms.map((m) => m.promotion)).toEqual(['queen']);
+    const w = board({ h7: 'P', g8: 'n', e1: 'K', e8: 'k' });
+    for (const to of ['h8', 'g8']) {
+      const wm = pseudoMoves(w, 'white').filter((x) => x.from === toIndex('h7') && x.to === toIndex(to));
+      expect(wm.map((m) => m.promotion)).toEqual(['queen', 'rook', 'bishop', 'knight']);
+    }
+    expect(pseudoMoves(w, 'white').filter((x) => x.from === toIndex('e1')).every((m) => m.promotion === null)).toBe(true);
+  });
+
+  it('make/unmake places the chosen piece and restores the pawn and the capture', () => {
+    const w = board({ h7: 'P', g8: 'n', e1: 'K', e8: 'k' });
+    const before = Array.from(w);
+    const codes = { queen: 5, rook: 4, bishop: 3, knight: 2 } as const;
+    for (const m of pseudoMoves(w, 'white').filter((x) => x.from === toIndex('h7'))) {
+      makeMove(w, m);
+      expect(w[m.to]).toBe(codes[m.promotion!]);
+      expect(w[m.from]).toBe(0);
+      unmakeMove(w, m);
+      expect(Array.from(w)).toEqual(before);
+    }
+    const b = board({ a2: 'p', b1: 'N', e1: 'K', e8: 'k' });
+    const bBefore = Array.from(b);
+    const m = pseudoMoves(b, 'black').find((x) => x.from === toIndex('a2') && x.to === toIndex('b1'))!;
+    makeMove(b, m);
+    expect(b[toIndex('b1')]).toBe(-5);
+    unmakeMove(b, m);
+    expect(Array.from(b)).toEqual(bBefore);
   });
 
   it('make/unmake restores 200 seeded positions', () => {

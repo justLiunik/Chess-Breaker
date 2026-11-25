@@ -22,6 +22,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Teaching template. Enemy army value 7-9 against a mate in 5: enough
   slack to learn summoning and the par counter without the stage being a

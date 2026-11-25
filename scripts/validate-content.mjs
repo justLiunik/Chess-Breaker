@@ -168,6 +168,8 @@ try {
 }
 
 const valueOf = (pieceType) => economy.pieces?.[pieceType]?.value;
+// A `when` list for a deck action that may run only in the shop (M5.1: no stage-end chooser).
+const onlyShop = (when) => Array.isArray(when) && when.length === 1 && when[0] === 'shop';
 const templateIds = new Set();
 const skillIds = new Set();
 
@@ -479,31 +481,45 @@ const abilitiesFor = (type, tier) => {
   if (problems === 0) ok('economy.yaml: rarity retention values valid');
 }
 
-// 2a'''. Promotion (docs/02 §2.2).
+// 2a'''. Promotion (docs/02 §2.2, M5.1). The player chooses the piece type on
+// rank 8 and the piece keeps the pawn's rarity: nothing is rolled, so the old
+// roll keys must be gone. An over-full deck blocks the next stage in the shop;
+// there is no stage-end chooser.
+const REMOVED_PROMOTION_KEYS = ['resultTypeWeights', 'tierUpChance', 'appliesRetention', 'rolledAtGeneration'];
 {
   const promo = economy.promotion ?? {};
   let problems = 0;
-  for (const [type, w] of Object.entries(promo.resultTypeWeights ?? {})) {
-    if (!pieceDefs.get(type)?.purchasable) {
-      fail(`economy.yaml: promotion.resultTypeWeights.${type} — promotion may only produce deck piece types`);
+  for (const key of REMOVED_PROMOTION_KEYS) {
+    if (key in promo) {
+      fail(`economy.yaml: promotion.${key} was removed in M5.1 — the player chooses the promoted type and it keeps the pawn's rarity (docs/02 §2.2)`);
       problems += 1;
     }
-    if (typeof w !== 'number' || w < 0) {
-      fail(`economy.yaml: promotion.resultTypeWeights.${type} must be a non-negative number`);
-      problems += 1;
-    }
-  }
-  if (!(promo.tierUpChance >= 0 && promo.tierUpChance <= 1)) {
-    fail('economy.yaml: promotion.tierUpChance must be between 0 and 1');
-    problems += 1;
   }
   if (promo.clampToActCeiling !== true) {
     fail('economy.yaml: promotion.clampToActCeiling must be true — promotion must not bypass the act ceiling (I14)');
     problems += 1;
   }
-  if (problems === 0) ok('economy.yaml: promotion results are deck pieces, clamped to the act ceiling');
+  if (promo.joinsDeck !== 'immediately') {
+    fail(`economy.yaml: promotion.joinsDeck must be immediately (docs/02 §2.2), got ${promo.joinsDeck}`);
+    problems += 1;
+  }
+  if (promo.overCapacity !== 'blocks_next_stage') {
+    fail(`economy.yaml: promotion.overCapacity must be blocks_next_stage — the shop refuses the next stage while the deck is over capacity (docs/02 §2.2, I9), got ${promo.overCapacity}`);
+    problems += 1;
+  }
+  if (problems === 0) ok('economy.yaml: promotion is the player\'s choice at the pawn\'s rarity; an over-full deck blocks the next stage');
 }
-const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
+
+// Deployment limits (docs/02 §5, M5.1 decision P10): at most this many queens
+// may be summoned per stage. 0 would make every queen in the deck useless.
+{
+  const maxQ = economy.deployment?.maxQueenSummons;
+  if (!Number.isInteger(maxQ) || maxQ < 1) {
+    fail(`economy.yaml: deployment.maxQueenSummons must be an integer >= 1 (docs/02 §5), got ${maxQ}`);
+  } else {
+    ok(`economy.yaml: at most ${maxQ} queen summon(s) per stage`);
+  }
+}
 
 // Enemy AI (docs/02 §8.1): terminal scores must dwarf any positional score,
 // so the enemy never trades a forced outcome for a slightly better position.
@@ -712,6 +728,11 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
     fail('economy.yaml: deck.merge.clampToActCeiling must be true — merging must not bypass the act ceiling (I14)');
     problems += 1;
   }
+  // M5.1: there is no stage-end chooser, so merging happens only in the shop.
+  if (!onlyShop(merge.when)) {
+    fail(`economy.yaml: deck.merge.when must be [shop] — merging happens only in the shop (docs/06 §4.5), got ${JSON.stringify(merge.when)}`);
+    problems += 1;
+  }
   if (!(Number.isInteger(economy.deck?.capacity) && economy.deck.capacity >= 1)) {
     fail('economy.yaml: deck.capacity must be a positive integer');
     problems += 1;
@@ -776,7 +797,10 @@ const promotionWeights = economy.promotion?.resultTypeWeights ?? {};
   }
 }
 
-// 2a''''. Templates: spawned pawns stay out of the enemy zone.
+// 2a''''. Templates: spawned pawns stay out of the enemy zone and on rank 6 or lower. G5's
+// no_first_turn_mate moves only summons, never a spawned pawn, so a pawn on rank 7 could promote
+// and mate on turn 1 (b7-b8=Q#) without G5 seeing it (docs/04 §4).
+const MAX_SPAWN_RANK = 6;
 for (const t of templates) {
   const sp = t.spawnedPawns;
   if (!sp) continue;
@@ -791,7 +815,12 @@ for (const t of templates) {
     fail(`${t.id}: spawnedPawns.ranks overlap enemyZone on rank(s) ${overlap.join(', ')}`);
     problems += 1;
   }
-  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, clear of the enemy zone`);
+  const high = sp.ranks.filter((r) => r > MAX_SPAWN_RANK);
+  if (high.length > 0) {
+    fail(`${t.id}: spawnedPawns.ranks ${high.join(', ')} above ${MAX_SPAWN_RANK}: spawned pawns stand on rank ${MAX_SPAWN_RANK} or lower; G5 moves summons only, so a pawn on rank 7 could promote-mate on turn 1 (docs/04 §4)`);
+    problems += 1;
+  }
+  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, clear of the enemy zone and at most rank ${MAX_SPAWN_RANK}`);
 }
 
 // 2a-sell. Selling deck pieces (docs/07 §4). The sell factor must stay at or
@@ -816,10 +845,9 @@ for (const t of templates) {
       fail('economy.yaml: economy.services.sell.rounding must be floor (a sale never rounds in the player\'s favour)');
       problems += 1;
     }
-    const allowedWhen = new Set(['shop', 'capacity_cut']);
-    const badWhen = (sell.when ?? []).filter((w) => !allowedWhen.has(w));
-    if (!Array.isArray(sell.when) || sell.when.length === 0 || badWhen.length > 0) {
-      fail(`economy.yaml: economy.services.sell.when must list only shop / capacity_cut${badWhen.length ? `, got ${badWhen.join(', ')}` : ''}`);
+    // M5.1: there is no stage-end chooser, so selling happens only in the shop.
+    if (!onlyShop(sell.when)) {
+      fail(`economy.yaml: economy.services.sell.when must be [shop] — selling happens only in the shop (docs/07 §4), got ${JSON.stringify(sell.when)}`);
       problems += 1;
     }
     for (const must of ['king', 'spent']) {
@@ -972,8 +1000,11 @@ for (const file of ['run-starter.yaml', 'run-mid.yaml', 'run-act3-strong.yaml'])
     if (typeof p.durability === 'number' && typeof p.durabilityMax === 'number' && p.durability > p.durabilityMax) {
       fail(`${label}: durability ${p.durability} exceeds max ${p.durabilityMax}`);
     }
-    if (p.pricePaid !== undefined && p.origin !== 'shop') {
-      fail(`${label}: pricePaid is only for shop purchases, but origin is "${p.origin}" (docs/07 §4)`);
+    if (p.origin === 'promotion') {
+      // M5.1: a promoted piece cost no coins, so it carries pricePaid 0 and sells for 0 (docs/02 §2.2).
+      if (p.pricePaid !== 0) fail(`${label}: a promoted piece must carry pricePaid 0, got ${p.pricePaid} (docs/02 §2.2, docs/07 §4)`);
+    } else if (p.pricePaid !== undefined && p.origin !== 'shop') {
+      fail(`${label}: pricePaid is only for shop purchases and promotions (0), but origin is "${p.origin}" (docs/07 §4)`);
     }
   }
 
@@ -1030,17 +1061,12 @@ if (stage) {
     if (piece.spawned) {
       spawnedCount += 1;
       const pawnTier = tierRank(piece.rarity);
-      const resultTier = tierRank(piece.promotesTo?.rarity);
       if (stageCeiling >= 0 && pawnTier > stageCeiling) {
         fail(`stage-state.yaml:${square}: spawned pawn rarity "${piece.rarity}" is above the act ceiling`);
       }
-      const expectedHigh = Math.min(pawnTier + 1, stageCeiling >= 0 ? stageCeiling : pawnTier + 1);
-      if (resultTier < Math.min(pawnTier, expectedHigh) || resultTier > expectedHigh) {
-        fail(`stage-state.yaml:${square}: promotesTo rarity "${piece.promotesTo?.rarity}" must be the pawn's tier or one higher, within the act ceiling`);
-      }
-      if (!(promotionWeights[piece.promotesTo?.pieceType] > 0)) {
-        fail(`stage-state.yaml:${square}: promotesTo type "${piece.promotesTo?.pieceType}" has no promotion weight`);
-      }
+      // The promoted type is the player's choice on rank 8 (docs/02 §2.2), so a
+      // pawn carries no pre-rolled result. (The whole-content scan below
+      // reports any stray promotesTo key elsewhere.)
     }
     if (piece.color === 'black' && piece.instanceId) {
       fail(`stage-state.yaml:${square}: black piece must not carry an instanceId (no enemy deck)`);
@@ -1115,7 +1141,7 @@ if (stage) {
   if (stageTemplate?.spawnedPawns && spawnedCount > stageTemplate.spawnedPawns.count[1]) {
     fail(`stage-state.yaml: ${spawnedCount} spawned pawns exceed template max ${stageTemplate.spawnedPawns.count[1]}`);
   } else if (spawnedCount > 0) {
-    ok(`stage-state.yaml: ${spawnedCount} spawned pawn(s) with valid rarity and promotion result`);
+    ok(`stage-state.yaml: ${spawnedCount} spawned pawn(s) with a rarity within the act ceiling`);
   }
 
   const whiteKings = pieces.filter(([, p]) => p.color === 'white' && p.pieceType === 'king');
@@ -1160,6 +1186,42 @@ if (stage) {
       ok(`stage-state.yaml: enemy value ${enemyValue} within ${minValue}–${maxValue}`);
     }
   }
+}
+
+// 2d. M5.1 promotion and START rules across all content.
+// - No spawned pawn (or anything else) carries a pre-rolled `promotesTo`: the
+//   player chooses the promoted type on rank 8 (docs/02 §2.2).
+// - Every template lists the `no_start_check` precondition, so no spawned pawn
+//   ever gives check at Start (I16, docs/04 §4).
+{
+  const findKey = (node, key, at, out) => {
+    if (Array.isArray(node)) node.forEach((v, i) => findKey(v, key, `${at}[${i}]`, out));
+    else if (node && typeof node === 'object') {
+      for (const [k, v] of Object.entries(node)) {
+        const here = at ? `${at}.${k}` : k;
+        if (k === key) out.push(here);
+        findKey(v, key, here, out);
+      }
+    }
+    return out;
+  };
+  const stray = [
+    ...Object.entries(docs).flatMap(([file, doc]) => findKey(doc, 'promotesTo', '', []).map((p) => `${file}: ${p}`)),
+    ...templates.flatMap((t) => findKey(t, 'promotesTo', '', []).map((p) => `${t.id}: ${p}`)),
+  ];
+  for (const where of stray) {
+    fail(`${where} — promotesTo was removed in M5.1: the player chooses the promoted type on rank 8 and it keeps the pawn's rarity (docs/02 §2.2)`);
+  }
+  if (stray.length === 0) ok('content: no spawned pawn carries promotesTo (promotion is the player\'s choice)');
+
+  let missing = 0;
+  for (const t of templates) {
+    if (!(t.preconditions ?? []).includes('no_start_check')) {
+      fail(`${t.id}: preconditions must include no_start_check — no check may stand at Start (I16, docs/04 §4)`);
+      missing += 1;
+    }
+  }
+  if (missing === 0) ok(`templates: all ${templates.length} list no_start_check (I16)`);
 }
 
 // ---------------------------------------------------------------------------

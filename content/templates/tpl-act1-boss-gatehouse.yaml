@@ -22,6 +22,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Act I boss. Enemy value 9-11 (the Act I band x1.25 is 8.75-11.25), mate in
   4, depth-4 policy. Teaches mating to a par: a rook behind a full pawn wall

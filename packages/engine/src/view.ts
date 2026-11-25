@@ -1,15 +1,17 @@
 import { spawnCostOf } from './abilities';
 import {
-  boardWith, checkPlacement, spawnCostOfPlaced, type Placed,
+  boardWith, checkPlacement, queenLimitExceeded, spawnCostOfPlaced, startCheckSquare, type Placed,
 } from './deployment';
-import { inCheck } from './legality';
+import { inCheck, planPlayerMove } from './legality';
 import { interestOf, pendingBase, stageEconomy } from './economy';
 import { beginQueue, resolveStep } from './queue';
 import { simulate } from './rules';
-import { DIAG_R, KING_T, KNIGHT_T, ORTHO_R } from './movegen';
+import { DIAG_R, KING_T, KNIGHT_T, ORTHO_R, WHITE_PROMOTIONS } from './movegen';
 import { BISHOP, KING, KNIGHT, PAWN, QUEEN, ROOK, fromBoard } from './position';
 import { toSquare } from './square';
-import type { Action, Award, CommitError, EngineConfig, GameEvent, RunState, Square, StageState } from './types';
+import type {
+  Action, Award, CommitError, EngineConfig, GameEvent, PromotionType, RunState, Square, StageState,
+} from './types';
 
 /**
  * Read-only answers for the UI (M5 §7.3), so that it computes no rules itself. Pure; they never
@@ -59,13 +61,14 @@ export function threatMap(
 }
 
 export type DropRefusal =
-  | 'occupied' | 'outside_zone' | 'king_in_check' | 'not_in_deck' | 'duplicate' | 'spawn_points_exceeded';
+  | 'occupied' | 'outside_zone' | 'king_in_check' | 'gives_check' | 'queen_limit' | 'not_in_deck' | 'duplicate'
+  | 'spawn_points_exceeded';
 
 export type DeploymentStatus = {
   spawnUsed: number;
   spawnBudget: number;
   startCost: { instanceId: string; from: number; to: number }[];
-  tray: Record<string, { placeable: boolean; reason?: 'spent' | 'too_expensive' | 'placed' }>;
+  tray: Record<string, { placeable: boolean; reason?: 'spent' | 'too_expensive' | 'placed' | 'queen_limit' }>;
   drop(instanceId: string, to: Square): { ok: true } | { ok: false; reason: DropRefusal };
 };
 
@@ -75,7 +78,10 @@ export type DeploymentStatus = {
  * square. It runs `startStage`'s own per-placement and cost checks (`checkPlacement`,
  * `spawnCostOfPlaced`), so it cannot disagree with START. Placements that fail those checks are
  * ignored. `drop` judges the new placement after the existing ones; a King's check is judged on the
- * board so far, so drop the King after its blockers (a non-King never changes it for the worse).
+ * board so far, so drop the King after its blockers (a non-King never changes it for the worse). A
+ * summon that gives check to the Black King (`gives_check`, I16) and a queen past the limit
+ * (`queen_limit`) are judged on the board after this placement, as START judges them; the tray marks
+ * every unplaced queen `queen_limit` once the limit of queens is placed.
  */
 export function deploymentStatus(
   run: RunState, stage: StageState, placements: { instanceId: string; to: Square }[], config: EngineConfig,
@@ -94,12 +100,15 @@ export function deploymentStatus(
   });
 
   const remaining = stage.spawnPoints - spawnUsed;
+  const placedQueens = placed.filter((p) => p.instance.pieceType === 'queen').length;
   const tray: DeploymentStatus['tray'] = {};
   for (const inst of run.deck) {
     if (placed.some((p) => p.instance.instanceId === inst.instanceId)) {
       tray[inst.instanceId] = { placeable: false, reason: 'placed' };
     } else if (inst.status !== 'in_deck' || (inst.pieceType !== 'king' && (inst.durability ?? 0) < 1)) {
       tray[inst.instanceId] = { placeable: false, reason: 'spent' };
+    } else if (inst.pieceType === 'queen' && placedQueens >= config.deployment.maxQueenSummons) {
+      tray[inst.instanceId] = { placeable: false, reason: 'queen_limit' };
     } else if (inst.pieceType !== 'king' && spawnCostOf(inst.pieceType, inst.rarity ?? 'normal', config) > remaining) {
       tray[inst.instanceId] = { placeable: false, reason: 'too_expensive' };
     } else {
@@ -114,13 +123,17 @@ export function deploymentStatus(
     if (!r.ok) {
       const e = r.error;
       return { ok: false, reason: e.kind === 'invalid_deployment' && e.reason !== 'king_missing' && e.reason !== 'king_in_check'
+        && e.reason !== 'gives_check' && e.reason !== 'queen_limit'
         ? e.reason : 'not_in_deck' };
     }
     const next = [...placed, { instance: r.value, to }];
     if (spawnCostOfPlaced(next, config) > stage.spawnPoints) return { ok: false, reason: 'spawn_points_exceeded' };
-    if (r.value.pieceType === 'king' && inCheck(fromBoard(boardWith(stage, next)), 'white')) {
+    if (queenLimitExceeded(next, config)) return { ok: false, reason: 'queen_limit' };
+    const board = boardWith(stage, next);
+    if (r.value.pieceType === 'king' && inCheck(fromBoard(board), 'white')) {
       return { ok: false, reason: 'king_in_check' };
     }
+    if (startCheckSquare(board, config) !== null) return { ok: false, reason: 'gives_check' };
     return { ok: true };
   };
 
@@ -160,6 +173,18 @@ export function previewSteps(
   }
   const sim = simulate(run, stage, queue, config);
   return sim.ok ? { steps, error: null, result: sim.value } : { steps, error: sim.error, result: null };
+}
+
+/**
+ * The promotion picker's choices for the MOVE from `from` to `to` on `stage`'s board: every
+ * `PromotionType`, queen, rook, bishop, knight, when the move is legal and brings a pawn to rank 8
+ * (the engine refuses it without a choice, `promotion_required`); null for any other move, legal or
+ * not (docs/02 §2.2).
+ */
+export function promotionChoices(
+  stage: StageState, from: Square, to: Square, config: EngineConfig,
+): PromotionType[] | null {
+  return planPlayerMove(stage.board, from, to, config).reason === 'promotion_required' ? [...WHITE_PROMOTIONS] : null;
 }
 
 /** Why a skill cannot be activated at all at a point of the queue (the engine's `skill_unavailable` reasons). */

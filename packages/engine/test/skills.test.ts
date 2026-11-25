@@ -7,7 +7,8 @@ import { startStage } from '../src/deployment';
 import { endStage } from '../src/stage-end';
 import { config, deckFor, deepFreeze, deploymentStageOf, runOf, stageOf } from './helpers';
 
-const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
+const mv = (from: string, to: string, promotion?: 'queen' | 'rook' | 'bishop' | 'knight'): Action =>
+  ({ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) });
 const skill = (skillId: string, target?: string): Action => ({
   type: 'ACTIVATE_SKILL', skillId, ...(target !== undefined && { target }),
 });
@@ -134,8 +135,12 @@ describe('ACTIVATE_SKILL checks (spec 8.1, in order)', () => {
   });
   it('a Lockdown targeting a square emptied earlier in the queue is invalid_target no_target', () => {
     const s = stageOf({ e1: 'K', a7: 'P', b8: 'n', e8: 'k' }, { focus: 3 });
-    expect(refused(runWith('lockdown'), s, [mv('a7', 'b8'), skill('lockdown', 'b8')])).toEqual({
-      kind: 'invalid_target', atStep: 1, skillId: 'lockdown', target: 'b8', reason: 'no_target',
+    expect(refused(runWith('lockdown'), s, [mv('a7', 'a8', 'queen'), skill('lockdown', 'a7')])).toEqual({
+      kind: 'invalid_target', atStep: 1, skillId: 'lockdown', target: 'a7', reason: 'no_target',
+    });
+    // A pawn capturing on rank 8 leaves its promoted Hero Piece there, not an empty square.
+    expect(refused(runWith('lockdown'), s, [mv('a7', 'b8', 'queen'), skill('lockdown', 'b8')])).toEqual({
+      kind: 'invalid_target', atStep: 1, skillId: 'lockdown', target: 'b8', reason: 'wrong_target',
     });
   });
 });

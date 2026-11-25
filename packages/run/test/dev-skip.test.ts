@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pendingBase } from '@checkbreaker/engine';
 import { commit, devSkipStage, expectedSeed, leave, newRun, provideStage, sell, start } from '../src/session';
-import { loadSave, serializeSave } from '../src/save';
+import { SAVE_VERSION, loadSave, serializeSave } from '../src/save';
 import type { RunEvent, RunResult, RunSession } from '../src/types';
 import { ROOK_ID, deepFreeze, mateInOneStage, runConfig as c, runWithRook } from './fixtures';
 
@@ -20,7 +20,7 @@ function deployedAt(n: number): RunSession {
   const fresh = newRun(SEED, c);
   const run = { ...runWithRook(fresh.run), actIndex: Math.floor(n / 3), stageIndex: n % 3 };
   const request = { ...fresh.next!.request, run, actIndex: run.actIndex, stageIndex: run.stageIndex };
-  const s: RunSession = { ...fresh, run, next: { request, stage: null } };
+  const s: RunSession = { ...fresh, run, next: { request, stage: null, clue: null } };
   return ok(provideStage(s, mateInOneStage(expectedSeed(SEED, run.actIndex, run.stageIndex)), c)).session;
 }
 
@@ -81,17 +81,20 @@ describe('devSkipStage', () => {
     expect(events.at(-1)).toEqual({ type: 'run_ended', result: 'won' });
   });
 
-  it('skip that overflows the deck opens the chooser', () => {
+  it('skip with an over-full deck goes to the shop, which refuses to leave until the deck fits', () => {
     const d = deployedAt(0);
     const over = c.deck.capacity + 1 - d.run.deck.filter(p => p.pieceType !== 'king').length;
     const extras = Array.from({ length: over }, (_, i) => ({ ...d.run.deck[1]!, instanceId: `p_extra_${i}` }));
     const s = { ...d, run: { ...d.run, deck: [...d.run.deck, ...extras] } };
     const { session, events } = ok(devSkipStage(s, c));
-    expect(session.phase).toBe('chooser');
-    expect(session.chooser).toEqual({ overCapacity: 1 });
-    expect(events).toContainEqual({ type: 'chooser_opened', overCapacity: 1 });
+    expect(session.phase).toBe('shop');
+    expect(events.map(e => e.type)).not.toContain('chooser_opened');
+    expect(events.at(-1)).toMatchObject({ type: 'shop_opened' });
     expect(session.run.history.at(-1)!.outcome).toBe('win');
-    expect(ok(sell(session, 'p_extra_0', c)).session.phase).toBe('shop');
+    expect(leave(session, c)).toEqual({ ok: false, error: { kind: 'deck_over_capacity', size: c.deck.capacity + 1, capacity: c.deck.capacity } });
+    const sold = ok(sell(session, 'p_extra_0', c)).session;
+    expect(sold.phase).toBe('shop');
+    expect(ok(leave(sold, c)).session.phase).toBe('awaiting_stage');
   });
 
   it('debug survives save and is never cleared', () => {
@@ -112,10 +115,10 @@ describe('devSkipStage', () => {
     const d = deployedAt(0);
     expect('debug' in d).toBe(false);
     for (const bad of [false, 'true', 1, null]) {
-      const r = loadSave(JSON.stringify({ version: 1, session: { ...d, debug: bad } }), c);
+      const r = loadSave(JSON.stringify({ version: SAVE_VERSION, session: { ...d, debug: bad } }), c);
       expect(r).toEqual({ ok: false, error: expect.objectContaining({ kind: 'invalid_session' }) });
     }
-    expect(loadSave(JSON.stringify({ version: 1, session: { ...d, debug: true } }), c).ok).toBe(true);
+    expect(loadSave(JSON.stringify({ version: SAVE_VERSION, session: { ...d, debug: true } }), c).ok).toBe(true);
   });
 
   it('refused outside deployment/action', () => {

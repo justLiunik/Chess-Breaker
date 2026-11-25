@@ -2,6 +2,8 @@ export type Square = string;
 export type PieceType = 'king' | 'pawn' | 'knight' | 'bishop' | 'rook' | 'queen';
 export type Color = 'white' | 'black';
 export type Rarity = 'normal' | 'rare' | 'unique' | 'legendary';
+/** What a White pawn reaching rank 8 may become (docs/02 §2.2). */
+export type PromotionType = 'knight' | 'bishop' | 'rook' | 'queen';
 
 export interface BoardPiece {
   pieceType: PieceType;
@@ -11,7 +13,6 @@ export interface BoardPiece {
   stageId?: string;
   spawned?: true;
   rarity?: Rarity;
-  promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
   transformed?: { pieceType: PieceType; modifierId: string };
 }
 
@@ -109,10 +110,16 @@ export interface RunState {
 }
 
 export type Action =
-  | { type: 'MOVE'; from: Square; to: Square }
+  /** `promotion` is required on a move that brings a White pawn to rank 8, and refused on any other. */
+  | { type: 'MOVE'; from: Square; to: Square; promotion?: PromotionType }
   | { type: 'ACTIVATE_SKILL'; skillId: string; target?: string };
 
-export type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
+export type MoveRejection =
+  | 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square'
+  /** A White pawn reaches rank 8 without a `promotion`. */
+  | 'promotion_required'
+  /** A `promotion` on a move that does not promote. */
+  | 'promotion_not_allowed';
 
 export type CommitError =
   | {
@@ -133,7 +140,7 @@ export type CommitError =
   | {
       kind: 'invalid_deployment';
       to: Square;
-      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate';
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'gives_check' | 'queen_limit' | 'not_in_deck' | 'duplicate';
     }
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   | { kind: 'skill_unavailable'; atStep: number; skillId: string; reason: 'not_in_loadout' | 'not_implemented' | 'once_per_turn' }
@@ -151,7 +158,7 @@ export interface Award {
 export type GameEvent =
   | { type: 'move'; from: Square; to: Square; pieceType: PieceType; color: Color }
   | { type: 'capture'; square: Square; pieceType: PieceType; color: Color; salvage: number; instanceId?: string; stageId?: string }
-  | { type: 'pawn_promoted'; square: Square; promotesTo: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity }; instanceId: string }
+  | { type: 'pawn_promoted'; square: Square; pieceType: PromotionType; rarity: Rarity; instanceId: string }
   | { type: 'enemy_promoted'; square: Square }
   | { type: 'check'; king: Color; square: Square }
   | { type: 'stage_won'; award: Award }
@@ -234,6 +241,8 @@ export interface EngineConfig {
   abilities: AbilityTable;
   skills: Record<string, SkillDef>;
   deck: { capacity: number };
+  /** Deployment limits (docs/02 §5). */
+  deployment: { maxQueenSummons: number };
   pieceValues: Record<PieceType, number>;
   economy: {
     baseReward: { act1: number; act2: number; act3: number; bossMultiplier: number };

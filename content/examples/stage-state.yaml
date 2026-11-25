@@ -6,9 +6,10 @@
 #   - Enemy pieces do not (there is no enemy deck), and are always Normal.
 #   - The e6 pawn is a spawned pawn (Open Field spawns 3-4 pawns on rank 6, under
 #     the enemy's pawn line): free and stage-only, with no instanceId.
-#     It is Rare, and its promotion result was rolled at generation and is shown
-#     to the player: a Rare knight. A Rare pawn would usually promote one tier up,
-#     but Act I caps everything at Rare (docs/02 §2.2).
+#     It is Rare and shown as "Rare pawn, promotes to any piece": on rank 8 the
+#     player chooses a knight, bishop, rook or queen, which keeps the Rare tier,
+#     stays on its rank-8 square and joins the deck. Nothing about the promotion is rolled
+#     (docs/02 §2.2).
 #   - An enemy pawn has already been captured (salvage paid); checkmate is the
 #     only way to clear the stage (docs/02 §7).
 #   - A Lockdown modifier is live against the b7 pawn, expiring at the end of the
@@ -34,9 +35,6 @@ board:
     stageId: s01
     spawned: true
     rarity: rare
-    promotesTo:
-      pieceType: knight
-      rarity: rare
   b7:
     pieceType: pawn
     color: black

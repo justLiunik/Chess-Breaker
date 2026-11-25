@@ -16,7 +16,9 @@
  * - mate2, mate3: the shortest mate is on turn 2, or 3.
  * - bonus: a mate on turn `mateIn` with the bonus move, and none within it without, from this
  *   deployment and from every deployment candidate of the stage.
- * - promotion: the same with a pawn reaching rank 8.
+ * - promotion: the same with a pawn reaching rank 8, and no queue mating on turn 1 from this
+ *   deployment or any candidate (M5.1: a promoted piece stays on the board, so a pawn one step from
+ *   rank 8 can mate at once, and a turn-1 mate proves nothing).
  * The "every candidate" part is beyond the brief's condition: the solver (Task 15) deploys from
  * `deploymentCandidates`, so its line must then use the bonus move, or the promotion.
  *
@@ -24,17 +26,25 @@
  * and 2 and 3 for promotion. The first run (2026-11-11) took about 40 minutes, almost all of it in
  * the mate3 search over the Act III boss; it found mate2, mate3 and bonus by scan and hand-built
  * promotion after 2,000 stages without one.
+ *
+ *   npx tsx packages/gen/test/solver/freeze-fixtures.ts --hand-built
+ *
+ * rebuilds only the hand-built fixtures, checks each against its condition, and writes them over
+ * their entries in the existing file. The scanned fixtures are kept as they are, after the same
+ * check under the current rules. M5.1 Task 4 used it (2026-11-25): promotion now keeps the piece on
+ * the board, which changed only the hand-built position.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadFormations, loadGenConfig, loadTemplates } from '@checkbreaker/content';
 import type { GenConfig } from '@checkbreaker/content';
-import { durabilityMaxOf, hash } from '@checkbreaker/engine';
-import type { Action, BoardPiece, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
+import { durabilityMaxOf, hash, simulate, startStage } from '@checkbreaker/engine';
+import type { Action, BoardPiece, PieceInstance, Rarity, RunState, StageState } from '@checkbreaker/engine';
 import { generateWith } from '../../src/generate';
+import { queueText } from '../../src/solver/beam';
 import { deploymentCandidates } from '../../src/solver/deployment';
 import type { Placement } from '../../src/types';
 import { deckRun } from '../helpers';
-import { bruteMate, bruteSearch } from './brute';
+import { bruteMate, bruteQueues, bruteSearch } from './brute';
 import type { BruteFilter, BruteOpts } from './brute';
 
 type Name = 'mate2' | 'mate3' | 'bonus' | 'promotion';
@@ -114,6 +124,20 @@ function noneWithin(run: RunState, stage: StageState, placements: Placement[], t
   return true;
 }
 
+/** Whether no queue of the full set (`bruteQueues`) mates on turn 1, after `placements` or any deployment candidate of `stage`. */
+function noTurnOneMate(run: RunState, stage: StageState, placements: Placement[]): boolean {
+  for (const c of [placements, ...deploymentCandidates(run, stage, config)]) {
+    const started = startStage(run, stage, c, config);
+    if (!started.ok) throw new Error(`freeze-fixtures: startStage refused ${JSON.stringify(c)}`);
+    const { run: r, stage: s } = started.value;
+    for (const q of bruteQueues(s, FULL, config)) {
+      const sim = simulate(r, s, q, config);
+      if (sim.ok && sim.value.stage.status === 'won') return false;
+    }
+  }
+  return true;
+}
+
 /** The highest rank (1-8) of a White pawn on `stage`, or 0. */
 function topPawnRank(stage: StageState): number {
   let top = 0;
@@ -152,26 +176,32 @@ function meets(name: Name, run: RunState, stage: StageState, placements: Placeme
         return false;
       }
       return noneWithin(run, stage, placements, turn, NO_PROMOTION)
-        && bruteMate(run, stage, placements, turn, FULL, config) === turn;
+        && bruteMate(run, stage, placements, turn, FULL, config) === turn
+        && noTurnOneMate(run, stage, placements);
     }
   }
 }
 
 /**
  * The hand-built promotion mate in 2 (Act II Fortress fields, its board replaced; deck King + rook).
- * Black Ka8 Bb8, pawns b7 b6 f6; White spawned pawns a7 c7; the King on e1, the rook on d1 (the
- * stage's first deployment candidate). The a7 pawn blocks the a-file and can leave it only by
- * capturing on b8, where it vanishes: 1. a7xb8 (pawn_promoted), any reply (Ka7, b5 or f5), 2. Rd1-a1
- * mate (b8 is covered by c7, b7 and b6 hold Black's own pawns, the king's other squares lie on the
- * a-file). Without the promotion the a-file stays shut and the rook has no check: no deployment
- * candidate mates within 2 turns. The f6 pawn only keeps Black from being stalemated.
+ * Black Ka8 Bb8 Rh8, pawns b7 b6 f6; White Rare spawned pawns a7 c7; the King on e1, the rook on d1
+ * (the stage's first deployment candidate). The a7 pawn blocks the a-file and can leave it only by
+ * capturing on b8, where it promotes: 1. a7xb8=Q+ (c7 guards b8, the queen covers a7), Rh8xb8
+ * forced, 2. Rd1-a1 mate (b8 and b7 hold Black's own pieces, the king's other squares lie on the
+ * a-file). A rook promotion works the same way. Without a promotion the a-file stays shut and the
+ * rook has no check: no deployment candidate mates within 2 turns.
+ *
+ * Rebuilt for M5.1 (Task 4). The M5 board had no h8 rook: there the pawn vanished on b8, and
+ * a7xb8 then Ra1 mated. Once the promoted piece stays on the board, a7xb8=Q (and c7xb8=Q) mated on
+ * turn 1, below `minSolveTurns`. The h8 rook answers that check, so no queue mates on turn 1. The f6
+ * pawn is kept from the M5 board, where it kept Black from being stalemated.
  */
 function handBuiltPromotion(): Omit<Fixture, 'deploymentRanks'> {
   const run = smallRun('7F3A-2210', 1, 0, [instance('p_rook_07', 'rook', 'normal')]);
   const { stage: generated } = generateWith({ run, actIndex: 1, stageIndex: 0 }, content, config, neverProves);
   const black = (pieceType: BoardPiece['pieceType'], stageId: string): BoardPiece => ({ pieceType, color: 'black', stageId });
-  const pawn = (stageId: string, promotesTo: BoardPiece['promotesTo']): BoardPiece => ({
-    pieceType: 'pawn', color: 'white', spawned: true, stageId, rarity: 'normal', promotesTo,
+  const pawn = (stageId: string, rarity: Rarity): BoardPiece => ({
+    pieceType: 'pawn', color: 'white', spawned: true, stageId, rarity,
   });
   const board: Record<string, BoardPiece> = {
     b6: black('pawn', 's01'),
@@ -179,8 +209,9 @@ function handBuiltPromotion(): Omit<Fixture, 'deploymentRanks'> {
     b7: black('pawn', 's03'),
     a8: black('king', 's04'),
     b8: black('bishop', 's05'),
-    a7: pawn('s06', { pieceType: 'rook', rarity: 'rare' }),
-    c7: pawn('s07', { pieceType: 'knight', rarity: 'rare' }),
+    h8: black('rook', 's06'),
+    a7: pawn('s07', 'rare'),
+    c7: pawn('s08', 'rare'),
   };
   const { provenance: _, ...rest } = generated;
   const stage: StageState = { ...rest, board, mateIn: 2 };
@@ -213,10 +244,61 @@ function boardText(board: StageState['board']): string {
   return rows.join('/');
 }
 
-const lineText = (line: Action[][]): string =>
-  line.map((q) => q.map((a) => (a.type === 'MOVE' ? `${a.from}${a.to}` : a.skillId)).join(',')).join(' | ');
+const lineText = (line: Action[][]): string => line.map(queueText).join(' | ');
+
+const FILE = new URL('../fixtures/solver-known.json', import.meta.url);
+
+/** One line per fixture: its mating turn, where it came from, the board, the deployment and the oracle's line. */
+function describeFixtures(fixtures: Fixture[], origin: (f: Fixture) => string): void {
+  for (const f of fixtures) {
+    const line = bruteSearch(f.run, f.stage, f.placements, f.mateTurn, FULL, config).mate!.line;
+    const placed = f.placements
+      .map((p) => `${f.run.deck.find((d) => d.instanceId === p.instanceId)!.pieceType}@${p.to}`)
+      .join(' ');
+    console.log(`- ${f.name}: mateTurn ${f.mateTurn}; ${origin(f)}`);
+    console.log(`  board ${boardText(f.stage.board)}; deploy ${placed}; line ${lineText(line)}`);
+  }
+}
+
+/**
+ * `--hand-built`: every HAND_BUILT fixture is rebuilt and must meet its condition; it replaces its
+ * entry in the existing file. Every other entry must still meet its condition (with the scan's
+ * pre-checks off) and is written back unchanged.
+ */
+function refreezeHandBuilt(): void {
+  const t0 = performance.now();
+  const elapsed = () => ((performance.now() - t0) / 1000).toFixed(1);
+  const fixtures = JSON.parse(readFileSync(FILE, 'utf8')) as Fixture[];
+  const rebuilt = new Set<Name>();
+  for (const [i, f] of fixtures.entries()) {
+    const build = HAND_BUILT[f.name];
+    if (build === undefined) {
+      if (!meets(f.name, f.run, f.stage, f.placements, f.mateTurn, false)) {
+        throw new Error(`freeze-fixtures: the kept ${f.name} fixture fails its condition; run the full scan`);
+      }
+      console.log(`[${elapsed()}s] ${f.name}: kept, condition holds`);
+      continue;
+    }
+    const next = build();
+    if (!meets(next.name, next.run, next.stage, next.placements, next.mateTurn, false)) {
+      throw new Error(`freeze-fixtures: the hand-built ${f.name} position fails its condition; nothing written`);
+    }
+    fixtures[i] = { ...next, deploymentRanks: DEPLOYMENT_RANKS };
+    rebuilt.add(f.name);
+    console.log(`[${elapsed()}s] ${f.name}: hand-built position rebuilt and verified`);
+  }
+  writeFileSync(FILE, `${JSON.stringify(fixtures, null, 2)}\n`, 'utf8');
+  console.log(`\nwrote solver-known.json in ${elapsed()}s`);
+  describeFixtures(fixtures, (f) => (rebuilt.has(f.name)
+    ? `hand-built (${f.stage.templateId} fields, stage seed ${f.stage.stageSeed})`
+    : 'kept'));
+}
 
 function main(): void {
+  if (process.argv.includes('--hand-built')) {
+    refreezeHandBuilt();
+    return;
+  }
   const t0 = performance.now();
   const elapsed = () => ((performance.now() - t0) / 1000).toFixed(1);
   const found = new Map<Name, Fixture>();
@@ -277,19 +359,11 @@ function main(): void {
   }
 
   const fixtures = KINDS.map((k) => found.get(k.name)!);
-  const dir = new URL('../fixtures/', import.meta.url);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(new URL('solver-known.json', dir), `${JSON.stringify(fixtures, null, 2)}\n`, 'utf8');
+  mkdirSync(new URL('./', FILE), { recursive: true });
+  writeFileSync(FILE, `${JSON.stringify(fixtures, null, 2)}\n`, 'utf8');
 
   console.log(`\nwrote solver-known.json in ${elapsed()}s; generation failures skipped: ${skipped}`);
-  for (const f of fixtures) {
-    const line = bruteSearch(f.run, f.stage, f.placements, f.mateTurn, FULL, config).mate!.line;
-    const placed = f.placements
-      .map((p) => `${f.run.deck.find((d) => d.instanceId === p.instanceId)!.pieceType}@${p.to}`)
-      .join(' ');
-    console.log(`- ${f.name}: mateTurn ${f.mateTurn}; ${origin.get(f.name)}; scanned ${scanned.get(f.name)}`);
-    console.log(`  board ${boardText(f.stage.board)}; deploy ${placed}; line ${lineText(line)}`);
-  }
+  describeFixtures(fixtures, (f) => `${origin.get(f.name)}; scanned ${scanned.get(f.name)}`);
 }
 
 main();

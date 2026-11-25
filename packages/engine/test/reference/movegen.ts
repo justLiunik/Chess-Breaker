@@ -189,15 +189,22 @@ function targets(b: Int8Array, from: number, t?: Int8Array): RefTarget[] {
   return slides(b, from, [...DIAGONALS, ...ORTHOGONALS], a);
 }
 
-/** Plays a move on copies: a White pawn reaching rank 8 vanishes, a Black pawn reaching rank 1 becomes a queen; tiers move with the piece. */
+/** What a White pawn reaching rank 8 may become (docs/02 §2.2), and its piece code. */
+export type RefPromotion = 'queen' | 'rook' | 'bishop' | 'knight';
+const PROMOTED: Record<RefPromotion, number> = { queen: QUEEN, rook: ROOK, bishop: BISHOP, knight: KNIGHT };
+
+/**
+ * Plays a move on copies: a White pawn reaching rank 8 becomes `promotion`, a Black pawn reaching
+ * rank 1 becomes a queen; tiers move with the piece (a promoted pawn's piece keeps the pawn's tier).
+ */
 function after(
-  b: Int8Array, t: Int8Array | undefined, from: number, m: RefTarget,
+  b: Int8Array, t: Int8Array | undefined, from: number, m: RefTarget, promotion: RefPromotion | null,
 ): { b: Int8Array; t: Int8Array | undefined } {
   const c = b.slice();
   const code = c[from]!;
   c[from] = 0;
   if (m.via >= 0) c[m.via] = 0;
-  if (code === PAWN && rank(m.to) === 7) c[m.to] = 0;
+  if (code === PAWN && rank(m.to) === 7) c[m.to] = PROMOTED[promotion!];
   else if (code === -PAWN && rank(m.to) === 0) c[m.to] = -QUEEN;
   else c[m.to] = code;
   if (t === undefined) return { b: c, t };
@@ -219,19 +226,29 @@ export function refPseudoMoves(b: Int8Array, color: Color, t?: Int8Array): { fro
   return moves;
 }
 
-export function refLegalMoves(b: Int8Array, color: Color, t?: Int8Array): { from: number; to: number; via: number }[] {
+export type RefMove = { from: number; to: number; via: number; promotion: RefPromotion | null };
+
+/**
+ * Legal moves of `color`: one per target, except that a White pawn reaching rank 8 gives one move per
+ * promotion type and a Black pawn reaching rank 1 one queen move.
+ */
+export function refLegalMoves(b: Int8Array, color: Color, t?: Int8Array): RefMove[] {
   const s = sgn(color);
   const enemy: Color = color === 'white' ? 'black' : 'white';
-  const moves: { from: number; to: number; via: number }[] = [];
+  const moves: RefMove[] = [];
   for (let from = 0; from < 64; from++) {
     if (b[from]! * s <= 0) continue;
     for (const m of targets(b, from, t)) {
-      const next = after(b, t, from, m);
-      let safe = true;
-      for (let k = 0; k < 64; k++) {
-        if (next.b[k] === KING * s && refAttacked(next.b, k, enemy, next.t)) safe = false;
+      const pawnToLast = b[from] === PAWN * s && rank(m.to) === (s > 0 ? 7 : 0);
+      const choices: (RefPromotion | null)[] = !pawnToLast ? [null] : s > 0 ? ['queen', 'rook', 'bishop', 'knight'] : ['queen'];
+      for (const promotion of choices) {
+        const next = after(b, t, from, m, promotion);
+        let safe = true;
+        for (let k = 0; k < 64; k++) {
+          if (next.b[k] === KING * s && refAttacked(next.b, k, enemy, next.t)) safe = false;
+        }
+        if (safe) moves.push({ from, to: m.to, via: m.via, promotion });
       }
-      if (safe) moves.push({ from, to: m.to, via: m.via });
     }
   }
   return moves;

@@ -7,14 +7,16 @@ import { isAttacked } from '../src/movegen';
 import { config, randomBoard, runOf, stageOf } from './helpers';
 import { legalPlayerMoves, planPlayerMove } from '../src/legality';
 import { resolveQueue } from '../src/queue';
+import { promotionChoices } from '../src/view';
 import { TIERS } from '../src/position';
 import { toIndex, toSquare } from '../src/square';
 import type { Action } from '../src/types';
 import { refAttacked, refLegalMoves, refPseudoMoves } from './reference/movegen';
 import { refEvaluate } from './reference/evaluate';
 
-const sortMoves = (ms: { from: number; to: number }[]) =>
-  ms.map(({ from, to }) => ({ from, to })).sort((a, b) => a.from - b.from || a.to - b.to);
+const sortMoves = (ms: { from: number; to: number; promotion: string | null }[]) =>
+  ms.map(({ from, to, promotion }) => ({ from, to, promotion }))
+    .sort((a, b) => a.from - b.from || a.to - b.to || String(a.promotion).localeCompare(String(b.promotion)));
 
 const COLORS = ['white', 'black'] as const;
 const CHECK_BOARDS = 1000;
@@ -239,12 +241,13 @@ describe('Black against White abilities, against the reference', () => {
   }, 120_000);
 
   it("the search's White replies equal refLegalMoves with tiers, multi-captures included", () => {
-    const key = (m: { from: number; to: number; via: number }) => `${m.from}-${m.to}-${m.via}`;
+    const key = (m: { from: number; to: number; via: number; promotion: string | null }) =>
+      `${m.from}-${m.to}-${m.via}${m.promotion === null ? '' : `=${m.promotion}`}`;
     let multi = 0;
     for (const { b, t } of blackCases(2000, 0)) {
       const fast = legalMoves(b, 'white', undefined, { t, table: config.abilities }).map(key).sort();
       expect(fast).toEqual(refLegalMoves(b, 'white', t).map(key).sort());
-      if (fast.some((k) => !k.endsWith('--1'))) multi++;
+      if (fast.some((k) => !/--1(=|$)/.test(k))) multi++;
     }
     expect(multi).toBeGreaterThanOrEqual(10);
   }, 120_000);
@@ -283,14 +286,18 @@ describe('White legal moves with tiers against the reference', () => {
     return { ...base, board };
   }
 
-  /** The fast side: `legalPlayerMoves` candidates, each judged by the queue as a one-move turn. */
+  /**
+   * The fast side: `legalPlayerMoves` candidates, each judged by the queue as a one-move turn (a
+   * promotion as a queen: what the pawn becomes never changes White's own king safety).
+   */
   function fastLegal(b: Int8Array, t: Int8Array): string[] {
     const stage = stageFrom(b, t);
     const out: string[] = [];
     for (let from = 0; from < 64; from++) {
       if (b[from]! <= 0) continue;
       for (const to of legalPlayerMoves(stage, toSquare(from), config)) {
-        const move: Action = { type: 'MOVE', from: toSquare(from), to };
+        const promotes = promotionChoices(stage, toSquare(from), to, config) !== null;
+        const move: Action = { type: 'MOVE', from: toSquare(from), to, ...(promotes && { promotion: 'queen' as const }) };
         if (resolveQueue(runOf(), stage, [move], config).ok) out.push(`${from}-${toIndex(to)}`);
       }
     }

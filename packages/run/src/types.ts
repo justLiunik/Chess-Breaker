@@ -1,6 +1,8 @@
-import type { CommitError, DeckType, EndReason, GameEvent, Rarity, Result, RunState, StageState } from '@checkbreaker/engine';
+import type {
+  CommitError, DeckType, EndReason, GameEvent, PieceInstance, Rarity, Result, RunState, Square, StageState,
+} from '@checkbreaker/engine';
 
-export type RunPhase = 'awaiting_stage' | 'deployment' | 'action' | 'chooser' | 'shop' | 'ended';
+export type RunPhase = 'awaiting_stage' | 'deployment' | 'action' | 'shop' | 'ended';
 
 export type GenRequest = { run: RunState; actIndex: number; stageIndex: number; previousTemplateId?: string };
 
@@ -18,6 +20,11 @@ export interface ShopState {
   slots: (Offer & { sold: boolean })[];
 }
 
+/** One placement of the solver's proven deployment, as the generation worker reports it (the King included). */
+export type CluePlacement = { instanceId: string; to: Square };
+/** A clue placement with the piece's type and rarity copied from the deck at the time, so a UI needs no lookup; `rarity` is absent for the King. */
+export type ClueSquare = CluePlacement & { pieceType: PieceInstance['pieceType']; rarity?: Rarity };
+
 export interface StageTally { startCoins: number; salvage: number; piecesLost: number }
 
 export interface RunSession {
@@ -28,9 +35,10 @@ export interface RunSession {
   /** The stage as provided, kept in deployment and action so `restartStage` can go back to it; null elsewhere. */
   entryStage: StageState | null;
   tally: StageTally | null;
-  chooser: { overCapacity: number } | null;
   shop: ShopState | null;
-  next: { request: GenRequest; stage: StageState | null } | null;
+  /** The solver's proven deployment for the current stage (M5.1 placement clue); null for an unproven stage and outside deployment/action. */
+  clue: ClueSquare[] | null;
+  next: { request: GenRequest; stage: StageState | null; clue: ClueSquare[] | null } | null;
   outcome: { result: 'won' | 'lost'; endReason?: EndReason | 'abandoned' } | null;
   /** Set by `devSkipStage` and never cleared: the run used a development tool. Absent otherwise. */
   debug?: true;
@@ -40,6 +48,8 @@ export type RunError =
   | { kind: 'wrong_phase'; expected: RunPhase[] }
   | { kind: 'insufficient_coins'; price: number; coins: number }
   | { kind: 'deck_full' }
+  /** `leave` while a promotion has the non-king deck above `deck.capacity`: sell, merge or cut first (docs/07 section 1). */
+  | { kind: 'deck_over_capacity'; size: number; capacity: number }
   | { kind: 'loadout_full' }
   | { kind: 'replace_not_needed' }
   | { kind: 'restart_unavailable' }
@@ -62,7 +72,6 @@ export type RunEvent =
   | { type: 'stage_restarted' }
   | { type: 'stage_skipped'; coins: number }
   | { type: 'skill_granted'; skillId: string }
-  | { type: 'chooser_opened'; overCapacity: number }
   | { type: 'shop_opened'; act: number; recovery: boolean }
   | { type: 'item_bought'; slot: number; offer: Offer; instanceId?: string }
   | { type: 'piece_repaired'; instanceId: string; durability: number }

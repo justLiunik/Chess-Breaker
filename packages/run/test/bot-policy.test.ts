@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { TIERS, commitQueue, simulate, spawnCostOf, startStage } from '@checkbreaker/engine';
-import type { Action, PieceInstance, RunState, StageState } from '@checkbreaker/engine';
-import {
-  applyChooserMove, applyShopMove, chooseChooserAction, chooseShopAction, fallbackPlacements, fallbackQueue,
-} from '../src/bot-policy';
-import { commit, expectedSeed, newRun, provideStage, requestFor, start } from '../src/session';
+import type { Action, PieceInstance, PromotionType, RunState, StageState } from '@checkbreaker/engine';
+import { applyShopMove, chooseShopAction, fallbackPlacements, fallbackQueue } from '../src/bot-policy';
+import { commit, expectedSeed, leave, newRun, provideStage, requestFor, start } from '../src/session';
 import { sellPrice } from '../src/prices';
 import type { Offer, RunResult, RunSession, ShopState } from '../src/types';
 import {
@@ -41,17 +39,8 @@ function shopSession(
     act: 1, stageNumber: 1, roll: 0, rerollsUsed: 0, recovery: false, slots: offers.map(o => ({ ...o, sold: false })), ...over.shop,
   };
   return {
-    version: 1, run, phase: 'shop', stage: null, entryStage: null, tally: null, chooser: null, shop,
-    next: { request: requestFor(run, 2, c), stage: null }, outcome: null,
-  };
-}
-
-/** The chooser after stage 1 (Act I) with `deck` (the King added). */
-function chooserSession(deck: PieceInstance[]): RunSession {
-  const run: RunState = { ...starterRun(SEED), stageIndex: 1, deck: [KING, ...deck] };
-  return {
-    version: 1, run, phase: 'chooser', stage: null, entryStage: null, tally: null, chooser: { overCapacity: deck.length - c.deck.capacity },
-    shop: null, next: null, outcome: null,
+    version: 1, run, phase: 'shop', stage: null, entryStage: null, clue: null, tally: null, shop,
+    next: { request: requestFor(run, 2, c), stage: null, clue: null }, outcome: null,
   };
 }
 
@@ -73,7 +62,8 @@ const rookRun = (extra: PieceInstance[] = []): RunSession => {
   const s = newRun(SEED, c);
   return { ...s, run: { ...runWithRook(s.run), deck: [...runWithRook(s.run).deck, ...extra] } };
 };
-const mv = (from: string, to: string): Action[] => [{ type: 'MOVE', from, to }];
+const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
+  [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 
 describe('chooseShopAction', () => {
   it('merges a valid triple before buying', () => {
@@ -160,50 +150,87 @@ describe('chooseShopAction', () => {
   });
 });
 
-describe('chooseChooserAction', () => {
+describe('chooseShopAction with a deck over capacity (the deck gate)', () => {
   // Act I, no triple of the same type and rarity: 2 of each type at Normal plus a Rare knight (9 pieces).
   const mixed = (): PieceInstance[] => [
     piece('p_n1', 'knight'), piece('p_n2', 'knight'), piece('p_b1', 'bishop'), piece('p_b2', 'bishop'),
     piece('p_r1', 'rook'), piece('p_r2', 'rook'), piece('p_q1', 'queen'), piece('p_q2', 'queen'),
     piece('p_x1', 'knight', { rarity: 'rare', origin: 'shop', pricePaid: 1 }),
   ];
+  const OFFERS = [pieceOffer('knight', 8), pieceOffer('bishop', 8), skillOffer(3), pieceOffer('rook', 10)];
 
   it('merges when a triple exists', () => {
-    const deck = [...fill(8), piece('p_z', 'knight')];
-    const s = chooserSession(deck);
-    const m = chooseChooserAction(s, NONE, c);
+    const s = shopSession([...fill(8), piece('p_z', 'knight')], 0, OFFERS);
+    const m = chooseShopAction(s, NONE, c);
     expect(m.kind).toBe('merge');
-    const after = ok(applyChooserMove(s, m, c));
+    const after = ok(applyShopMove(s, m, c));
     expect(after.phase).toBe('shop');
+    expect(after.run.deck.filter(p => p.pieceType !== 'king').length).toBeLessThanOrEqual(c.deck.capacity);
   });
 
   it('sells the lowest-priced sellable piece, never a protected one while another is left', () => {
-    const s = chooserSession(mixed());
+    const s = shopSession(mixed(), 100, OFFERS);
     expect(sellPrice(mixed()[8]!, 1, c)).toBe(1);
-    expect(chooseChooserAction(s, NONE, c)).toEqual({ kind: 'sell', id: 'p_x1' });
+    expect(chooseShopAction(s, NONE, c)).toEqual({ kind: 'sell', id: 'p_x1' });
     // next lowest: the Normal knights and bishops; ties by instanceId
     const prices = mixed().slice(0, 8).map(p => sellPrice(p, 1, c));
     const min = Math.min(...prices);
     const expected = mixed().slice(0, 8).filter(p => sellPrice(p, 1, c) === min).map(p => p.instanceId).sort()[0];
-    expect(chooseChooserAction(s, new Set(['p_x1']), c)).toEqual({ kind: 'sell', id: expected });
+    expect(chooseShopAction(s, new Set(['p_x1']), c)).toEqual({ kind: 'sell', id: expected });
   });
 
   it('falls back to a protected piece only when nothing else can go', () => {
-    const s = chooserSession(mixed());
+    const s = shopSession(mixed(), 0, []);
     const all = new Set(mixed().map(p => p.instanceId));
-    expect(chooseChooserAction(s, all, c)).toEqual({ kind: 'sell', id: 'p_x1' });
+    expect(chooseShopAction(s, all, c)).toEqual({ kind: 'sell', id: 'p_x1' });
   });
 
-  it('clears a real overflow (promotion at a full deck) with accepted moves', () => {
+  it('sells before it repairs, buys, rerolls or leaves', () => {
+    const hurt = mixed().map(p => (p.instanceId === 'p_r1' ? { ...p, durability: 1 } : p));
+    expect(chooseShopAction(shopSession(hurt, 100, OFFERS), NONE, c)).toEqual({ kind: 'sell', id: 'p_x1' });
+    expect(chooseShopAction(shopSession(mixed(), 0, OFFERS), NONE, c)).toEqual({ kind: 'sell', id: 'p_x1' });
+  });
+
+  it('a promoted piece sells first: it pays 0', () => {
+    // Rare, like the pawn it came from: no triple with the two Normal queens
+    const promoted = piece('p_promo', 'queen', { rarity: 'rare', origin: 'promotion', pricePaid: 0 });
+    const s = shopSession([...mixed().slice(0, 8), promoted], 100, OFFERS);
+    expect(sellPrice(promoted, 1, c)).toBe(0);
+    expect(chooseShopAction(s, NONE, c)).toEqual({ kind: 'sell', id: 'p_promo' });
+  });
+
+  it('clears a real overflow (promotion at a full deck) with accepted moves, then leaves', () => {
     const extra = [piece('p_fill_01', 'knight'), piece('p_fill_02', 'bishop'), piece('p_fill_03', 'bishop')];
     const t0 = deployed(rookRun(extra), doublePromotionStage);
-    const t1 = ok(commit(t0, mv('b7', 'b8'), c));
-    const t2 = ok(commit(t1, mv('c7', 'c8'), c));
+    const t1 = ok(commit(t0, mv('b7', 'b8', 'knight'), c));
+    const t2 = ok(commit(t1, mv('c7', 'c8', 'knight'), c));
     let s = ok(commit(t2, mv('e1', 'e8'), c));
-    expect(s.phase).toBe('chooser');
-    for (let i = 0; i < 10 && s.phase === 'chooser'; i++) s = ok(applyChooserMove(s, chooseChooserAction(s, NONE, c), c));
     expect(s.phase).toBe('shop');
+    expect(s.run.deck.filter(p => p.pieceType !== 'king')).toHaveLength(c.deck.capacity + 2);
+    expect(leave(s, c).ok).toBe(false);
+    const moves: string[] = [];
+    for (let i = 0; i < 50 && s.phase === 'shop'; i++) {
+      const m = chooseShopAction(s, NONE, c);
+      moves.push(m.kind);
+      s = ok(applyShopMove(s, m, c));
+    }
+    expect(s.phase).toBe('awaiting_stage');
+    expect(moves.at(-1)).toBe('leave');
     expect(s.run.deck.filter(p => p.pieceType !== 'king').length).toBeLessThanOrEqual(c.deck.capacity);
+  });
+
+  it('with no triple to merge, sells down to the capacity and then leaves, every move accepted', () => {
+    let s = shopSession(mixed(), 0, OFFERS);
+    const moves: string[] = [];
+    for (let i = 0; i < 50 && s.phase === 'shop'; i++) {
+      const m = chooseShopAction(s, NONE, c);
+      moves.push(m.kind);
+      s = ok(applyShopMove(s, m, c));
+    }
+    expect(moves[0]).toBe('sell');
+    expect(moves.at(-1)).toBe('leave');
+    expect(s.phase).toBe('awaiting_stage');
+    expect(s.run.deck.filter(p => p.pieceType !== 'king')).toHaveLength(c.deck.capacity);
   });
 });
 
@@ -221,6 +248,17 @@ describe('fallbackQueue', () => {
     expect(q).toEqual(mv('c1', 'd1'));
     expect(simulate(st.run, st.stage, mv('c1', 'b1'), c).ok).toBe(false);
     expect(commitQueue(st.run, st.stage, q, c).ok).toBe(true);
+  });
+
+  it('promotes a pawn reaching rank 8 to a queen', () => {
+    // King e1 alone: b7-b8=Q mates the h8 king behind its g7/h7 pawns
+    const run = starterRun(SEED);
+    const st = engineOk(startStage(run, promotionOverflowStage('AAAA-0001'), [{ instanceId: 'p_king_01', to: 'e1' }], c));
+    const q = fallbackQueue(st.run, st.stage, c);
+    expect(q).toEqual(mv('b7', 'b8', 'queen'));
+    const r = engineOk(commitQueue(st.run, st.stage, q, c));
+    expect(r.stage.status).toBe('won');
+    expect(r.events).toContainEqual(expect.objectContaining({ type: 'pawn_promoted', square: 'b8', pieceType: 'queen' }));
   });
 
   it('returns an empty queue when no single MOVE is accepted', () => {
@@ -270,6 +308,26 @@ describe('fallbackPlacements', () => {
     const placements = fallbackPlacements(starterRun(SEED), stage, c);
     expect(placements[0]).toEqual({ instanceId: 'p_king_01', to: 'd1' });
     expect(startStage(starterRun(SEED), stage, placements, c).ok).toBe(true);
+  });
+
+  it('summons at most one queen (maxQueenSummons), whatever the budget', () => {
+    const run = { ...starterRun(SEED), deck: [KING, piece('p_q1', 'queen'), piece('p_q2', 'queen', { rarity: 'unique' })] };
+    const stage = { ...mateInOneStage('AAAA-0001'), spawnPoints: 60 };
+    const placements = fallbackPlacements(run, stage, c);
+    expect(placements.filter(p => p.instanceId !== 'p_king_01')).toHaveLength(c.deployment.maxQueenSummons);
+    expect(startStage(run, stage, placements, c).ok).toBe(true);
+  });
+
+  it('never summons a piece onto a square where it gives check at START', () => {
+    // Black king h5 alone: a bishop on d1 sees it along d1-h5; the knight takes d1 instead
+    const base = mateInOneStage('AAAA-0001');
+    const stage = { ...base, board: { h5: { pieceType: 'king' as const, color: 'black' as const, stageId: 's01' } } };
+    const run = { ...starterRun(SEED), deck: [KING, piece('p_b1', 'bishop'), piece('p_n1', 'knight')] };
+    const naive = [{ instanceId: 'p_king_01', to: 'e1' }, { instanceId: 'p_b1', to: 'd1' }];
+    expect(startStage(run, stage, naive, c)).toMatchObject({ ok: false, error: { kind: 'invalid_deployment', reason: 'gives_check' } });
+    const placements = fallbackPlacements(run, stage, c);
+    expect(placements).toEqual([{ instanceId: 'p_king_01', to: 'e1' }, { instanceId: 'p_n1', to: 'd1' }]);
+    expect(startStage(run, stage, placements, c).ok).toBe(true);
   });
 
   it('leaves out spent and durability-0 pieces', () => {

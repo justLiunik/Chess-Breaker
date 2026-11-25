@@ -13,7 +13,7 @@ import * as zobrist from './zobrist';
 // of an imported binding into a getter call, which made the search's hot loops ~1.8x slower under
 // test than under plain Node.
 const {
-  attackedAfterMove, attackedBy, makeMove, makeMoveTiered, promotionOf, targetsInto, unmakeMove,
+  attackedAfterMove, attackedBy, makeMove, makeMoveTiered, promotionOf, pushMoves, targetsInto, unmakeMove,
   unmakeMoveTiered,
 } = movegen;
 const { analyse, inCheck, legalMoves, legalMovesInPlace, safeMove, safeMoveVia } = legality;
@@ -80,7 +80,15 @@ const QVIA = new Int8Array(80);
 const sameMove = (a: Move, m: Move): boolean =>
   a.from === m.from && a.to === m.to && a.promotion === m.promotion && a.via === m.via;
 
-/** Plays `m` on the context's board, and on its tiers when it has them; returns what unmake needs. */
+/**
+ * Plays `m` on the context's board, and on its tiers when it has them; returns what unmake needs.
+ *
+ * Ruling R7 (M5.1): a White promotion here keeps the pawn's tier, and spawned pawns carry tier 0
+ * (`tiersOf`), so the lookahead searches a hypothetical promoted piece as a Normal-tier piece even
+ * when the pawn is Rare or better. Real moves (`resolveStep`), legality, the preview and the solver
+ * give it the pawn's rarity exactly. Giving spawned pawns their tier would make `hasTiers` true on
+ * almost every stage and trip the rarity depth cap (`maxDepthWithRarity`, policy.ts).
+ */
 function make(ctx: Ctx, m: Move): number {
   const t = ctx.t;
   if (t === null) {
@@ -105,11 +113,16 @@ function ranks(values: number[]): Int32Array {
   return Int32Array.from(values, (v) => distinct.indexOf(v));
 }
 
+/** Promotion order in a sort key (bits 0-1): queen first, then rook, bishop, knight (none: 0). */
+const PROMOTION_RANK = (m: Move): number =>
+  m.promotion === null ? 0 : m.promotion === 'queen' ? 3 : m.promotion === 'rook' ? 2 : m.promotion === 'bishop' ? 1 : 0;
+
 /**
  * Writes each move's sort key into `keys`; a higher key sorts first. The key packs, from the most
  * significant field down: `first` (the TT move), capture, victim rank (higher first), attacker rank
- * (lower first), check, from-index (lower first), to-index (lower first) - the order of orderMoves.
- * From and to identify a move, so no two keys are equal.
+ * (lower first), check, from-index (lower first), to-index (lower first), promotion (queen, rook,
+ * bishop, knight) - the order of orderMoves. From, to and the promotion identify a move, so no two
+ * keys are equal.
  */
 function keyMoves(
   ctx: Ctx, moves: Move[], blackToMove: boolean, first: Move | null, keys: Int32Array,
@@ -124,7 +137,7 @@ function keyMoves(
   const t = blackToMove ? null : ctx.t;
   for (let i = 0; i < moves.length; i++) {
     const m = moves[i]!;
-    let key = ((63 - m.from) << 6) | (63 - m.to);
+    let key = ((63 - m.from) << 8) | ((63 - m.to) << 2) | PROMOTION_RANK(m);
     if (first !== null && sameMove(first, m)) key |= 1 << 22;
     if (m.captured !== 0) {
       const a = ctx.attackerRank[Math.abs(b[m.from]!)]!;
@@ -252,10 +265,7 @@ function quiesce(
         const via = QVIA[i]!;
         const captured = b[to]!;
         if (captured === 0 || !safeMoveVia(b, sf, side, from, to, via)) continue;
-        captures.push({
-          from, to, captured, promotion: code === PAWN ? promotionOf(side, to) : null,
-          via, viaCaptured: via >= 0 ? b[via]! : 0,
-        });
+        pushMoves(captures, side, from, to, captured, code === PAWN && promotionOf(side, to), via, via >= 0 ? b[via]! : 0);
       }
       continue;
     }
@@ -264,10 +274,7 @@ function quiesce(
       const to = QBUF[i]!;
       const captured = b[to]!;
       if (captured === 0 || !safeMove(b, sf, side, from, to)) continue;
-      captures.push({
-        from, to, captured, promotion: code === PAWN * side ? promotionOf(side, to) : null,
-        via: -1, viaCaptured: 0,
-      });
+      pushMoves(captures, side, from, to, captured, code === PAWN * side && promotionOf(side, to), -1, 0);
     }
   }
   if (captures.length === 0) return stand;

@@ -1,14 +1,16 @@
 import { commitQueue, durabilityMaxOf, endStage, hash, pendingBase, startStage } from '@checkbreaker/engine';
 import type { Action, PieceInstance, Result, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { GenRequest, Offer, RunError, RunEvent, RunPhase, RunResult, RunSession, StageTally } from './types';
+import type {
+  ClueSquare, CluePlacement, GenRequest, Offer, RunError, RunEvent, RunPhase, RunResult, RunSession, StageTally,
+} from './types';
 import { cutPiece, mergePieces, repairPiece, sellPiece } from './deck';
 import { buyOffer, openShop, rerollShop } from './shop';
 
 type History = RunState['history'][number];
 
 const DECK_TYPES = ['knight', 'bishop', 'rook', 'queen'] as const;
-const NON_ENDED: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop'];
+const NON_ENDED: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'shop'];
 
 const done = (session: RunSession, events: RunEvent[]): RunResult => ({ ok: true, value: { session, events } });
 const fail = (error: RunError): RunResult => ({ ok: false, error });
@@ -17,7 +19,6 @@ const wrongPhase = (expected: RunPhase[]): RunResult => fail({ kind: 'wrong_phas
 const nonKingCount = (run: RunState): number => run.deck.filter(p => p.pieceType !== 'king').length;
 /** 0-8: `actIndex x stagesPerAct + stageIndex` of the stage being played or just cleared. */
 const stageNumberOf = (run: RunState, c: RunConfig): number => run.actIndex * c.run.stagesPerAct + run.stageIndex;
-const actOf = (stageNumber: number, c: RunConfig): 1 | 2 | 3 => (Math.floor(stageNumber / c.run.stagesPerAct) + 1) as 1 | 2 | 3;
 
 /**
  * The stage seed gen's G0 derives for (run seed, act, stage): the 32-bit hash as `XXXX-XXXX`,
@@ -64,8 +65,8 @@ export function newRun(seed: string, c: RunConfig): RunSession {
     deck, loadout: [], history: [], rngCursor: 0, status: 'in_progress',
   };
   return {
-    version: 1, run, phase: 'awaiting_stage', stage: null, entryStage: null, tally: null, chooser: null, shop: null,
-    next: { request: requestFor(run, 0, c), stage: null }, outcome: null,
+    version: 1, run, phase: 'awaiting_stage', stage: null, entryStage: null, clue: null, tally: null, shop: null,
+    next: { request: requestFor(run, 0, c), stage: null, clue: null }, outcome: null,
   };
 }
 
@@ -75,7 +76,9 @@ export function newRun(seed: string, c: RunConfig): RunSession {
  * when due and a loadout slot is free. A session loaded in Deployment never passes here again, so the grant
  * cannot repeat (Review Focus 1).
  */
-function enterDeployment(s: RunSession, request: GenRequest, stage: StageState, c: RunConfig): RunResult {
+function enterDeployment(
+  s: RunSession, request: GenRequest, stage: StageState, clue: ClueSquare[] | null, c: RunConfig,
+): RunResult {
   const stageNumber = request.actIndex * c.run.stagesPerAct + request.stageIndex;
   let run: RunState = { ...s.run, actIndex: request.actIndex, stageIndex: request.stageIndex };
   const events: RunEvent[] = [{ type: 'stage_entered', stageNumber }];
@@ -85,23 +88,38 @@ function enterDeployment(s: RunSession, request: GenRequest, stage: StageState, 
     events.push({ type: 'skill_granted', skillId: free.skillId });
   }
   const tally: StageTally = { startCoins: run.coins, salvage: 0, piecesLost: 0 };
-  return done({ ...s, run, phase: 'deployment', stage, entryStage: stage, tally, chooser: null, shop: null, next: null }, events);
+  return done({ ...s, run, phase: 'deployment', stage, entryStage: stage, clue, tally, shop: null, next: null }, events);
+}
+
+/** Copies each entry's piece type and rarity from the snapshot's deck; null when there is no clue or an instance is missing. */
+function resolveClue(clue: CluePlacement[] | null, run: RunState): ClueSquare[] | null {
+  if (!clue) return null;
+  const out: ClueSquare[] = [];
+  for (const { instanceId, to } of clue) {
+    const piece = run.deck.find(p => p.instanceId === instanceId);
+    if (!piece) return null;
+    out.push({ instanceId, to, pieceType: piece.pieceType, ...(piece.rarity != null && { rarity: piece.rarity }) });
+  }
+  return out;
 }
 
 /**
  * Hands the session the stage its request asked for. Refused unless the stage's seed is the request's
  * (`stage_mismatch`) and no stage was provided yet (`stage_already_provided`). In awaiting_stage the stage's
- * Deployment begins; in the shop it is kept in `next.stage` and the phase does not change.
+ * Deployment begins; in the shop it is kept in `next.stage` and the phase does not change. The worker's
+ * `clue` is resolved against the request's deck snapshot (type and rarity copied); an entry naming an
+ * instance that is not in it makes the whole clue null.
  */
-export function provideStage(s: RunSession, stage: StageState, c: RunConfig): RunResult {
+export function provideStage(s: RunSession, stage: StageState, c: RunConfig, clue: CluePlacement[] | null = null): RunResult {
   if (s.phase !== 'awaiting_stage' && s.phase !== 'shop') return wrongPhase(['awaiting_stage', 'shop']);
   const next = s.next;
   if (!next) return fail({ kind: 'not_ready' });
   if (next.stage !== null) return fail({ kind: 'stage_already_provided' });
   const expected = expectedSeed(s.run.seed, next.request.actIndex, next.request.stageIndex);
   if (stage.stageSeed !== expected) return fail({ kind: 'stage_mismatch', expected, got: stage.stageSeed });
-  if (s.phase === 'awaiting_stage') return enterDeployment(s, next.request, stage, c);
-  return done({ ...s, next: { ...next, stage } }, []);
+  const resolved = resolveClue(clue, next.request.run);
+  if (s.phase === 'awaiting_stage') return enterDeployment(s, next.request, stage, resolved, c);
+  return done({ ...s, next: { ...next, stage, clue: resolved } }, []);
 }
 
 /** Deployment: `startStage` with the placements; engine refusals come back as `{ kind: 'engine' }`. */
@@ -127,9 +145,10 @@ export function restartStage(s: RunSession, c: RunConfig): RunResult {
 }
 
 /**
- * Action: `commitQueue` with the queue. Salvage and lost Hero Pieces are folded into the tally. A turn that
- * ends the stage writes its history record: a loss ends the run; a win runs `endStage`, then opens the
- * chooser if the deck overflows, else goes on (spec section 8.2).
+ * Action: `commitQueue` with the queue. Salvage and lost Hero Pieces (a promoted piece the enemy takes
+ * included: it carries its instanceId) are folded into the tally. A turn that ends the stage writes its
+ * history record: a loss ends the run; a win runs `endStage`, then goes on to the shop or the run end,
+ * whatever the deck size (spec section 8.2; M5.1 spec section 4.2).
  */
 export function commit(s: RunSession, queue: Action[], c: RunConfig): RunResult {
   if (s.phase !== 'action') return wrongPhase(['action']);
@@ -167,7 +186,8 @@ export function commit(s: RunSession, queue: Action[], c: RunConfig): RunResult 
 /**
  * The shared post-win path (a mate in `commit`, or `devSkipStage`): `endStage` returns deployed pieces and
  * removes spent ones, the history record is written (`coinsEarned` = `awardCoins` + salvage; the wallet
- * already holds the award), then the chooser opens if the deck overflows, else `proceed`.
+ * already holds the award), then `proceed`. A deck a promotion overflowed is trimmed in the shop: `leave`
+ * refuses the next stage until it fits.
  */
 function finishWin(
   s: RunSession, run: RunState, stage: StageState, awardCoins: number, tally: StageTally, events: RunEvent[], c: RunConfig,
@@ -181,12 +201,7 @@ function finishWin(
   };
   const next: RunState = { ...ended.value.run, history: [...ended.value.run.history, win] };
   const all = [...events, ...ended.value.events];
-  const cleared: RunSession = { ...s, run: next, stage: null, entryStage: null, tally: null };
-  const over = ended.value.overCapacity;
-  if (over > 0) {
-    return done({ ...cleared, phase: 'chooser', chooser: { overCapacity: over } }, [...all, { type: 'chooser_opened', overCapacity: over }]);
-  }
-  return proceed(cleared, all, c);
+  return proceed({ ...s, run: next, stage: null, entryStage: null, clue: null, tally: null }, all, c);
 }
 
 /**
@@ -203,15 +218,18 @@ export function devSkipStage(s: RunSession, c: RunConfig): RunResult {
   return finishWin({ ...s, debug: true }, run, { ...s.stage, status: 'won' }, coins, tally, [{ type: 'stage_skipped', coins }], c);
 }
 
-/** After a won stage whose deck fits: stage 9 ends the run won, any other opens the shop and requests the next stage. */
+/**
+ * After a won stage, whatever the deck size: stage 9 ends the run won (the size no longer matters), any other
+ * opens the shop and requests the next stage.
+ */
 function proceed(s: RunSession, events: RunEvent[], c: RunConfig): RunResult {
   const stageNumber = stageNumberOf(s.run, c);
   if (stageNumber >= c.run.acts * c.run.stagesPerAct - 1) return endRun(s, s.run, events, 'won');
   const piecesLost = s.run.history.at(-1)?.piecesLost ?? 0;
   const shop = openShop(s.run, stageNumber, piecesLost, c);
-  const next = { request: requestFor(s.run, stageNumber + 1, c), stage: null };
+  const next = { request: requestFor(s.run, stageNumber + 1, c), stage: null, clue: null };
   return done(
-    { ...s, phase: 'shop', chooser: null, shop, next },
+    { ...s, phase: 'shop', shop, next },
     [...events, { type: 'shop_opened', act: shop.act, recovery: shop.recovery }],
   );
 }
@@ -221,49 +239,49 @@ function endRun(
 ): RunResult {
   const outcome = { result, ...(endReason !== undefined && { endReason }) };
   return done(
-    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, entryStage: null, tally: null, chooser: null, shop: null, next: null, outcome },
+    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, entryStage: null, clue: null, tally: null, shop: null, next: null, outcome },
     [...events, { type: 'run_ended', ...outcome }],
   );
 }
 
 /**
- * A merge, sale or cut in the chooser or the shop, at the act of the stage just cleared. In the chooser the
- * phase moves on by itself as soon as the non-king deck fits (Review Focus 4).
+ * A merge, sale or cut, in the shop only, at the act of the stage just cleared. The phase never changes: a deck
+ * brought back to `deck.capacity` lets `leave` go on (Review Focus 4).
  */
 function deckAction(
-  s: RunSession, c: RunConfig,
+  s: RunSession,
   apply: (run: RunState, act: 1 | 2 | 3, stageNumber: number) => Result<{ run: RunState; event: RunEvent }, RunError>,
 ): RunResult {
-  if (s.phase !== 'chooser' && s.phase !== 'shop') return wrongPhase(['chooser', 'shop']);
-  const stageNumber = s.shop?.stageNumber ?? stageNumberOf(s.run, c);
-  const r = apply(s.run, s.shop?.act ?? actOf(stageNumber, c), stageNumber);
+  if (s.phase !== 'shop') return wrongPhase(['shop']);
+  if (!s.shop) return fail({ kind: 'not_ready' });
+  const r = apply(s.run, s.shop.act, s.shop.stageNumber);
   if (!r.ok) return fail(r.error);
-  const { run, event } = r.value;
-  if (s.phase === 'shop') return done({ ...s, run }, [event]);
-  const over = nonKingCount(run) - c.deck.capacity;
-  if (over > 0) return done({ ...s, run, chooser: { overCapacity: over } }, [event]);
-  return proceed({ ...s, run, chooser: null }, [event], c);
+  return done({ ...s, run: r.value.run }, [r.value.event]);
 }
 
-/** Chooser or shop: three identical pieces become one a tier up (docs/06 section 4.5). */
+/** Shop: three identical pieces become one a tier up (docs/06 section 4.5). */
 export function merge(s: RunSession, ids: string[], c: RunConfig): RunResult {
-  return deckAction(s, c, (run, act, stageNumber) => {
+  return deckAction(s, (run, act, stageNumber) => {
     const r = mergePieces(run, ids, act, stageNumber, c);
     return r.ok ? { ok: true, value: { run: r.value.run, event: { type: 'pieces_merged', inputs: [...ids], result: r.value.resultId } } } : r;
   });
 }
 
-/** Chooser or shop: sells a piece at the act of the stage just cleared (docs/07 section 4). */
+/**
+ * Shop: sells a piece at the act of the stage just cleared (docs/07 section 4). A promoted piece paid nothing
+ * (`pricePaid: 0`), so the sale cap makes it sell for 0.
+ */
 export function sell(s: RunSession, id: string, c: RunConfig): RunResult {
-  return deckAction(s, c, (run, act) => {
+  return deckAction(s, (run, act) => {
     const r = sellPiece(run, id, act, c);
     return r.ok ? { ok: true, value: { run: r.value.run, event: { type: 'piece_sold', instanceId: id, coins: r.value.coins } } } : r;
   });
 }
 
-/** Chooser or shop: removes a piece for nothing. */
+/** Shop: removes a piece for nothing. */
 export function cut(s: RunSession, id: string, c: RunConfig): RunResult {
-  return deckAction(s, c, (run) => {
+  void c;
+  return deckAction(s, (run) => {
     const r = cutPiece(run, id);
     return r.ok ? { ok: true, value: { run: r.value.run, event: { type: 'piece_cut', instanceId: id } } } : r;
   });
@@ -302,11 +320,18 @@ export function reroll(s: RunSession, c: RunConfig): RunResult {
   return done({ ...s, run: r.value.run, shop: r.value.shop }, [{ type: 'shop_rerolled', roll: r.value.shop.roll, cost: r.value.cost }]);
 }
 
-/** Shop: leaves (banking whatever is unspent) for the next stage's Deployment, or awaiting_stage if it is not generated yet. */
+/**
+ * Shop: leaves (banking whatever is unspent) for the next stage's Deployment, or awaiting_stage if it is not
+ * generated yet. Refused with `deck_over_capacity` while the non-king deck holds more than `deck.capacity`
+ * pieces (a promotion overflowed it): the deck gate (I9; docs/07 section 1). Selling, merging or cutting
+ * opens it again.
+ */
 export function leave(s: RunSession, c: RunConfig): RunResult {
   if (s.phase !== 'shop') return wrongPhase(['shop']);
+  const size = nonKingCount(s.run);
+  if (size > c.deck.capacity) return fail({ kind: 'deck_over_capacity', size, capacity: c.deck.capacity });
   if (!s.next) return fail({ kind: 'not_ready' });
-  if (s.next.stage) return enterDeployment({ ...s, shop: null }, s.next.request, s.next.stage, c);
+  if (s.next.stage) return enterDeployment({ ...s, shop: null }, s.next.request, s.next.stage, s.next.clue, c);
   return done({ ...s, phase: 'awaiting_stage', shop: null }, []);
 }
 

@@ -20,11 +20,11 @@ This document is the authority. If any other document disagrees with it, this on
 | **Durability** | A piece instance's remaining deployments: how many more stages it can be summoned into (see [06](06-deck-durability-and-permadeath.md)). |
 | **Hero Piece** | A piece the player owns: an instance in `RunState.deck`. On a board it carries an `instanceId`. May hold any rarity. |
 | **Stage Piece** | A piece placed by the stage itself, not drawn from the deck: the enemy army and the player's spawned pawns (and any future neutral pieces). No `instanceId`, never joins the deck. Enemy Stage Pieces are always Normal rarity. |
-| **Spawned pawn** | A free, stage-only pawn the stage places for the player, with a rolled rarity and a visible promotion result (§2.2). The only way the player gets pawns. |
-| **Promotion** | A spawned pawn reaching rank 8 leaves the board and becomes a new Hero Piece in the deck (§2.2). |
+| **Spawned pawn** | A free, stage-only pawn the stage places for the player, with a rolled rarity (§2.1). It promotes to any piece the player chooses (§2.2). The only way the player gets pawns. |
+| **Promotion** | A spawned pawn reaching rank 8 is replaced, on its square, by a Hero Piece of the type the player chooses (knight, bishop, rook or queen) with the pawn's rarity. The piece stays on the board for the rest of the stage and joins the deck at once (§2.2). |
 | **Rarity** | A piece's tier: Normal, Rare, Unique, Legendary (ascending). Every piece except the King has one. Bishops, knights, rooks and queens gain abilities by tier (§2.3); see also [06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-and-rarity). |
 | **Deployment phase** | The step between entering a stage and the first move, in which the player places the King and summons pieces from the deck (§5). |
-| **Summon** | Placing a deck piece on the board in the Deployment phase. Costs its spawn cost from the stage's spawn points, and 1 durability, both paid at Start. The only way a Hero Piece reaches the board. |
+| **Summon** | Placing a deck piece on the board in the Deployment phase. Costs its spawn cost from the stage's spawn points, and 1 durability, both paid at Start. The only way a deck piece reaches the board; the one other way a Hero Piece appears on it is a promotion, which creates a new one (§2.2). |
 | **Spawn points** | A stage's summon budget (Act I 9 · Act II 12 · Act III 15; bosses +3). The summons' total spawn cost — knight 3, bishop 3 (Legendary 5), rook 5, queen 9 — must fit it; the King is free (§5). |
 | **Deployment square** | An empty square on ranks 1–4, the player's half of the board, where the King or a summon may be placed. Ranks 5–8 are enemy territory. |
 | **Stalemate** | A side that is not in check and has no legal move (the player: no legal queue). Either side's stalemate is a **loss** for the player (§7). |
@@ -40,8 +40,9 @@ This document is the authority. If any other document disagrees with it, this on
   - **The king can never be captured.** Checkmate is the only way to defeat a king.
   - Castling and en passant are **disabled** (they are position-dependent complexity that adds
     nothing to sparse puzzle boards and complicate transform/durability interactions).
-  - **Player pawn promotion** follows §2.2, not the chess rule. **Enemy pawns** promote by the
-    normal chess rule, to a Normal queen only.
+  - **Player pawn promotion** follows the chess rule — the player chooses a knight, bishop, rook or
+    queen — with the additions in §2.2 (rarity and deck). **Enemy pawns** promote by the normal chess
+    rule, to a Normal queen only.
   - Pieces with a rarity above Normal gain the movement abilities in §2.3.
 - Castling rights are absent; generated stages have no castling flags.
 - Every piece on the board is either a **Hero Piece** (the player's, from the deck) or a **Stage
@@ -61,41 +62,54 @@ Pawns cannot be bought and never enter the deck. Each stage **spawns** pawns for
 - Spawned pawns cost nothing: no deck slot, no durability, no summon. They are placed by the stage
   at generation, so they are already on the board when the Deployment phase begins.
 - They move and capture as standard chess pawns at every tier (one square forward, capture
-  diagonally; the two-square first step applies only from rank 2). Their rarity changes only what
-  they promote into.
+  diagonally; the two-square first step applies only from rank 2). Their rarity changes only the
+  rarity of the piece they promote into.
 - A captured spawned pawn is gone for the stage only; there is nothing permanent to lose. At stage
   end every surviving
   spawned pawn is discarded.
 
 ### 2.2 Promotion
 
-When a spawned pawn reaches rank 8, it **promotes**:
+When a spawned pawn reaches rank 8 by a `MOVE`, it **promotes, as in chess**:
 
-1. The pawn leaves the board immediately; its square becomes empty. Nothing appears in its place.
-2. A new **Hero Piece** instance is created: the pawn's `promotesTo` result, at full durability for
-   its type and tier, with `origin: promotion`.
-3. The new piece joins the deck **at once**, but the deck is locked for the stage (§5): it can first
-   be summoned in the **next** stage.
+1. The `MOVE` names the promotion: `promotion: knight | bishop | rook | queen`, the player's
+   choice. Every type is allowed at every rarity, including a Legendary queen. A `MOVE` that brings a
+   spawned pawn to rank 8 without a promotion is refused (`promotion_required`); a promotion on a move
+   that does not promote is refused (`promotion_not_allowed`).
+2. The pawn is replaced, **on the same square**, by a **Hero Piece** of the chosen type with the
+   **pawn's rarity**. There is no tier-up and no roll. A new instance at full durability for its type
+   and tier is created and joins the deck **at once** (`origin: promotion`, `pricePaid: 0`); the board
+   piece carries its `instanceId`.
+3. From then on in the stage, the promoted piece is an ordinary Hero Piece on the board: it moves
+   with its type's moves and its rarity abilities (§2.3), skills can target it, and if the enemy
+   captures it, it is lost from the run like any captured Hero Piece
+   ([06](06-deck-durability-and-permadeath.md)).
+4. It paid no spawn cost and no durability in this stage. From the next stage on it is summoned like
+   any deck piece (§5).
+5. A promotion that is also a capture, or that gives check or mate, applies the same way: the promoted
+   piece gives check and mates as its new type at once. Deferred validation still judges only the end
+   of the queue (R1–R3).
 
-**The result is rolled at stage generation, not at promotion**, and is shown on the pawn from turn 1
-("→ Rare Knight"). Promotion is random, but never a hidden dice roll: the player plans with the
-result in view, the solver knows it, and preview equals outcome (I10).
+The choice is part of planning the queue, not of resolving it: the player picks the type when the
+planned `MOVE` puts the pawn on rank 8, and the `MOVE` stores it. So the preview shows the promoted
+piece, and preview equals outcome (I10). Nothing is rolled: the act's rarity ceiling (I14) already
+holds, because spawned pawns are rolled within it, and the Legendary-queen retention roll
+([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)) does not apply.
 
-| Roll | Rule |
-|---|---|
-| Piece type | Knight 35 · Bishop 35 · Rook 20 · Queen 10 (`promotion.resultTypeWeights`) |
-| Tier | One tier above the pawn with 75% chance, otherwise the pawn's own tier (`promotion.tierUpChance`) |
-| Ceiling | Never above the act's rarity ceiling: in Act I a Rare pawn always promotes to Rare. A Legendary pawn promotes to Legendary |
-| Legendary queen | A result that would be a Legendary queen keeps that tier only 20% of the time, else it is a Unique queen ([07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating)) |
+A later `MOVE` in the same queue may move the promoted piece again (it is named by its square, §4), if
+a credit pays for it.
 
 **Over capacity.** The deck holds at most 8 pieces. If the new piece pushes it above 8, the stage
-continues normally; at stage end, before the shop, the player must merge
-([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)), sell (half the piece's current price,
-[07 §4](07-shop-phase.md#4-purchases)) or cut pieces until the deck fits (I9).
+continues normally. After a won stage the run goes straight to the shop, and the shop **cannot start
+the next stage** while the deck holds more than 8 pieces (`deck_over_capacity`): the player merges
+([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)), sells (half the piece's current price,
+never more than its `pricePaid`, so a promoted piece sells for 0;
+[07 §4](07-shop-phase.md#4-purchases)) or cuts pieces until the deck fits (I9). After the final stage
+the run ends, and the deck size no longer matters.
 
 Promotion is a tempo trade, exactly as pillar 2 requires: every move spent pushing a pawn is a move
-not spent mating, and the coin preview drops one rate step per turn. The reward is a permanent piece
-for a stage's worth of turns.
+not spent mating, and the coin preview drops one rate step per turn. The reward is a stronger piece on
+the board at once, and a permanent piece in the deck.
 
 ### 2.3 Rarity movement abilities
 
@@ -200,7 +214,7 @@ A stage runs in a fixed order. Each step ends before the next begins, and none c
 | # | Phase | What happens |
 |---|---|---|
 | 1 | **Shop** | The player buys pieces and skills ([07](07-shop-phase.md)). The last chance to change the deck before the stage. |
-| 2 | **Enter stage** | The stage is generated ([04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)): the enemy army and the player's spawned pawns are placed, and every spawned pawn's promotion result is shown. No Hero Piece is on the board yet. |
+| 2 | **Enter stage** | The stage is generated ([04 §3](04-stage-generation-and-authoring.md#3-generation-pipeline)): the enemy army and the player's spawned pawns are placed. No Hero Piece is on the board yet. |
 | 3 | **Analysis & Deployment** | The player studies the board, places the King, and summons deck pieces whose total spawn cost fits the stage's spawn points, all on ranks 1–4 (§5). Placements can be moved or taken back freely; nothing is paid yet. |
 | 4 | **Start → Action** | Pressing **Start** commits the deployment, pays durability, and **locks the deck**. The player's first move follows at once, and turns run until the stage ends (§7). From here on, no piece can be summoned. |
 
@@ -233,13 +247,15 @@ one named rule each. "Move twice" is two real moves, not a teleport.
 
 | Action | Payload | Costs | Notes |
 |---|---|---|---|
-| `MOVE` | `{ from, to }` | 1 move credit (0 for a Legendary knight's bonus move) | Must be legal for that piece right now, including its rarity abilities (§2.3) |
+| `MOVE` | `{ from, to, promotion? }` | 1 move credit (0 for a Legendary knight's bonus move) | Must be legal for that piece right now, including its rarity abilities (§2.3). `promotion` is given exactly when a spawned pawn reaches rank 8 (§2.2) |
 | `ACTIVATE_SKILL` | `{ skillId, target? }` | Focus equal to the skill's cost | Does **not** cost a move credit; may grant credits |
 
 A `MOVE` names its piece by its square: the piece on `from` at that moment of the queue. Stage Pieces
 have no id, and a square is unambiguous at every step.
 
-There is no `DEPLOY` action. Pieces enter the board only in the Deployment phase (§5).
+There is no `DEPLOY` action. Pieces enter the board only in the Deployment phase (§5), with one
+exception: a promotion replaces a spawned pawn with a Hero Piece on its square during the stage
+(§2.2).
 
 Cost accounting is **sequential**: walking the queue, each action must be affordable *at the moment
 it executes*. A skill that grants a move credit cannot retroactively pay for a move already committed
@@ -288,10 +304,22 @@ points cannot pay for the whole deck, and every piece brought costs durability.
 4. A summoned piece must have **durability ≥ 1**; summoning decrements it by exactly 1.
 5. Until **Start**, placements may be moved, swapped or taken back without cost. Spawn points and
    durability are paid only when Start commits the deployment.
-6. Start is refused if the King would begin in check (I2), or if the summons cost more than the
+6. **One queen summon per stage.** At most one queen is summoned per stage, whatever its rarity
+   (`deployment.maxQueenSummons`). The limit counts summons only: a pawn may still promote to a queen
+   in that stage. In the next stage, that queen is a deck piece and counts like any other queen.
+7. **No check at Start.** No white piece may give check to the black king at Start (I16). The player
+   moves first, so a check standing at Start would be a free attack the enemy never got to answer.
+   Placing a piece can only block lines, never open them, so the check is made once, on the full
+   placement. The King can never give it (two kings are never adjacent, I2), so the rule is about
+   summons; the stage's own spawned pawns never give check (generation guarantees it, precondition
+   `no_start_check` in [04 §4](04-stage-generation-and-authoring.md#4-preconditions)).
+8. Start is refused if the King would begin in check (I2), if a white piece gives check (I16,
+   `gives_check`), if a second queen is summoned (`queen_limit`), or if the summons cost more than the
    stage's spawn points. A refused Start costs nothing.
-7. After Start the **deck is locked** for the stage (I15). Nothing — no action, no skill, no
-   promotion — brings another deck piece onto the board until the next stage.
+9. After Start the **deck is locked** for the stage (I15). Nothing — no action, no skill — brings
+   another deck piece onto the board until the next stage. A promotion is not a summon: it puts a new
+   Hero Piece on the pawn's square (§2.2), and that piece joins the deck but can first be summoned in
+   the next stage.
 
 Because the cheapest summon costs 3, a normal stage fits at most 3 / 4 / 5 summons by act, and a boss
 one more. The budget is the ceiling, not the target: with durability this scarce
@@ -505,13 +533,14 @@ These are the contract the engine, the generator, and the tests all share.
 | **I6** | Total Focus spent in a queue never exceeds the pool plus Focus granted during that queue. |
 | **I7** | A piece's durability never goes below 0; summoning requires durability ≥ 1 and spends exactly 1. |
 | **I8** | No placement in the Deployment phase — King or summon — is on an occupied square or outside the deployment ranks (1–4). |
-| **I9** | Outside a stage, deck size never exceeds the fixed capacity of 8 (a promotion may overflow it during a stage; the cut happens at stage end); the king is never destroyed or removed from the deck; the deck never holds a pawn. |
+| **I9** | Outside a stage and outside the shop, the deck holds at most 8 pieces (the King not counted). A promotion may overflow it during a stage, and the player must bring it back to 8 in the shop before the next stage (`deck_over_capacity`). The king is never destroyed or removed from the deck; the deck never holds a pawn. |
 | **I10** | The coin payout shown in the preview equals the payout at evaluation, for the same plan. |
 | **I11** | Given identical `(RunState, seed)`, generation and all enemy decisions are reproducible. |
 | **I12** | The King has no rarity (`null`); every other piece has exactly one tier, fixed for the life of the instance (a merge creates a new instance; it never changes an existing one). |
 | **I13** | Every enemy piece is Normal rarity. |
-| **I14** | Nothing — shop offer, spawned pawn, or promotion result — is above its act's rarity ceiling; the Act I ceiling is Rare. |
-| **I15** | Hero Pieces enter the board only in the Deployment phase: the King plus summons whose total spawn cost fits the stage's spawn points, and none after Start. |
+| **I14** | Nothing — shop offer, spawned pawn, or promoted piece — is above its act's rarity ceiling; the Act I ceiling is Rare. |
+| **I15** | Hero Pieces enter the board only in the Deployment phase: the King plus summons whose total spawn cost fits the stage's spawn points, with at most one queen (`deployment.maxQueenSummons`), and none after Start — except a promoted piece, which replaces its spawned pawn on rank 8 during the stage (§2.2). |
+| **I16** | At Start, the black king is not in check. |
 
 ## 10. Worked example: deployment and the first turn
 
@@ -562,7 +591,7 @@ That is not a loophole — it is the mechanic that makes extra moves worth buyin
 ## 11. Rules that are out of scope for MVP
 
 - Playing as Black; any color asymmetry.
-- Castling, en passant, underpromotion.
+- Castling, en passant, enemy underpromotion (enemy pawns always promote to a Normal queen).
 - Enemy deployment, enemy skills, enemy reinforcement waves.
 - Obstacles, terrain, walls, or special squares.
 - Multi-king or non-standard variants.

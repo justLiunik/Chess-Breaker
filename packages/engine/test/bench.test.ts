@@ -7,6 +7,7 @@ import { scoreRootMoves } from '../src/enemy/search';
 import { hasLegalQueue } from '../src/legal-queue';
 import type { StageState } from '../src/types';
 import { GAME_FENS, MIDGAME_FENS, RARITY_FENS, config, fenToStage, rarityStage, runOf, stageOf } from './helpers';
+import { PROMOTION_FENS } from './bench-positions';
 
 const WARMUP = 3;
 const RUNS = 20;
@@ -41,6 +42,15 @@ describe('depth-4 enemy search speed', () => {
       console.log(`depth 4 median ${ms.toFixed(1)} ms (M1 ${m1} ms, ${(ms / m1).toFixed(2)}x)  ${fen}`);
       expect(ms).toBeLessThan(50);
       expect(ms).toBeLessThanOrEqual(1.1 * m1);
+    });
+  }
+
+  // M5.1: a White pawn on rank 7, so White's replies in the tree promote four ways. Same 50 ms bound.
+  for (const fen of PROMOTION_FENS) {
+    it(`under 50 ms (median), a promotion in the tree: ${fen}`, { timeout: 120_000 }, () => {
+      const ms = medianMs(fenToStage(fen));
+      console.log(`depth 4 median ${ms.toFixed(1)} ms (promotion in the tree)  ${fen}`);
+      expect(ms).toBeLessThan(50);
     });
   }
 

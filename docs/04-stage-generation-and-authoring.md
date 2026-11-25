@@ -58,6 +58,7 @@ preconditions:
   - enemy_value_in_band
   - deployment_squares_available
   - spawned_pawns_placed
+  - no_start_check
 ```
 
 Templates never specify the player's army — the player summons it from the deck in the Deployment phase ([02 §5](02-rules-framework.md#5-deployment)); a template may only lower its `spawnPoints`. The deployment ranks are not a template field: the player always deploys on ranks 1–4 (`rules.deploymentRanks`), and the enemy always starts on ranks 5–8. A normal template never
@@ -67,7 +68,7 @@ rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-an
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
 further away makes it a costly detour from the par. With no turn limit, rank 8 is always reachable;
-the validator rejects a template whose spawn ranks overlap `enemyZone`.
+the validator rejects a template whose spawn ranks overlap `enemyZone` or lie above rank 6 (§4).
 Spawn ranks may lie inside the deployment ranks (3 and 4 usually do): a spawned pawn simply takes a
 square the player could otherwise deploy on, and `deployment_squares_available` counts it.
 
@@ -92,7 +93,8 @@ a large family of stages.
 ## 3. Generation pipeline
 
 Generation runs once per stage, **right after the previous stage is cleared**, from the deck as it
-stands after the stage-end chooser. It never runs during play: the solver works in the background
+stands at the end of that stage (a promotion may have added a piece; there is no stage-end chooser).
+It never runs during play: the solver works in the background
 over the results screen and the shop, which then shows the finished board as a preview without its
 par ([07 §1](07-shop-phase.md#1-entry-exit-and-flow)). Nothing is re-checked after the shop: selling
 or merging a piece the next stage needs is the player's informed choice. Generation is deterministic
@@ -104,8 +106,8 @@ for `(runSeed, actIndex, stageIndex, deck)`; the solver's budgets count nodes, n
 | **G1** | Select a template by act and tier (the boss when `stageIndex == 2`), weighted by `draw(stageSeed, 'template')`; avoid the previous stage's template where possible | No template → engine bug (every act and tier needs at least 1 template) |
 | **G2** | Board. A `fixed` template takes `fixedEnemy` as is. Any other template takes a formation (below) at index `⌊draw(stageSeed, 'formation', attempt) × n⌋`, mirrored left–right when `draw(stageSeed, 'mirror', attempt) < 0.5`. With an empty pool it falls back to random placement in `enemyZone` (streams `'army'` and `'place'`, at most `maxPlacementTries` squares tried per piece). Every enemy piece is a Stage Piece at Normal rarity; no rarity roll happens | — |
 | **G3** | Prepare the Deployment phase: `mateIn` (the par X) drawn once per stage from the template range with `draw(stageSeed, 'par')`; `spawnPoints` (the act and tier's budget, lowered by the template if it says so); Focus; the enemy policy. **No Hero Piece is placed** — the King and the summons are the player's choice ([02 §5](02-rules-framework.md#5-deployment)) | — |
-| **G4** | Spawn pawns: the count from `spawnedPawns.count`; per pawn a square in `spawnedPawns.ranks`, a rarity from `rarity.pool` for the act, then its `promotesTo` result (type, then tier per [02 §2.2](02-rules-framework.md#22-promotion)), all from `draw(stageSeed, 'spawn', attempt, i, field)` | No square → next attempt |
-| **G5** | Verify the enemy army value is inside the act band (§6), then the seven preconditions (§4) | Next attempt, at most `maxRegenerations` (20) per template |
+| **G4** | Spawn pawns: the count from `spawnedPawns.count`; per pawn a square in `spawnedPawns.ranks` and a rarity from `rarity.pool` for the act, from `draw(stageSeed, 'spawn', attempt, i, field)`. No promotion is rolled: the player chooses the type on rank 8 and the piece keeps the pawn's rarity ([02 §2.2](02-rules-framework.md#22-promotion), M5.1) | No square → next attempt |
+| **G5** | Verify the enemy army value is inside the act band (§6), then the eight preconditions (§4) | Next attempt, at most `maxRegenerations` (20) per template |
 | **G6** | `solveStage` (§5) with the deck: the pieces with durability ≥ 1, and the King. A mate within the par, on turn 2 or later, must exist | Next board, at most `maxBoards` (3) boards that passed G5 |
 | **G7** | Choose the board: the first proven one. If none is proven, the first board that passed G5 gets **one extra spawned pawn**, silently (below) | — |
 | **G8** | Emit `StageState` (`phase: deployment`, `mateIn`, `overtimePaid: 0`) with provenance `{templateId, seed, attempts}`. The generator also returns `{formationId, mirrored, proven, bonusPawn, solverNodes}` beside it, for `gen:report` only; the player never sees them | — |
@@ -125,7 +127,7 @@ mix32(hash(seed, ...parts)) / 2^32`, so a change to one step never shifts anothe
 | `draw(stageSeed, 'formation', attempt)` | G2, formation index |
 | `draw(stageSeed, 'mirror', attempt)` | G2, mirroring |
 | `draw(stageSeed, 'par')` | G3, once per stage |
-| `draw(stageSeed, 'spawn', attempt, i, field)` | G4, per pawn and field (square, rarity, `promotesTo`) |
+| `draw(stageSeed, 'spawn', attempt, i, field)` | G4, per pawn and field (square, rarity). Until M5.1 it also drew `promotesTo`; draws are keyed, so removing that draw moved no other stream: every enemy piece, pawn square and rarity stayed the same, and stages only lost the `promotesTo` field |
 | `draw(stageSeed, 'bonus-pawn', field)` | G7, the extra pawn |
 | `draw(stageSeed, 'army', …)` and `draw(stageSeed, 'place', …)` | Random-placement fallback in G2 |
 
@@ -174,7 +176,8 @@ deployment could do on it.
 | `enemy_has_moves` | The enemy has at least one legal move with the board as generated | A stage must not open on a stalemate (a loss, [02 §7](02-rules-framework.md#7-stage-end-evaluation)) |
 | `enemy_value_in_band` | `enemyArmyValue` within the act's band ([§6](#6-difficulty-curve)) | Prevents hopeless boards |
 | `deployment_squares_available` | At least `floor(spawnPoints / cheapest spawn cost) + 1` empty squares on ranks 1–4 | The King and the most summons the budget allows must fit |
-| `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity and `promotesTo` within the act ceiling | Promotion must be a real, visible option from turn 1 |
+| `spawned_pawns_placed` | Every spawned pawn is on an empty square in `spawnedPawns.ranks`, with a rarity within the act ceiling | Promotion must be a real, visible option from turn 1 |
+| `no_start_check` | No spawned pawn attacks the black king | No check may stand at Start (I16, [02 §5](02-rules-framework.md#5-deployment)); the stage's own pawns must never make that impossible. Summons that would give check are the player's to avoid, and `startStage` refuses them (`gives_check`) |
 
 `no_first_turn_mate` is an **approximation**: it tries each deck piece alone and every pair that
 fits the budget, not every combination of summons, because larger combinations explode. Pairs are
@@ -183,6 +186,9 @@ one piece to cover the squares another needs to mate. A deployment of three or m
 combines into a turn-1 mate is possible in principle; the spawn-point budget keeps it rare (at most
 three summons in Act I), and finding one is a reward for reading the board, not a bug. If playtests
 show it happening, the check widens to triples (tracked in [10](10-roadmap-and-milestones.md)).
+It also moves only the summons, never a spawned pawn, and since M5.1 a pawn on rank 7 could promote
+and mate on turn 1 (`b7-b8=Q#`) without the check seeing it, so spawn ranks stop at 6 (the template
+schema and the validator refuse rank 7).
 
 ## 5. The solver
 
@@ -197,7 +203,9 @@ matches the real game, and it is far cheaper than a two-sided minimax.
 "This deck" includes each Hero Piece's rarity, because rarity changes movement: `simulate` gives the
 solver the abilities of [02 §2.3](02-rules-framework.md#23-rarity-movement-abilities) (ally leaps, extra
 leaps and steps, multi-capture, the Legendary knight's free second move), and it models spawned pawns
-and promotion. Lifeline does not affect a stage, so it is ignored.
+and promotion. A promotion branches on **all four piece types** (queen first): stalemate is a loss, so
+a rook or bishop can be right where a queen stalemates, and promotions are rare enough that the extra
+branches cost little. Lifeline does not affect a stage, so it is ignored.
 
 **Queues are a single `MOVE`, or a `MOVE` plus the Legendary knight's bonus `MOVE`. No skills.**
 Skills only add options, so a line without them stays legal for any loadout. The solver is therefore
@@ -208,11 +216,16 @@ at worst, a bonus pawn.
 ### Deployment candidates (ply 0)
 
 Trying every placement is hopeless (up to 32 squares on ranks 1–4, up to six pieces), so ply 0
-enumerates a bounded, deterministic set. Each candidate is validated by `startStage`.
+enumerates a bounded, deterministic set. Each candidate is validated by `startStage`. From M5.1 the
+candidates **skip placements that give check** (I16) and **hold at most
+`deployment.maxQueenSummons` (1) queen**, so no candidate is spent on a deployment `startStage` would
+refuse. If this filter removes every winning deployment, the stage takes the existing unproven path
+(next board, then a bonus pawn, §3); the proven rate per template is re-measured with `gen:report`
+and recorded next to the par curve.
 
 | Part | Rule | Bound |
 |---|---|---|
-| Subsets | Every type-and-rarity multiset of the deck that fits `spawnPoints`, identical instances counted once; maximal subsets first, largest value first | `deployment.maxSubsets` (6) |
+| Subsets | Every type-and-rarity multiset of the deck that fits `spawnPoints` and holds at most one queen, identical instances counted once; maximal subsets first, largest value first | `deployment.maxSubsets` (6) |
 | King squares | Safe squares on ranks 1–4, spread across files (e, d, f, c, g, b, h, a) and alternating ranks 1 and 2, avoiding an open line to an enemy rook, bishop or queen | `deployment.kingSquares` (4) |
 | Piece squares | Each piece's best squares, scored by attacks on the squares next to the enemy king, legal moves into ranks 5–8, and safety from enemy attack | `deployment.squaresPerPiece` (6) |
 | Combining | Greedy assignment plus single-piece variants, interleaved across subsets and King squares | `deployment.maxCandidates` (200) |
@@ -393,7 +406,8 @@ pays overtime); one that always mates in 2 against a par of 5 is too loose.
 | No opening stalemate | 100% of stages give the enemy at least one legal move |
 | Enemy value band | 100% of stages have `enemyArmyValue` inside the act band |
 | Deployment availability | 100% of stages have at least `floor(spawnPoints / 3) + 1` free squares on ranks 1–4, and no enemy piece on ranks 1–4 |
-| Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns and their `promotesTo` never exceed the act ceiling (I14) |
+| Stage rarity | 100% of enemy pieces are Normal (I13); spawned pawns never exceed the act ceiling (I14), so neither does a piece promoted from them |
+| No check at Start | 100% of stages satisfy `no_start_check`: no spawned pawn attacks the black king (I16, M5.1) |
 | Spawned pawns | 100% of stages spawn a count within the template range, or one above it on a bonus-pawn stage (§3), on spawn ranks outside `enemyZone` |
 | Determinism | Same seed twice → byte-identical `StageState` |
 | Regeneration bounds | Synthetic impossible template terminates within `maxRegenerations` and falls through |

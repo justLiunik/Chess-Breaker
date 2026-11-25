@@ -88,7 +88,7 @@
         "pricePaid": {
           "type": "integer",
           "minimum": 0,
-          "description": "Coins paid in the shop (recovery offers included). A sale never pays more (docs/07 §4). Absent on starter, promotion and merge pieces."
+          "description": "Coins paid in the shop (recovery offers included). A sale never pays more (docs/07 §4). Always 0 on a promoted piece, so it sells for 0 (docs/02 §2.2, M5.1). Absent on starter and merge pieces."
         },
         "usedOnce": {
           "type": "array",
@@ -104,6 +104,11 @@
           "if": { "properties": { "pieceType": { "const": "king" } }, "required": ["pieceType"] },
           "then": { "properties": { "rarity": { "const": null } } },
           "else": { "properties": { "rarity": { "type": "string" } } }
+        },
+        {
+          "$comment": "A promoted piece joins the deck with pricePaid 0: it cost no coins and sells for 0 (docs/02 §2.2, docs/07 §4; M5.1).",
+          "if": { "properties": { "origin": { "const": "promotion" } }, "required": ["origin"] },
+          "then": { "required": ["pricePaid"], "properties": { "pricePaid": { "const": 0 } } }
         }
       ]
     },

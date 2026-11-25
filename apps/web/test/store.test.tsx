@@ -38,6 +38,30 @@ describe('store', () => {
     expect(api.generating).toBe(false);
   });
 
+  it("the source's clue reaches session.clue", async () => {
+    mount(testStageSource());
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await flush();
+    expect(api.session?.clue).toEqual([
+      { instanceId: 'p_king_01', to: 'e1', pieceType: 'king' },
+      { instanceId: 'p_bishop_04', to: 'a3', pieceType: 'bishop', rarity: 'normal' },
+    ]);
+  });
+
+  it('a reload in Deployment keeps the clue without a new request', async () => {
+    const storage = mount(testStageSource());
+    await send({ type: 'new_run', seed: '7F3A-2210' });
+    await flush();
+    const saved = api.session!.clue;
+    expect(saved).not.toBeNull();
+    document.body.innerHTML = '';
+    mount({ request: () => { throw new Error('no request expected'); } }, storage);
+    await send({ type: 'continue' });
+    await flush();
+    expect(api.session!.phase).toBe('deployment');
+    expect(api.session!.clue).toEqual(saved);
+  });
+
   it('generates an XXXX-XXXX seed when none is given', async () => {
     mount(testStageSource());
     await send({ type: 'new_run' });

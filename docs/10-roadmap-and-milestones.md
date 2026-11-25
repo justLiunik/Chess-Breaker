@@ -361,6 +361,7 @@ run to feel it; hints, onboarding highlights, full keyboard parity and art are M
       playtest (2026-11-17) found every stage very hard and did not finish a run. Findings, all
       open for design work: a promoted pawn leaves the board with no explanation in the UI; a summon
       may give check to the enemy king at START; shop prices feel too high; stages feel too hard.
+      The first two are the M5.1 rule change below; prices and difficulty wait for the replay on it.
 - [x] The coin preview in the HUD always equals the payout actually awarded:
       `packages/engine/test/view-preview.test.ts` (I10 property cases) and
       `apps/web/test/action.test.tsx` ("… COMMIT pays it (I10)").
@@ -404,6 +405,102 @@ First Steps, the Gatehouse and Open Field (accepted gap, user decision 2026-11-1
 browser miss is recorded as a gap and does not block M5.
 About a third of the stages the M4 bot reached were unproven; a human may also meet one, which is
 why the dev skip exists. It changes no rule and never appears unless the dev toggle is on.
+
+---
+
+## M5.1 — Chess promotion and no check at START
+
+**Delivers:** the two rule changes from the first M5 playtest (2026-11-17), on their own branch
+(`M5.1`, after M5 merges) and their own review. Design:
+[M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md) (approved 2026-11-17);
+decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start-m51).
+
+**Scope**
+- Promotion works like chess ([02 §2.2](02-rules-framework.md#22-promotion)): on rank 8 the player
+  chooses a knight, bishop, rook or queen at the pawn's rarity; the piece stays on the board and joins
+  the deck at once (`pricePaid: 0`). `promotesTo` and the generation-time promotion roll are removed.
+- The stage-end chooser is removed: a won stage goes straight to the shop, which refuses the next
+  stage while the deck holds more than 8 pieces (`deck_over_capacity`).
+- No check at START (I16, `gives_check`) and at most one summoned queen per stage
+  (`deployment.maxQueenSummons`, `queen_limit`); new generation precondition `no_start_check`.
+- The solver and the enemy search branch on all four promotion types; the solver's deployment
+  candidates skip checks and respect the queen limit.
+- Web: promotion picker (Q/R/B/N) while building the queue, `gives_check` and `queen_limit` marks in
+  Deployment, the shop's deck gate, no Chooser screen. Save version bumped; older saves are refused.
+- Placement clue (added 2026-11-25,
+  [design](superpowers/specs/2026-11-25-placement-clue-design.md)): Deployment's free **Show a winning
+  setup** marks the solver's proven deployment; unproven stages disable it; moves are never shown.
+- **Not in scope:** economy prices, par values, enemy strength (decision P7: tuned after the replay).
+
+**Acceptance criteria**
+- [x] Engine tests:
+  - promotion to each of the four types stays on the board with the pawn's rarity and joins the deck;
+  - `promotion_required` and `promotion_not_allowed`;
+  - a promoted piece captured later in the stage is lost;
+  - I10 holds over promotions;
+  - I16 is refused at START, and `deploymentStatus` reports `gives_check`;
+  - a second summoned queen is refused (`queen_limit`), and a promotion to a queen in the same stage
+    is allowed.
+
+  Evidence: `packages/engine/test/promotion.test.ts` and `packages/engine/test/deployment.test.ts`,
+  which also covers a Unique bishop checking through its own pawn, and a summoned queen plus a queen
+  promotion. The enemy-search bench now has a promotion position: depth-4 median about 6 ms, against
+  the 50 ms bound.
+- [x] Generation: 100% of stages satisfy `no_start_check`. `bulk.test.ts` asserts this for all
+      1,000 stages, including `validationFailed` ones, and the 1,000-stage run passes. Spawned pawns
+      are capped at rank 6 (schema plus validator), so G5 cannot miss a turn-1 promotion mate.
+      `gen:report --workers 1 --stages 40` (2026-11-25) gives proven within par, median mating turn
+      against par, and wall-time median / p95:
+
+      | Template | Proven within par | Mating turn vs par | Wall median / p95 |
+      |---|---|---|---|
+      | Gatehouse | 40/40 | 3.0 vs 4 | 1.1 s / 8.9 s |
+      | First Steps | 40/40 | 3.5 vs 4 | 0.9 s / 6.9 s |
+      | Open Field | 40/40 | 4.0 vs 5 | 0.2 s / 1.0 s |
+      | Citadel | 40/40 | 3.0 vs 4 | 0.8 s / 5.9 s |
+      | Fortress | 39/40 | 3.0 vs 4 | 2.5 s / 9.0 s |
+      | Redoubt | 33/40 | 2.0 vs 2 | 1.1 s / 7.1 s |
+      | Last Line | 39/40 | 2.0 vs 3 | 1.8 s / 6.5 s |
+
+      Overall 271/280 = 96.8%, against the 95% target. Redoubt's 5 and Last Line's 1 validation
+      failures are all `no_first_turn_mate`. Every template now meets the M3 time target (median
+      ≤ 3 s, p95 ≤ 15 s) in this Node run. Nothing was re-tuned (P7).
+- [x] Run: no chooser phase; `deck_over_capacity` refuses the next stage at 9 and allows it at 8; a
+      pre-M5.1 save is refused with the version message (`packages/run/test/session.test.ts`,
+      `save.test.ts`). A 20-run bot (2026-11-25) gave 1 win and 19 losses, against M4's 0/20.
+      Every loss was `out_of_coins` on a fallback stage, mostly at stage 7. The bot had 0 crashes
+      and 0 invariant breaches.
+- [x] Web:
+  - the promotion picker appears for a move to rank 8, and the preview shows the promoted piece;
+  - `gives_check` squares are marked;
+  - the shop gate reads and works as described;
+  - the full-run test is updated and passes.
+
+  Evidence: `apps/web/test/action.test.tsx` (the picker, including a pawn advanced earlier in the
+  queue, and the picker being modal), `deployment.test.tsx`, `screens.test.tsx` (the gate, and a real
+  version-1 save under `checkbreaker.save.1`) and `full-run.test.tsx`.
+- [x] Data, schemas and the validator agree. `npm test`, `typecheck`, `validate`, `check:links` and
+      `build` pass: 86 files / 1,108 tests, 74 validator checks, 0 broken links, main chunk 125.37 kB
+      gzip (2026-11-25).
+- [x] Placement clue:
+  - the worker and the `StageSource` double pass the clue, and an unproven stage gives `null`;
+  - the run layer keeps it across `restartStage` and save/load, clears it at stage end, and
+    `loadSave` refuses a malformed clue;
+  - the Deployment button marks every clue square with the right piece, is disabled with its reason
+    on an unproven stage, and labels a piece that has since been sold or spent, on the board (dashed
+  ghost) and in a list beside it;
+  - the marks change no `deploymentStatus` verdict.
+
+  Evidence: commits 8602c1b..the fix-wave commit (`fix(web): visible clue notes and clue polish`) on M5.1. `npm test`: 87 files / 1,138 tests, all passing
+  (the bulk test did not time out under parallel load, so no solo re-run was needed). `typecheck`
+  clean; `validate`: 74 checks, 0 failures; `check:links`: 230 links, 0 broken; main chunk 126.05 kB
+  gzip (2026-11-25). Fix wave: 177 web tests, chunk 126.09 kB gzip.
+- [ ] The user plays again and says whether the stages and the economy now feel right (the input for a
+      later tuning pass).
+
+**Risks:** queen promotions mid-stage may make stages much easier; that is the point of the replay,
+not a reason to re-tune blind (P7). The no-check filter may lower the proven rate of some templates;
+an unproven stage still has the bonus pawn and the dev skip.
 
 ---
 
@@ -465,7 +562,7 @@ enforce "one rule at a time"; a skill that needs two sentences to explain is two
 | Legendary knight / Rare+ leaps blow the solver budget | Medium | Medium | Measure in M3; cap Legendary knights per deck or tighten ability scope if needed | M3 |
 | Checkmate-only stages too hard without a fallback win | Medium | High | Solver proves a mate exists; tune par ranges and enemy bands first in M6 | M3, M6 |
 | Base reward + no capacity sink inflates coins | Medium | Medium | Headless-bot tuning of `baseReward` before prices; merges as the main deck-growth path | M4, M6 |
-| Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; headless-bot tuning of `tierUpChance` | M4, M6 |
+| Promotion becomes a stall strategy that out-earns mating | Medium | Medium | Spawn ranks per template; coin preview decay; a promoted piece sells for 0 (M5.1), so promotion is never a coin source; re-measure stage ease after the M5.1 replay | M4, M5.1, M6 |
 | Deployment ply blows up the solver | Medium | High | Bounded candidate subsets and squares, sound-but-incomplete search, regeneration on miss; measure first | M3 |
 | A multi-piece deployment mates on turn 1 | Medium | Medium | Rank-4 summons sit close to the enemy zone: `no_first_turn_mate` checks single pieces and budget-fitting pairs; widen to triples if playtests find turn-1 mates | M3, M6 |
 | Flat durability 2 drains the deck too fast | Medium | High | Deliberate (unforgiving by design), but bounded: spawn points cap the drain per stage, "bring less" is a real choice, repairs, promotion; tune repair price and income, not durability, with the headless bot | M4, M6 |

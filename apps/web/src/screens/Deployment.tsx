@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { deploymentStatus, threatMap } from '@checkbreaker/engine';
 import type { BoardPiece, PieceInstance, Square, StageState } from '@checkbreaker/engine';
 import { Board } from '../board/Board';
-import type { Arrow, Mark } from '../board/Board';
+import type { Arrow, ClueMark, Mark } from '../board/Board';
 import { PIECE_NAME, PieceGlyph, RARITY_NAME } from '../board/pieces';
 import { engineConfig } from '../config';
 import { Header } from '../hud/Header';
@@ -13,7 +13,7 @@ import { useRun } from '../state/store';
 
 type Placement = { instanceId: string; to: Square };
 
-const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'placed (click to pick up)' } as const;
+const TRAY_REASON = { spent: 'spent', too_expensive: 'too expensive', placed: 'placed (click to pick up)', queen_limit: 'one Queen per stage' } as const;
 
 const tierName = (i: PieceInstance): string => (i.rarity ? RARITY_NAME[i.rarity] : 'King');
 
@@ -26,6 +26,8 @@ export function Deployment() {
   const [message, setMessage] = useState<string | null>(null);
   // Which problem is the latest: a refused drop here, or the run layer's refusal of START.
   const [latest, setLatest] = useState<'local' | 'run'>('local');
+  // Deployment remounts on every phase change, so the clue starts hidden on each entry (a restart included).
+  const [showClue, setShowClue] = useState(false);
 
   useShortcuts({ escape: () => setSelected(null) });
 
@@ -97,20 +99,33 @@ export function Deployment() {
   };
 
   // While the King is selected or dragged, mark the deployment squares where it would start in check.
-  const king = run.deck.find((i) => i.pieceType === 'king');
-  const kingActive = king !== undefined && (selected === king.instanceId || dragging === king.instanceId);
+  // While a piece is selected or dragged, mark the squares the engine refuses for START-safety reasons:
+  // the King starting in check, a piece giving check, or a second queen.
+  const activeId = selected ?? dragging;
   const marks: Mark[] = [];
-  if (king && kingActive) {
-    const judge = statusFor(king.instanceId);
+  if (activeId) {
+    const judge = statusFor(activeId);
     for (const sq of hatch) {
-      const v = judge.drop(king.instanceId, sq);
-      if (!v.ok && v.reason === 'king_in_check') marks.push({ square: sq, kind: 'king-unsafe', label: 'King would start in check here' });
+      const v = judge.drop(activeId, sq);
+      if (v.ok) continue;
+      if (v.reason === 'king_in_check') marks.push({ square: sq, kind: 'king-unsafe', label: 'King would start in check here' });
+      else if (v.reason === 'gives_check') marks.push({ square: sq, kind: 'deploy-refused', label: 'Gives check to the enemy King at START: block the line first or choose another square' });
+      else if (v.reason === 'queen_limit') marks.push({ square: sq, kind: 'deploy-refused', label: 'One queen per stage' });
     }
   }
 
+  // The solver's proven setup as ghosts; display only, nothing here feeds a verdict.
+  const clue = session.clue;
+  const clueMarks: ClueMark[] = (clue ?? []).map((c) => {
+    const inst = run.deck.find((i) => i.instanceId === c.instanceId);
+    const note = !inst ? 'you no longer have this piece' : inst.status === 'spent' ? 'this piece is spent' : undefined;
+    return { square: c.to, piece: { pieceType: c.pieceType, color: 'white', ...(c.rarity ? { rarity: c.rarity } : {}) }, ...(note ? { note } : {}) };
+  });
+  const clueNotes = clueMarks.filter((m) => m.note);
+
   const stagePieces = Object.entries(stage.board)
-    .filter(([, p]) => p.color === 'white' && p.promotesTo)
-    .map(([sq, p]) => `${PIECE_NAME[p.pieceType]} on ${sq} promotes to ${PIECE_NAME[p.promotesTo!.pieceType]} (${p.promotesTo!.rarity})`);
+    .filter(([, p]) => p.color === 'white' && p.pieceType === 'pawn')
+    .map(([sq, p]) => `${RARITY_NAME[p.rarity ?? 'normal']} pawn on ${sq}, promotes to any piece`);
   const problem = latest === 'local' ? message : error;
 
   return (
@@ -119,7 +134,7 @@ export function Deployment() {
       <div className="deployment-body">
         <Board
           stage={stage}
-          overlays={{ ghost: plannedBoard, threats, hatch, arrows, marks }}
+          overlays={{ ghost: plannedBoard, threats, hatch, arrows, marks, ...(showClue ? { clue: clueMarks } : {}) }}
           onSquare={onSquare}
           onSquareContext={pickUp}
           onHover={setHover}
@@ -199,6 +214,17 @@ export function Deployment() {
               <h2>Stage pieces</h2>
               <ul>{stagePieces.map((t) => <li key={t}>{t}</li>)}</ul>
             </div>
+          )}
+          <button type="button" disabled={clue === null} onClick={() => setShowClue(!showClue)}>
+            {showClue ? 'Hide the winning setup' : 'Show a winning setup'}
+          </button>
+          {clue === null && (
+            <p data-testid="no-clue">No proven solution for this stage.{dev ? ' Use Skip stage (dev) if you are stuck.' : ''}</p>
+          )}
+          {showClue && clueNotes.length > 0 && (
+            <ul data-testid="clue-notes">
+              {clueNotes.map((m) => <li key={m.square}>{`${m.square}, ${PIECE_NAME[m.piece.pieceType]}: ${m.note}`}</li>)}
+            </ul>
           )}
           <button
             type="button"

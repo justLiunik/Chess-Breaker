@@ -21,7 +21,7 @@ function deploymentStage(pieces: Record<Square, string>, overrides: Partial<Stag
     const pieceType = LETTERS[letter.toLowerCase()]!;
     board[sq] = letter === letter.toLowerCase()
       ? { pieceType, color: 'black' }
-      : { pieceType, color: 'white', spawned: true, rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' } };
+      : { pieceType, color: 'white', spawned: true, rarity: 'normal' };
   }
   const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
   let n = 0;
@@ -83,6 +83,17 @@ export function losingStage(seed: string): StageState {
 export function promotionOverflowStage(seed: string): StageState {
   return deploymentStage({ h8: 'k', g7: 'p', h7: 'p', a7: 'p', b7: 'P' }, {
     stageSeed: seed, enemyPolicy: { type: 'scripted', line: ['a7a6'], fallbackDepth: 1 },
+  });
+}
+
+/**
+ * Deployment: a spawned pawn on b7 promotes on turn 1 (b7-b8=Q gives check), and the enemy's only reply,
+ * the a6 knight, takes the new piece on b8 in the same COMMIT; Re1-e8 then mates on turn 2 (Black king h8,
+ * pawns g7/h7). Review Focus 2.
+ */
+export function promotionCapturedStage(seed: string): StageState {
+  return deploymentStage({ h8: 'k', g7: 'p', h7: 'p', a6: 'n', b7: 'P' }, {
+    stageSeed: seed, enemyPolicy: { type: 'scripted', line: ['a6b8'], fallbackDepth: 1 },
   });
 }
 

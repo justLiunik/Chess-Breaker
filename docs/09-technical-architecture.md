@@ -81,7 +81,7 @@ packages/
                             parsers and the pure helpers (no `node:*` import)
   gen/                      Stage generation + solver (M3), `@checkbreaker/gen`
   run/                      Run layer (M4), `@checkbreaker/run`: run state machine, shop, merge/sell/
-                            cut/repair, the stage-end chooser, save serialization
+                            cut/repair, the shop's deck gate, save serialization
 apps/
   web/                      React UI (M5): screens, reducer, `config.ts` (YAML text via Vite `?raw` /
                             `import.meta.glob` → the content parsers), `storage.ts` (the
@@ -115,9 +115,16 @@ Boundary rules:
   **allowlists** for `run` and for `apps/web`: anything not listed fails.
 - **The generation worker protocol** (M5): the main thread posts `{ id, request: GenRequest }` whenever
   the session has `next.request` and no `next.stage`; the worker answers
-  `{ id, ok: true, stage, provenance, ms }` (`ms` timed inside the worker, around `generateStage`; `gen`
-  itself still never reads a clock) or `{ id, ok: false, message }`. The answer goes to `provideStage`;
-  an answer for a request the session has moved past is dropped by `id`. Tests replace the worker with
+  `{ id, ok: true, stage, provenance, ms, clue }` (`ms` timed inside the worker, around `generateStage`; `gen`
+  itself still never reads a clock; `clue` is the solver solution's `placements` — `{ instanceId, to }[]`,
+  the King included — or `null` for an unproven stage, M5.1 placement clue) or `{ id, ok: false, message }`.
+  The answer goes to `provideStage(s, stage, c, clue)`, which resolves each entry's `pieceType` and
+  `rarity` from the request's deck snapshot (an instance missing from it makes the whole clue `null`)
+  and keeps the result in `next.clue` while in the shop; entering Deployment moves it to
+  `RunSession.clue`, whose entries are `{ instanceId, to, pieceType, rarity? }` (`rarity` absent for the
+  King). It is saved, validated by `loadSave`, kept by `restartStage` and cleared with `stage`. The save
+  stays version 2: a version-2 save without the `clue` keys loads them as `null`. The move line is never sent. An
+  answer for a request the session has moved past is dropped by `id`. Tests replace the worker with
   a `StageSource` double that builds small stages carrying the expected `stageSeed`.
 - **Run-layer additions in M5** ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §6, §9.1):
   - `restartStage(s, c)`: Action phase before the first COMMIT only (docs/08 §6); back to Deployment
@@ -129,6 +136,16 @@ Boundary rules:
     save, and every screen that shows the run marks it **DEBUG RUN**.
   - `buy` with `opts.replace` while the loadout has room is refused with `{ kind: 'replace_not_needed' }`.
   - The shop's recovery offer reads as live only while `shop.recovery && !shop.slots[0].sold`.
+- **Run-layer changes in M5.1** ([M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md) §4.2):
+  - The `chooser` phase, `RunSession.chooser` and the `chooser_opened` event are removed: a won stage
+    goes straight to the shop, whatever the deck size.
+  - While the non-king deck holds more than `deck.capacity` (8) pieces, buying a piece is refused
+    with `deck_full` (unchanged), selling, merging and cutting work as usual, and leaving the shop for
+    the next stage is refused with a new `RunError`
+    `{ kind: 'deck_over_capacity'; size: number; capacity: number }` (`capacity` is `deck.capacity`,
+    8 today). After the final stage the run ends
+    and the deck size no longer matters.
+  - The bot always promotes to a queen and trims the deck in the shop.
 
 ## 3. Core types
 
@@ -146,7 +163,7 @@ interface PieceInstance {                // a Hero Piece
   durabilityMax: number | null;  // null = immortal (king); depends on rarity for some types
   origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
-  pricePaid?: number;            // shop purchases only: a sale never pays more (docs/07 §4)
+  pricePaid?: number;            // shop purchases, and 0 for a promotion: a sale never pays more (docs/07 §4)
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
   usedOnce?: Array<'lifeline'>;  // once-per-run rarity abilities already used
 }
@@ -175,9 +192,9 @@ interface BoardPiece {
   stageId?: string;                // Stage Pieces only ('s01', 's02', ... in square-index order); ids
                                    // that skills, modifiers and capture events use instead of squares
   spawned?: true;                  // a spawned pawn (player-side Stage Piece), docs/02 §2.1
-  rarity?: Rarity;                 // spawned pawns only; enemy pieces are implicitly Normal (I13)
-  promotesTo?: { pieceType: 'knight' | 'bishop' | 'rook' | 'queen'; rarity: Rarity };
-                                   // spawned pawns only; rolled at generation, shown to the player
+  rarity?: Rarity;                 // spawned pawns only; enemy pieces are implicitly Normal (I13).
+                                   // A promoted piece keeps this rarity (docs/02 §2.2); there is no
+                                   // promotesTo: the player chooses the type in the MOVE (M5.1)
   transformed?: { pieceType: PieceType; modifierId: string };
 }
 
@@ -215,8 +232,11 @@ startStage(
 ): Result<{ run: RunState; stage: StageState; events: GameEvent[] }, CommitError>
 ```
 
-It validates all placements at once (I2, I7, I8, I15) — every square empty and on ranks 1–4, the
-summons' total spawn cost (per type and rarity, `pieces.<type>.spawnCost`) within `spawnPoints` —
+It validates all placements at once (I2, I7, I8, I15, I16) — every square empty and on ranks 1–4, the
+summons' total spawn cost (per type and rarity, `pieces.<type>.spawnCost`) within `spawnPoints`, at
+most `deployment.maxQueenSummons` (1) summoned queens (`queen_limit`), and no white piece giving check
+to the black king in the final placement (`gives_check`, `to` = the checking piece's square; placing
+a piece only blocks lines, so this is checked once, like `king_in_check`) —
 spends 1 durability per non-King summon,
 marks those instances `deployed`, and returns the stage in `phase: 'action'`. Placements are never
 partially applied. Every later turn goes through the second:
@@ -309,15 +329,26 @@ type CommitError =
   // startStage only:
   | { kind: 'durability_unavailable'; instanceId: string }
   | { kind: 'invalid_deployment'; to: Square;
-      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate' }
+      reason: 'occupied' | 'outside_zone' | 'king_missing' | 'king_in_check' | 'not_in_deck' | 'duplicate'
+            | 'gives_check' | 'queen_limit' }        // M5.1: I16, and one summoned queen per stage
   | { kind: 'spawn_points_exceeded'; budget: number; cost: number }
   // endStage only:
   | { kind: 'stage_not_won'; status: StageState['status'] }
   // R2 safety net, and R5's capture of a Hero Piece that has no deck instance (I15); a bug if it ever fires:
   | { kind: 'invariant_violation'; invariant: 'I1' | 'I2' | 'I3' | 'I15'; detail: string };
 
-type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square';
+type MoveRejection = 'no_piece' | 'not_your_piece' | 'unreachable' | 'own_piece' | 'king_square'
+  | 'promotion_required'      // M5.1: a MOVE brings a spawned pawn to rank 8 without `promotion`
+  | 'promotion_not_allowed';  // M5.1: `promotion` on a MOVE that does not promote
+
+type Action =
+  | { type: 'MOVE'; from: Square; to: Square; promotion?: 'knight' | 'bishop' | 'rook' | 'queen' }
+  | { type: 'ACTIVATE_SKILL'; skillId: string; target?: string };
 ```
+
+A white pawn move to rank 8 generates one move per piece type, and the promoted Hero Piece takes the
+pawn's square (the old "pawn removed" result is gone). The queue writes the new instance to the deck
+inside resolution, as before, so a refused COMMIT adds nothing ([M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md) §4.5).
 
 `king_in_check_at_end.afterRevert` is true when the King is attacked only on the board R1 reverted.
 `unsupported_action` is gone: an `ACTIVATE_SKILL` is checked like any other step (spec section 8.1
@@ -346,6 +377,8 @@ is produced for a skill whose cost exceeds the Focus left at its step.
 | `overtime_paid { turn, fromReward, fromWallet }` | `applyEnemyTurn`, when a turn past the par is charged: `fromReward` comes out of the pending base reward, `fromWallet` out of the wallet (docs/02 §7). A turn neither can pay ends the stage with `out_of_coins` |
 
 `capture` and `pawn_promoted` carry the ids of the pieces involved (`instanceId` / `stageId`).
+From M5.1, `pawn_promoted` carries the chosen piece type, the rarity (the pawn's) and the new
+`instanceId`.
 `enemy_fell_back` is emitted **before** `enemy_move`.
 
 A stage that ends at R3 or R4 keeps its live suppress modifier in `StageState.modifiers`; the stage
@@ -380,8 +413,9 @@ cursor-based consumers (today the enemy search's transposition-table keys).
     reroll — covering piece type, rarity, retention and skill picks (M4)
   - shop and merge instance ids: `'p_' + hex(hash(runSeed, 'buy', stageNumber, roll, slot))` and
     `'p_' + hex(hash(runSeed, 'merge', ...sortedInputIds))` (the input ids sorted first, so the id does not depend on the order), like promotion's ids
-  - spawned-pawn rarity and `promotesTo` are drawn from `stageSeed` during generation (G4b), never
-    at the moment of promotion — so the engine's rules still consume no randomness
+  - spawned-pawn rarity is drawn from `stageSeed` during generation (G4); a promotion draws nothing
+    (the player chooses the type, the rarity is the pawn's) — so the engine's rules still consume no
+    randomness
 
 Because every random decision is a pure function of `(seed, cursor)`, a run is fully reproducible
 from a short string — which powers bug reports, QA replay, and (later) seed sharing.
@@ -431,7 +465,16 @@ Rulings the generator and solver depend on:
   pattern and the player-visible seed code.
 - A Legendary knight's free second move counts as part of the same turn: a queue is a `MOVE` plus
   its bonus `MOVE`, and the solver tries both.
-- Spawned-pawn moves are not tried in `no_first_turn_mate`: the precondition summons deck pieces only.
+- Spawned-pawn moves are not tried in `no_first_turn_mate`: the precondition summons deck pieces only,
+  so spawn ranks stop at 6 and no spawned pawn can promote-mate on turn 1 (docs/04 §4).
+- A promotion in the solver and in the enemy search branches on all four piece types (queen first):
+  stalemate loses here, so a rook or bishop can be right where a queen stalemates (M5.1).
+- The enemy search's lookahead treats a hypothetical White promotion as a Normal-tier piece: the promoted
+  piece keeps the pawn's tier, and spawned pawns carry tier 0. Real moves, legality, the preview and the
+  solver give it the pawn's rarity exactly; giving spawned pawns their tier in the search would trip the
+  rarity depth cap (`maxDepthWithRarity`) on almost every stage (ruling R7, M5.1).
+- The solver's deployment candidates skip placements that give check (I16) and respect
+  `deployment.maxQueenSummons`; `startStage` would refuse them anyway (M5.1).
 - The solver's King deployment squares alternate ranks 1 and 2, spread across files (e, d, f, c, g, b, h, a).
 - A node is one enemy reply needed, from the memo or computed, so node counts are the same on every device.
 
@@ -450,9 +493,9 @@ Rulings the generator and solver depend on:
 | `engine/abilities` (`abilities.ts`) | Compiles `rarityAbilities` from `pieces.yaml` into per-tier move data; spawn cost and durability lookups; the lifeline (whether a capture is saved, the durability it returns with) | Be consulted by name in `engine/rules` |
 | `engine/enemy` | `enemyMove(stage, seed, clock, config) → { move \| null, policy }` (move is null only when the enemy has no legal move): alpha-beta with iterative deepening, transposition table, capture quiescence, evaluation, seeded tie-break, scripted lines and fallback (docs/02 §8.1) | Read the clock, RNG or UI state from anywhere but its arguments |
 | `content` | Loading + validating YAML, typed accessors | Mutate state |
-| `run` | The run state machine (stage → chooser → shop → stage, run end), shop stock and every shop action, merge/sell/cut/repair, the free onboarding skill, the history record, save serialization and validation | Import `gen` or runtime `content`; read a clock or `Math.random`; contain board rules (those are `engine`'s) |
+| `run` | The run state machine (stage → shop → stage, run end; the shop's deck gate), shop stock and every shop action, merge/sell/cut/repair, the free onboarding skill, the history record, save serialization and validation | Import `gen` or runtime `content`; read a clock or `Math.random`; contain board rules (those are `engine`'s) |
 | `gen` | Template selection, board and spawned-pawn generation, preconditions, the solver and `generateStage` | Be imported by the web app's main thread (only the generation Web Worker imports it); use `Math.random`, `Date.now` or `performance.now` (generation depends only on the seed and the deck) |
-| `engine/view` (`view.ts`, M5) | Read-only answers for the UI: `threatMap` (attackers per square, capture lines), `deploymentStatus` (drop validity with its cause, spawn points, START cost summary), `previewSteps` (board and affordability per queue entry, first failing step, and `simulate`'s result for a complete queue), `hudEconomy` (par, overtime bill, next-turn coin potential), `skillUnavailable` (whether a skill could be the queue's next entry, by the queue's own `resolveStep`: not in the loadout, not implemented, or `once_per_turn` used) | Compute anything `simulate`, `startStage` or `legality` would compute differently: it calls them |
+| `engine/view` (`view.ts`, M5) | Read-only answers for the UI: `threatMap` (attackers per square, capture lines), `deploymentStatus` (drop validity with its cause — from M5.1 also `gives_check` per square and `queen_limit` per tray queen — spawn points, START cost summary), `previewSteps` (board and affordability per queue entry, first failing step, and `simulate`'s result for a complete queue), `hudEconomy` (par, overtime bill, next-turn coin potential), `skillUnavailable` (whether a skill could be the queue's next entry, by the queue's own `resolveStep`: not in the loadout, not implemented, or `once_per_turn` used) | Compute anything `simulate`, `startStage` or `legality` would compute differently: it calls them |
 | `apps/web` | Rendering, input, animation, persistence, planning arrows | Contain rules logic; import `gen` or `@checkbreaker/engine/internal` outside `generation.worker.ts` (an import allowlist test enforces it) |
 
 **The single most important architectural rule:** *no rule may live in the UI.* If a designer wants a
@@ -474,13 +517,13 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 ## 8. Persistence
 
 - Key: `checkbreaker.save.<version>`; value: `{ version, savedAt, session: RunSession }` — the run,
-  its phase (`awaiting_stage`, `deployment`, `action`, `chooser`, `shop`, `ended`), the stage being
+  its phase (`awaiting_stage`, `deployment`, `action`, `shop`, `ended`; `chooser` until M5.1), the stage being
   played, the shop (stock, sold slots, rerolls used) and the next stage once generated
   ([M4 spec](superpowers/specs/2026-11-13-m4-run-loop-design.md) §8.5). `savedAt` comes from the
   caller; the run layer never reads a clock.
 - The version gates migration; unknown future versions are refused with a clear message rather
   than silently corrupting a run.
-- Autosave points: after every run-layer action (each commit, START, chooser and shop action) and
+- Autosave points: after every run-layer action (each commit, START and shop action) and
   after stage generation. Everything random derives from the seed, so a reload never changes an
   outcome. A save taken before generation finished regenerates from the stored request
   (deterministic).
@@ -495,8 +538,9 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
     (missing, older or newer version; the message names it, and only primitives are printed because
     the field is player-editable) and `invalid_session`. It validates the session's shape (every field
     the run layer and the engine read, typed as in `types.ts`), exactly one King, the non-king deck
-    within `deck.capacity` except in `action`, the chooser, or a run lost mid-stage (promotions join
-    the deck during a stage and only the chooser trims them), the loadout within `run.loadoutSlots`,
+    within `deck.capacity` except in `action`, `shop` or `ended` (from M5.1: promotions join the
+    deck during a stage, the shop's deck gate trims it before the next stage, and after the final
+    stage the size no longer matters), the loadout within `run.loadoutSlots`,
     and that each phase carries the fields it needs.
   - `RunStorage { read(): string | null; write(text); clear() }` and `memoryStorage()` (each call makes
     a separate store; used by tests and the bot). The `localStorage` adapter, keyed
@@ -508,6 +552,13 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
     used the dev skip). `SAVE_VERSION` stays 1.
   - `loadSave` rebuilds the session from the fields it checked and drops unknown keys; the hand-copied
     enum lists in `save.ts` carry type-level exhaustiveness checks.
+- M5.1 bumps `SAVE_VERSION` to **2**. The storage key stays `checkbreaker.save.1`, so an old save is
+  found and refused with a message, not silently ignored. The pawn and deck shapes change
+  (`promotesTo` gone, the `chooser` phase gone, promoted pieces carry `pricePaid: 0`). A version 1 save
+  is refused with the existing `unknown_version` message, never migrated (decision P8 of the
+  [M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md)).
+- The M5.1 placement clue adds optional `clue` and `next.clue` keys to the save
+  (`{ instanceId, to, pieceType, rarity? }[]` or `null`); an absent key loads as `null`.
 - **No server.** A lost save is a lost run; the UI says so once and never nags.
 
 ## 9. Testing strategy
@@ -516,22 +567,22 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz): 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants and Legendary-knight bonus moves) and Focus spent never exceeds the pool. White's Hero Pieces carry random rarities and the deck matches the board (same ids), so multi-captures, bonus moves, R5 Hero captures and lifeline saves occur, each with a coverage count; a board/deck desync refuses with `invariant_violation` I15. `parity.test.ts` checks `commitQueue` = `simulate` + R5 including the deck changes of R5 captures |
-| Rarity gating | Property test over seeded shop rolls, spawned pawns and promotion results: I14 holds for every act; recovery offers are Normal |
+| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz). I16 (no check at START, M5.1) is not in the fuzz, whose cases begin in the Action phase: `deployment.test.ts` and `view-threats.test.ts` cover it, and the 1,000-stage `bulk.test.ts` checks that every generated stage passes `no_start_check`. The fuzz runs 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants and Legendary-knight bonus moves) and Focus spent never exceeds the pool. White's Hero Pieces carry random rarities and the deck matches the board (same ids), so multi-captures, bonus moves, R5 Hero captures and lifeline saves occur, each with a coverage count; a board/deck desync refuses with `invariant_violation` I15. `parity.test.ts` checks `commitQueue` = `simulate` + R5 including the deck changes of R5 captures |
+| Rarity gating | Property test over seeded shop rolls, spawned pawns and promoted pieces: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |
 | Merge | 3 same type + tier with durability ≥ 1 → 1 new instance one tier up at full durability; refused above the act ceiling, for Legendary inputs, kings and pawns; never changes an existing instance (I12) |
-| Deck lifecycle | `deck-lifecycle.test.ts`, `stage-end.test.ts`: a captured instance leaves `run.deck` at once; `endStage` returns deployed pieces with their durability, removes `spent` ones only then; promotion adds exactly `promotesTo` at full durability; I15 over 500 chained random queues |
+| Deck lifecycle | `deck-lifecycle.test.ts`, `stage-end.test.ts`: a captured instance leaves `run.deck` at once; `endStage` returns deployed pieces with their durability, removes `spent` ones only then; promotion adds exactly the chosen type at the pawn's rarity, at full durability, with `pricePaid: 0`; I15 over 500 chained random queues |
 | Skills | `skills.test.ts`, `modifiers.test.ts`: every `ACTIVATE_SKILL` check in spec 8.1 order (earlier wins), effects of Twin Step, Ascension and Lockdown, R1 revert, R3 suppression, R5 root mask, a temporary queen never mates |
 | `hasLegalQueue` | `legal-queue.test.ts`: skill-enabled escapes count, a second copy of a skill (once per turn) or short Focus do not; agrees with an exhaustive search over every interleaving on 300 small boards, with loadouts holding 0–2 copies of each skill. `npm run bench` bounds the worst case found so far (a mated board with all three launch skills) at 400 ms |
 | Rarity abilities | `abilities*.test.ts`, `enemy-abilities.test.ts`: per-tier tables from `pieces.yaml`, ability-aware attack squares, the Legendary knight bonus move in the queue, abilities suspended while Ascension holds, the enemy search models abilities |
 | Reference differential | `reference.test.ts`: the optimised move generator is checked against a slow, independent reference implementation on the same positions |
 | Lifeline | First capture of a Unique+ queen returns it at stage end with its `returnDurability` (1) and `usedOnce: [lifeline]`, also when it was spent (a Legendary queen); second capture destroys it |
-| Retention | Over seeded rolls, Legendary queens appear at ~20% of the Legendary rate of other types, in shop and promotion alike |
-| Promotion | Pawn on rank 8 → pawn removed, `promotesTo` instance in the deck, **not** summonable until the next stage (deck locked); over-capacity cut fires at stage end |
-| Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability; on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
+| Retention | Over seeded shop rolls, Legendary queens appear at ~20% of the Legendary rate of other types (promotion rolls nothing, M5.1) |
+| Promotion | M5.1: a pawn on rank 8 becomes each of the four types on its square, with the pawn's rarity, and the instance joins the deck; `promotion_required` and `promotion_not_allowed`; a promoted piece captured later in the stage is lost; I10 holds over promotions; the over-capacity deck refuses the next stage in the shop (`deck_over_capacity`) at 9 and allows it at 8 |
+| Deployment phase | `deployment.test.ts`: `startStage` refuses: no King, King in check, occupied squares or squares outside ranks 1–4, summons whose total spawn cost (Legendary bishop 5) exceeds `spawnPoints`, a piece at 0 durability, a placement that gives check (I16, `gives_check`), a second summoned queen (`queen_limit`); on success spends exactly 1 durability per summon and nothing for the King or for pieces left in the deck; no `commitQueue` before it and no summon after it |
 | Stalemate | Enemy with no legal move and not in check at R3 → stage lost (`enemy_stalemated`), the enemy never moves; player with no legal queue after R5 → `player_mated` or `player_stalemated`; an empty or skill-only queue → `empty_queue` |
-| Run layer | `packages/run/test/`: `session.test.ts` (new run, requests and `provideStage`, commit outcomes, salvage, lost pieces, chooser, free Twin Step at I-3, abandon, phase gating), `session-flow.test.ts` (9 stages from stub stages: acts 1,1,1,2,2,2,3,3 shops, interest, stage 9 → `won`), `boundaries.test.ts` (an import allowlist from M5: run imports the engine only, never `gen`, content as types only; no clock or RNG source) |
+| Run layer | `packages/run/test/`: `session.test.ts` (new run, requests and `provideStage`, commit outcomes, salvage, lost pieces, the shop's deck gate (the chooser until M5.1), free Twin Step at I-3, abandon, phase gating), `session-flow.test.ts` (9 stages from stub stages: acts 1,1,1,2,2,2,3,3 shops, interest, stage 9 → `won`), `boundaries.test.ts` (an import allowlist from M5: run imports the engine only, never `gen`, content as types only; no clock or RNG source) |
 | Shop and deck | `prices.test.ts` (piece and skill price tables, sale price and cap), `deck.test.ts` (merge, sell, repair, cut), `shop.test.ts` (stock, recovery offer and withdrawal, purchases, rerolls, 1,000-purchase sale-cap property), `shop-stats.test.ts` (10,000 seeded visits per act: pool, ceilings, weights, skill share; Legendary-queen retention over 100,000 rolls) |
 | Save | `save.test.ts`: every phase round trips deep-equal and plays on to the same end, Review Focus 1 (no second free skill after a reload), unknown versions refused, truncated or mutated saves are typed refusals and never throw |
 | Headless bot | `bot-policy.test.ts` (shop and fallback policy); `npm run bot -- --runs 20` is the acceptance run (0 crashes, 0 invariant breaches, 0 bot failures); the same seed twice gives byte-identical JSON. Kept out of `npm test`: it generates real stages and takes minutes |

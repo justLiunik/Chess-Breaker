@@ -80,7 +80,7 @@ interface PieceInstance {
   durabilityMax: number;     // from the piece definition, for this rarity
   origin: 'starter' | 'shop' | 'promotion' | 'merge' | 'reward';
   acquiredAtStage: number;
-  pricePaid?: number;        // coins paid in the shop; a sale never pays more (07 §4); absent = not bought
+  pricePaid?: number;        // coins paid in the shop; a sale never pays more (07 §4); 0 for a promoted piece; absent = starter or merge
   status: 'in_deck' | 'deployed' | 'captured' | 'spent';
 }
 ```
@@ -105,9 +105,11 @@ from and what rarity it may hold.
 
 How to tell them apart on a board: a Hero Piece carries an `instanceId` that points into
 `RunState.deck`; a Stage Piece has none. A spawned pawn is marked `spawned` and carries its own
-`rarity` and `promotesTo`. Stage Pieces are ephemeral — they exist only inside one `StageState` and
-are never added to the deck. The one bridge between the two is **promotion**: a spawned pawn that
-reaches rank 8 is replaced by a brand-new Hero Piece ([02 §2.2](02-rules-framework.md#22-promotion)).
+`rarity`. Stage Pieces are ephemeral — they exist only inside one `StageState` and are never added to
+the deck. The one bridge between the two is **promotion**: a spawned pawn that reaches rank 8 is
+replaced, on its square, by a brand-new Hero Piece of the type the player chooses, with the pawn's
+rarity. It stays on the board for the rest of the stage and joins the deck at once
+([02 §2.2](02-rules-framework.md#22-promotion)).
 
 **Summoned pieces are Hero Pieces.** They come from the deck in the Deployment phase
 ([02 §5](02-rules-framework.md#5-deployment)) and keep their own rarity; "placed before turn 1" does
@@ -138,8 +140,8 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 5. **Rarity is fixed at creation.** An instance keeps its tier for its whole life. Transforms
    (e.g. Ascension) change the piece type temporarily, never the rarity. Repairs do not change
    rarity. The only way up is merging (§4.5), which creates a new instance.
-6. **Rarity availability is gated by progression.** Shop offers, spawned pawns and promotion results
-   all respect the act's rarity ceiling; in Act I that ceiling is **Rare**, so Unique and Legendary
+6. **Rarity availability is gated by progression.** Shop offers, spawned pawns and promoted pieces
+   (which keep the pawn's rarity) all respect the act's rarity ceiling; in Act I that ceiling is **Rare**, so Unique and Legendary
    pieces cannot be acquired until later acts. Full rules: [07 §2.1](07-shop-phase.md#21-rarity-pool-and-progression-gating).
 7. **Skills have no rarity.** Rarity is a property of pieces only.
 
@@ -147,7 +149,7 @@ table. The tier list lives in [`data/economy.yaml`](../data/economy.yaml) → `r
 
 | Piece | What its tier changes |
 |---|---|
-| Pawn | Only its promotion result: usually one tier above the pawn ([02 §2.2](02-rules-framework.md#22-promotion)) |
+| Pawn | Only the rarity of the piece it promotes into: the pawn's own tier, for whichever type the player chooses ([02 §2.2](02-rules-framework.md#22-promotion)) |
 | Bishop | Rare leaps allies (no capture on a leap) · Unique captures after a leap · Legendary moves like a queen and costs 5 spawn points ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Knight | Rare adds a 2-square straight leap · Unique adds a 2-square diagonal leap · Legendary gets a free second move each turn ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
 | Rook | Rare leaps allies (no capture on a leap) · Unique adds a 1-square diagonal step · Legendary captures one piece after a leap and multi-captures two connected enemies on a non-leap move ([02 §2.3](02-rules-framework.md#23-rarity-movement-abilities)) |
@@ -175,7 +177,7 @@ upgraded in place, so I12 still holds.
 | Ceiling | Never above the act's rarity ceiling: Normal → Rare only in Act I, Rare → Unique from Act II, Unique → Legendary in Act III |
 | Excluded | The King (no rarity), pawns (never in the deck), and Legendary pieces (no higher tier) |
 | Cost | **Free** — the price is giving up three pieces for one |
-| When | In the shop, any number of times per visit; and in the stage-end chooser (merge, sell or cut) after a promotion overflows the deck |
+| When | Only in the shop, any number of times per visit — including to bring a deck a promotion overflowed back to 8 before the next stage (`deck_over_capacity`, §10) |
 
 **Why three.** Two-for-one would make tiers cheap: a single shop purchase plus an owned piece would
 reach the next tier. Three-for-one means committing three of the eight deck slots to one piece type,
@@ -184,7 +186,7 @@ needs three Unique queens, only possible in Act III.
 
 **Merging never saves coins.** Rarity prices rise ×1 → ×1.5 → ×2 → ×3, so three pieces of a tier
 always cost more to buy than one piece of the next. Merging is for turning pieces you already have —
-starters, promotion results, worn-out pieces — into one stronger piece, and for reaching a tier the
+starters, promoted pieces, worn-out pieces — into one stronger piece, and for reaching a tier the
 shop has not offered.
 
 ## 5. Durability lifecycle
@@ -211,8 +213,12 @@ shop has not offered.
                                          └─────────────────────────────┘
 ```
 
-Two paths are not drawn:
+Three paths are not drawn:
 
+- **Promotion** ([02 §2.2](02-rules-framework.md#22-promotion)): a new instance at full durability
+  joins the deck as `in_deck` (it was never summoned) while it stands on the promoted pawn's square,
+  without spending durability. Captured later in the stage → destroyed, like any piece on the board;
+  survives → it stays `in_deck` with its durability untouched.
 - **Lifeline** (Unique and Legendary queen, once per instance): `captured` → `in_deck` at stage end
   with 1 durability, instead of destroyed (rule 4).
 - **Recall** (skill, M6 — [03 §5](03-skill-framework.md)): `deployed` → `in_deck` during the stage,
@@ -254,8 +260,8 @@ economy and teaches the same lesson.
 
 **Every piece on the board was chosen, so every risk was chosen.** There is no free army: the only
 pieces that cost nothing to have on the board are the King (which cannot die) and the stage's spawned
-pawns (which leave nothing behind). Everything else was summoned, paid durability, and can die
-permanently. Bringing less is always safe and always slower.
+pawns (which leave nothing behind). Everything else was summoned and paid durability — or was
+promoted from a pawn the player chose to push — and can die permanently. Bringing less is always safe and always slower.
 
 ## 7. The King
 
@@ -307,8 +313,10 @@ Durability must be readable without opening a panel.
    colors — those are reserved for threat and rule-breaking
    ([00](00-vision-and-pillars.md#tone--art-direction-brief)). Enemy pieces show no rarity marker,
    because theirs never varies. The King shows none either.
-7. **Promotion preview** on every spawned pawn: its `promotesTo` result ("→ Rare Knight") is always
-   visible on the pawn, not hidden behind a hover.
+7. **Promotion label** on every spawned pawn: "Rare pawn, promotes to any piece" — its rarity, which
+   the promoted piece keeps, always visible on the pawn, not hidden behind a hover. The piece type is
+   the player's choice when a planned move reaches rank 8
+   ([08 §3.3](08-progression-and-ux.md#33-the-action-queue-builder)).
 8. **Ability legibility:** a piece's move preview shows every square its rarity abilities reach, and
    leap-only (non-capturing) moves look visibly different from capturing ones.
 
@@ -324,11 +332,15 @@ Durability must be readable without opening a panel.
 | Captured while transformed (Ascension) | Piece destroyed normally; no reversion step |
 | Hero Piece transformed (Ascension) | Piece type changes for the turn; rarity does not |
 | Captured Rare/Unique/Legendary piece | Destroyed like any other; rarity grants no protection and no refund |
-| Promotion while the deck is full | The new piece joins the deck anyway; at stage end, before the shop, the player must merge, sell or cut pieces until the deck fits (I9) |
-| Selling a piece | Only in the shop or the stage-end chooser; never the King or a `spent` piece; half its current price, never more than its `pricePaid`; it leaves the run like a cut piece ([07 §4](07-shop-phase.md#4-purchases)) |
+| Promotion while the deck is full | The new piece joins the deck anyway and the stage continues. After the stage the run goes straight to the shop, which refuses to start the next stage (`deck_over_capacity`) until merging, selling or cutting brings the deck back to 8 (I9). Cutting is always possible, so this never locks the run |
+| Selling a piece | Only in the shop; never the King or a `spent` piece; half its current price, never more than its `pricePaid`; it leaves the run like a cut piece ([07 §4](07-shop-phase.md#4-purchases)) |
+| Selling a promoted piece | Pays 0: its `pricePaid` is 0, so a sale is in effect a cut. Promotion is never a coin source |
 | Spawned pawn captured | Lost for this stage only; nothing leaves the deck |
 | Spawned pawn survives the stage without promoting | Discarded at stage end; nothing carries over |
-| Promoted piece in the same stage | Joins the deck at once but cannot be summoned — the deck is locked after Start (I15). First summonable next stage |
+| Promoted piece in the same stage | Stays on the board as a Hero Piece with the pawn's rarity and keeps playing; it spent no spawn points and no durability. It joins the deck at once, and is first summonable next stage, like any deck piece |
+| Promoted piece captured later in the stage | Lost from the run like any captured Hero Piece (rule 4); it counts as a Hero Piece lost in the stage, for the recovery offer too ([07 §3](07-shop-phase.md#recovery-offer)) |
+| A summon that would give check at Start | Start refused (I16, `gives_check`); nothing paid, placements kept. The Deployment screen marks such squares in advance |
+| Two queens summoned into one stage | Start refused (`queen_limit`, at most one queen summon per stage); a pawn may still promote to a queen in that stage |
 | Legendary knight + Twin Step | Both apply: Twin Step adds a credit for any piece; the knight's bonus move is only for itself |
 | Ascension on a Rare/Unique bishop | It moves as a Normal queen for the turn; its leap abilities return when the transform reverts |
 | Ascension on a Legendary bishop | Not a legal target (`excludesRarity: [legendary]`): it already moves like a queen ([03 §5](03-skill-framework.md)) |

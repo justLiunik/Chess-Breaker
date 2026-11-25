@@ -24,7 +24,8 @@ function refPerft(c: Chess, depth: number): number {
   let n = 0;
   for (const m of c.moves({ verbose: true })) {
     if (m.flags.includes('e')) continue;
-    if (m.promotion && m.promotion !== 'q') continue;
+    // White promotes to any of the four types (docs/02 §2.2); Black only to a queen.
+    if (m.promotion && m.color === 'b' && m.promotion !== 'q') continue;
     if (depth === 1) { n++; continue; }
     c.move(m);
     n += refPerft(c, depth - 1);

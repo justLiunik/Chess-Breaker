@@ -108,6 +108,31 @@ describe('deploymentStatus', () => {
     expect(d('p_king_01', 'e1')).toEqual({ ok: false, reason: 'king_in_check' });
     expect(d('p_king_01', 'd1')).toEqual({ ok: true });
   });
+  it('deploymentStatus.drop reports gives_check and queen_limit', () => {
+    const s = deploymentStageOf({ f7: 'k' }, { spawnPoints: 40 });
+    const withQ = deepFreeze({
+      ...run,
+      deck: [...run.deck, ...[7, 8].map((i) => ({ ...run.deck[1]!, instanceId: `p_queen_${i}`, pieceType: 'queen' as const }))],
+    });
+    const d = deploymentStatus(withQ, s, [], config).drop;
+    expect(d('p_bishop_04', 'c4')).toEqual({ ok: false, reason: 'gives_check' });
+    expect(d('p_bishop_04', 'd1')).toEqual({ ok: true });
+    const d2 = deploymentStatus(withQ, s, [P('p_queen_7', 'a1')], config).drop;
+    expect(d2('p_queen_8', 'b1')).toEqual({ ok: false, reason: 'queen_limit' });
+    expect(d2('p_knight_02', 'b1')).toEqual({ ok: true });
+  });
+  it('the tray marks other queens queen_limit after one is placed', () => {
+    const s = deploymentStageOf({ e8: 'k' }, { spawnPoints: 40 });
+    const withQ = deepFreeze({
+      ...run,
+      deck: [...run.deck, ...[7, 8].map((i) => ({ ...run.deck[1]!, instanceId: `p_queen_${i}`, pieceType: 'queen' as const }))],
+    });
+    expect(deploymentStatus(withQ, s, [], config).tray['p_queen_8']).toEqual({ placeable: true });
+    const st = deploymentStatus(withQ, s, [P('p_queen_7', 'a1')], config);
+    expect(st.tray['p_queen_7']).toEqual({ placeable: false, reason: 'placed' });
+    expect(st.tray['p_queen_8']).toEqual({ placeable: false, reason: 'queen_limit' });
+    expect(st.tray['p_knight_02']).toEqual({ placeable: true });
+  });
   it('drop refuses over the budget', () => {
     const s = dstage({ spawnPoints: spawnCostOf('knight', 'normal', config) });
     const d = deploymentStatus(run, s, [P('p_knight_02', 'd1')], config).drop;
@@ -142,11 +167,14 @@ describe('deploymentStatus', () => {
         const d = deploymentStatus(r, s, placements.slice(0, i), config).drop(p.instanceId, p.to);
         return d.ok ? null : d.reason;
       });
-      const perPlacement = reasons.find((x) => x !== null && x !== 'spawn_points_exceeded' && x !== 'king_in_check') ?? null;
+      const perPlacement = reasons.find((x) => x !== null && x !== 'spawn_points_exceeded' && x !== 'king_in_check'
+        && x !== 'gives_check' && x !== 'queen_limit') ?? null;
       const kings = placements.filter((p) => p.instanceId === 'p_king_01').length;
       const expected = perPlacement ?? (kings !== 1 ? 'king_missing'
         : reasons.includes('spawn_points_exceeded') ? 'spawn_points_exceeded'
-          : reasons.includes('king_in_check') ? 'king_in_check' : null);
+          : reasons.includes('queen_limit') ? 'queen_limit'
+            : reasons.includes('king_in_check') ? 'king_in_check'
+              : reasons.includes('gives_check') ? 'gives_check' : null);
       const note = JSON.stringify({ placements, reasons });
       if (expected === null) {
         okCount++;

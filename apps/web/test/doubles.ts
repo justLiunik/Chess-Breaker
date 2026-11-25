@@ -12,7 +12,7 @@ function deploymentStage(pieces: Record<Square, string>, overrides: Partial<Stag
     const pieceType = LETTERS[letter.toLowerCase()]!;
     board[sq] = letter === letter.toLowerCase()
       ? { pieceType, color: 'black' }
-      : { pieceType, color: 'white', spawned: true, rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' } };
+      : { pieceType, color: 'white', spawned: true, rarity: 'normal' };
   }
   const index = (sq: Square): number => 'abcdefgh'.indexOf(sq[0]!) + 8 * (Number(sq[1]) - 1);
   let n = 0;
@@ -53,7 +53,8 @@ export function testStageSource(): StageSource {
         : deploymentStage({ h8: 'k', g7: 'p', h7: 'p' }, {
           stageSeed: seed, mateIn: 4, enemyPolicy: { type: 'scripted', line: ['h7h6'], fallbackDepth: 1 },
         });
-      return Promise.resolve({ id, ok: true as const, stage, provenance: null, ms: 0 });
+      const clue = req.actIndex === 0 && req.stageIndex === 0 ? STARTER_MATE.placements : null;
+      return Promise.resolve({ id, ok: true as const, stage, provenance: null, ms: 0, clue });
     },
   };
 }

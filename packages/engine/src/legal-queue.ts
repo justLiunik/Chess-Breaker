@@ -1,7 +1,8 @@
-import type { EngineConfig, RunState, StageState } from './types';
+import type { Action, EngineConfig, RunState, StageState } from './types';
 import type { Resolving } from './queue';
 import { beginQueue, freeBonus, queueAccepted, resolveStep } from './queue';
 import { legalPlayerMoves } from './legality';
+import { WHITE_PROMOTIONS } from './movegen';
 import { QUEUE_NEUTRAL } from './skills/registry';
 
 /**
@@ -9,7 +10,8 @@ import { QUEUE_NEUTRAL } from './skills/registry';
  * target, followed by up to the resulting credits in moves (plus Legendary-knight bonus moves), that
  * `resolveQueue` accepts. Candidates (skill targets of the right colour, `legalPlayerMoves`) are
  * resolved by the queue's own steps (`resolveStep`) and judged by `queueAccepted`, so "legal" means
- * exactly what commit means; a shared prefix is resolved once. Stops at the first success.
+ * exactly what commit means; a shared prefix is resolved once. A pawn reaching rank 8 is tried with
+ * each promotion choice. Stops at the first success.
  *
  * Three reductions keep it exact:
  * - A skill made only of `QUEUE_NEUTRAL` primitives is never tried: it only spends Focus and its
@@ -41,12 +43,18 @@ export function hasLegalQueue(run: RunState, stage: StageState, config: EngineCo
       const piece = board[from]!;
       if (piece.color !== 'white') continue;
       if (r.ctx.moveCredits < 1 && !freeBonus(r.ledger, piece, config)) continue;
+      const promotes = (piece.transformed?.pieceType ?? piece.pieceType) === 'pawn';
       for (const to of legalPlayerMoves(here, from, config)) {
-        const next = resolveStep(r, { type: 'MOVE', from, to }, config);
-        if (!next.ok) continue;
-        if (queueAccepted(next.value, config)) return true;
-        const more = next.value.ctx.moveCredits >= 1 || [...next.value.ledger.values()].includes('earned');
-        if (more && movesFrom(next.value)) return true;
+        const actions: Action[] = promotes && to.endsWith('8')
+          ? WHITE_PROMOTIONS.map((promotion) => ({ type: 'MOVE', from, to, promotion }))
+          : [{ type: 'MOVE', from, to }];
+        for (const action of actions) {
+          const next = resolveStep(r, action, config);
+          if (!next.ok) continue;
+          if (queueAccepted(next.value, config)) return true;
+          const more = next.value.ctx.moveCredits >= 1 || [...next.value.ledger.values()].includes('earned');
+          if (more && movesFrom(next.value)) return true;
+        }
       }
     }
     return false;

@@ -23,6 +23,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Enemy value 11-12, mate in 4. The slack from Act I is gone: there is no
   slow win to fall back on, so the player must summon the right pieces in

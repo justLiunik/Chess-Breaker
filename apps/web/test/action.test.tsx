@@ -294,4 +294,101 @@ describe('Action screen', () => {
     expect(entry(2).getAttribute('data-problem')).toBe('blocked');
     expect(entry(2).textContent).toContain('blocked');
   });
+  describe('promotion picker', () => {
+    const withPawn = () => patched((s) => ({
+      ...s, board: { ...s.board, a7: { pieceType: 'pawn', color: 'white', spawned: true, rarity: 'rare', stageId: 's99' } },
+    }));
+    const picker = () => screen.queryByRole('dialog', { name: /Promote/ });
+
+    it('moving a spawned pawn to rank 8 opens the picker with the four engine choices', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      const p = picker();
+      expect(p).not.toBeNull();
+      const names = within(p!).getAllByRole('button').map((b) => b.textContent ?? '');
+      expect(names.slice(0, 4).map((n) => n.toLowerCase().match(/queen|rook|bishop|knight/)?.[0])).toEqual(['queen', 'rook', 'bishop', 'knight']);
+      expect(within(p!).getByRole('button', { name: /Cancel/ })).toBeTruthy();
+      expect(screen.queryByTestId('queue-entry-0')).toBeNull();
+    });
+
+    it('choosing Rook appends MOVE with promotion rook and ghosts a rook', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      await u.click(within(picker()!).getByRole('button', { name: /Rook/ }));
+      expect(picker()).toBeNull();
+      expect(entry(0).textContent).toContain('a7→a8=R');
+      expect(label('a8')).toBe('a8, white rook (rare)');
+      expect(square('a8').getAttribute('data-ghost')).not.toBeNull();
+    });
+
+    it('Esc cancels the picker and drops the move', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      await u.keyboard('{Escape}');
+      expect(picker()).toBeNull();
+      expect(screen.queryByTestId('queue-entry-0')).toBeNull();
+    });
+
+    it('a pawn moved earlier in the queue gets its picker on the planned position', async () => {
+      await setup(patched((s) => ({
+        ...s, board: { ...s.board, a6: { pieceType: 'pawn', color: 'white', spawned: true, rarity: 'normal', stageId: 's99' } },
+      })), ['twin_step']);
+      const u = user();
+      await playMove(u, 'a6', 'a7');
+      await playMove(u, 'a7', 'a8');
+      expect(picker()).not.toBeNull();
+    });
+
+    it('with the picker open a skill click does not append', async () => {
+      await setup(withPawn(), ['twin_step']);
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      const skill = screen.getByRole('button', { name: /Twin Step/ });
+      expect((skill as HTMLButtonElement).disabled).toBe(true);
+      await u.click(skill);
+      expect(screen.queryByTestId('queue-entry-0')).toBeNull();
+    });
+
+    it('with the picker open a queue reorder does not happen', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'e1', 'e2');
+      await playMove(u, 'a3', 'b2');
+      await playMove(u, 'a7', 'a8');
+      const dataTransfer = { setData: () => undefined, getData: () => '', effectAllowed: '' };
+      fireEvent.dragStart(entry(1), { dataTransfer });
+      fireEvent.dragOver(entry(0), { dataTransfer });
+      fireEvent.drop(entry(0), { dataTransfer });
+      await u.click(within(entry(1)).getByRole('button', { name: /^Move step 2 earlier/ }));
+      expect(entry(0).textContent).toContain('e1→e2');
+      expect(entry(1).textContent).toContain('a3→b2');
+    });
+
+    it('with the picker open the arrow keys do not change the shown step', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'e1', 'e2');
+      await playMove(u, 'a3', 'b2');
+      await playMove(u, 'a7', 'a8');
+      expect(entry(1).getAttribute('data-current')).not.toBeNull();
+      await u.keyboard('{ArrowLeft}');
+      expect(entry(1).getAttribute('data-current')).not.toBeNull();
+      expect(entry(0).getAttribute('data-current')).toBeNull();
+    });
+
+    it('COMMIT after a promotion shows the piece on the board', async () => {
+      await setup(withPawn());
+      const u = user();
+      await playMove(u, 'a7', 'a8');
+      await u.click(within(picker()!).getByRole('button', { name: /Queen/ }));
+      await u.click(commitButton());
+      await flush();
+      expect(api.session!.stage!.board['a8']).toMatchObject({ pieceType: 'queen', color: 'white', rarity: 'rare' });
+      await act(async () => { await new Promise((r) => setTimeout(r, 1000)); });
+      expect(label('a8')).toBe('a8, white queen (rare)');
+    });
+  });
 });

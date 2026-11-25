@@ -73,10 +73,10 @@
         },
         "ranks": {
           "type": "array",
-          "items": { "type": "integer", "minimum": 2, "maximum": 7 },
+          "items": { "type": "integer", "minimum": 2, "maximum": 6 },
           "minItems": 1,
           "uniqueItems": true,
-          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone. May overlap the deployment ranks (1-4): a spawned pawn simply occupies its square."
+          "description": "Ranks the pawns may spawn on. Must not overlap enemyZone. May overlap the deployment ranks (1-4): a spawned pawn simply occupies its square. At most rank 6: no_first_turn_mate moves only summons, so a pawn on rank 7 could promote and mate on turn 1 unseen (docs/04 §4)."
         }
       }
     },
@@ -94,7 +94,8 @@
           "enemy_has_moves",
           "deployment_squares_available",
           "enemy_value_in_band",
-          "spawned_pawns_placed"
+          "spawned_pawns_placed",
+          "no_start_check"
         ]
       }
     },

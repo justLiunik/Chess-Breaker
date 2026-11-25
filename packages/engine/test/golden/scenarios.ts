@@ -3,7 +3,8 @@ import { deckFor, runOf, stageOf } from '../helpers';
 
 export interface Scenario { name: string; run: RunState; stage: StageState; queue: Action[] }
 
-const mv = (from: string, to: string): Action => ({ type: 'MOVE', from, to });
+const mv = (from: string, to: string, promotion?: 'queen' | 'rook' | 'bishop' | 'knight'): Action =>
+  ({ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) });
 const script = (line: string[]) => ({ type: 'scripted' as const, line, fallbackDepth: 1 });
 const d1 = { type: 'best_move' as const, depth: 1 };
 const run = runOf();
@@ -47,7 +48,8 @@ export const scenarios: Scenario[] = [
     stage: stageOf({ e1: 'K', a1: 'R', e8: 'k', a7: 'n' }, { enemyPolicy: d1 }) },
   { name: 'two captures (credits 2)', run, queue: [mv('a1', 'a7'), mv('a7', 'b7')],
     stage: stageOf({ e1: 'K', a1: 'R', e8: 'k', a7: 'n', b7: 'r' }, { moveCredits: 2, enemyPolicy: d1 }) },
-  { name: 'pawn promotion removal', run, queue: [mv('a7', 'a8')],
+  // The promoted rook stays on a8 and checks the e8 king at once; it joins the deck (pricePaid 0).
+  { name: 'pawn promotion to a rook that checks', run, queue: [mv('a7', 'a8', 'rook')],
     stage: stageOf({ e1: 'K', a7: 'P', e8: 'k' }, { enemyPolicy: d1 }) },
   { name: 'checkmate win Act I', run, queue: [mv('a1', 'a8')],
     stage: stageOf(mateBoard, { turnsUsed: 1 }) },

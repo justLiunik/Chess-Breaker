@@ -4,6 +4,7 @@ import { hash } from '@checkbreaker/engine';
 import { loadFormations, loadTemplates } from '@checkbreaker/content';
 import type { Template } from '@checkbreaker/content';
 import { generateWith } from '../src/generate';
+import { checkPreconditions } from '../src/preconditions';
 import { selectTemplates } from '../src/select';
 import type { SolveResult } from '../src/types';
 import { config, deckRun, tpl } from './helpers';
@@ -100,6 +101,29 @@ describe('generateWith', () => {
     expect(r.provenance.attempts).toBe(20);
     expect(r.stage.provenance?.validationFailed).toBe(true);
     expect(r.provenance.proven).toBe(false);
+  });
+
+  it('a validationFailed stage never opens in check, even with its pawns on the rank below the king (I16)', () => {
+    // The king and five queens fill six of rank 6, six pawns crowd rank 5, and the queens' value keeps
+    // every board out of the act band, so all 20 boards fail G5 and the last is emitted. G4 never puts a
+    // pawn where it attacks the Black king (spawn.ts), so START can still be accepted (final review I-1).
+    const crowded = tpl({
+      id: 'tpl-act1-aaa-crowded',
+      enemyArmy: { queen: [5, 5] },
+      enemyZone: [6],
+      spawnedPawns: { count: [6, 6], ranks: [5] },
+      preconditions: ['enemy_value_in_band', 'no_start_check'],
+    });
+    const startCheckOnly = { ...crowded, preconditions: ['no_start_check' as const] };
+    for (let i = 0; i < 10; i++) {
+      const run = { ...deckRun('starter', 0, 0), seed: `CROWD-${i}` };
+      const r = generateWith({ run, actIndex: 0, stageIndex: 0 }, { templates: [crowded], formations: {} }, config, () => {
+        throw new Error('no board should be solved');
+      });
+      expect(r.provenance.validationFailed).toBe(true);
+      expect(spawned(r.stage)).toBe(6);
+      expect(checkPreconditions(run, r.stage, startCheckOnly, { extraPawns: 0 }, config)).toBeNull();
+    }
   });
 
   it('falls through to the next template', () => {

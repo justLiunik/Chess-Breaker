@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { TIERS } from '@checkbreaker/engine';
+import { KING, abilityAttacked, fromBoard, tiersOf } from '@checkbreaker/engine/internal';
 import { loadFormations, loadTemplates } from '@checkbreaker/content';
 import type { ActKey } from '@checkbreaker/content';
 import { checkPreconditions } from '../src/preconditions';
@@ -33,7 +34,11 @@ const ACT3_STAGES = 40; // Act III stages in the run (333 slots, capped); Acts I
 // validationFailed stages allowed per act, as measured: none in Acts I-II; in Act III one of the 40
 // (BULK-34, tpl-act3-last-line), whose 20 boards all have a turn-1 mate for the strong deck.
 const MAX_VALIDATION_FAILED = [0, 0, 1];
-const TIMEOUT_MS = 125_000; // ~2x the measured 63 s for 1,000 stages
+// This test guards validity and determinism, not speed (gen:report measures speed). 125 s was ~2x
+// the measured 63 s for 1,000 stages (81 s just before M5.1). M5.1's four-way promotion branching in
+// the engine (move generation, the enemy search, hasLegalQueue) took a solo run to 102-112 s (107.6 s
+// at M5.1 Task 4), and a full parallel `npm test` then timed out at 125 s (148 s there).
+const TIMEOUT_MS = 240_000;
 
 describe('1,000-stage CI run', () => {
   it('covers all nine (act, stage) pairs', () => {
@@ -69,11 +74,17 @@ describe('1,000-stage CI run', () => {
       const failed = checkPreconditions(run, stage, tpl, { extraPawns: 0 }, config);
       if (provenance.validationFailed) expect(failed, where).not.toBeNull();
       else expect(failed, where).toBeNull();
+      // I16: every stage, validationFailed included, passes no_start_check, and no White piece attacks
+      // the Black king as startStage judges it (rarity abilities included), so START is never refused
+      // before a piece is placed. G4 never spawns a pawn that attacks the king (final review I-1).
+      const startOnly = { ...tpl, preconditions: ['no_start_check' as const] };
+      expect(checkPreconditions(run, stage, startOnly, { extraPawns: 0 }, config), where).toBeNull();
+      const b = fromBoard(stage.board);
+      expect(abilityAttacked(b, tiersOf(stage.board), b.indexOf(-KING), config.abilities), `${where} opens in check`).toBe(false);
       for (const p of pieces) {
         if (p.color === 'black') expect(p.rarity, where).toBeUndefined();
         if (p.spawned) {
           expect(TIERS.indexOf(p.rarity!), where).toBeLessThanOrEqual(ceiling);
-          expect(TIERS.indexOf(p.promotesTo!.rarity), where).toBeLessThanOrEqual(ceiling);
         }
       }
       expect(validate(stage), `${where} ${JSON.stringify(validate.errors)}`).toBe(true);

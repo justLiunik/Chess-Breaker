@@ -28,10 +28,20 @@ rules:
   castling: false
   enPassant: false
   promotion:                    # see docs/02 §2.2
-    playerPawns: reward         # a spawned pawn on rank 8 leaves the board and becomes a deck piece
+    playerPawns: chess_choice   # a spawned pawn on rank 8 becomes the piece the player chooses (N/B/R/Q), stays on the board and joins the deck
     enemyPawns: queen           # enemy pawns promote by the normal chess rule, to a Normal queen
   kingCapturable: false         # invariant I3 — never
   stalemate: player_loses      # either side without a legal move (not in check) loses the stage for the player
+
+# ---------------------------------------------------------------------------
+# Deployment limits — see docs/02 §5
+#
+# Checked by startStage (invalid_deployment reason queen_limit) and respected by
+# the solver's deployment candidates. A queen from a promotion during the stage
+# is not a summon and does not count (docs/02 §2.2).
+# ---------------------------------------------------------------------------
+deployment:
+  maxQueenSummons: 1            # summoned queens per stage, any rarity (M5.1, decision P10)
 
 # ---------------------------------------------------------------------------
 # Economy — see docs/05-run-structure-and-economy.md
@@ -77,7 +87,7 @@ economy:
       priceFactor: 0.5          # of the piece's current shop price (rarity × act inflation); never above recoveryDiscount
       capAtPricePaid: true      # a sale never pays more than the piece's pricePaid (shop purchases only; docs/07 §4)
       rounding: floor
-      when: [shop, capacity_cut]  # in the shop, and as a third option beside merge/cut when a promotion overflows the deck
+      when: [shop]              # only in the shop; an over-full deck is trimmed there before the next stage (docs/07 §4)
       excludes: [king, spent]
 
   shop:
@@ -159,9 +169,10 @@ rarity:
   # price = round(basePrice × priceMultiplier[tier] × (1 + priceInflationPerAct × (act − 1)))
   priceMultiplier: { normal: 1.0, rare: 1.5, unique: 2.0, legendary: 3.0 }
 
-  # Retention: a roll (shop offer or promotion result) that lands on this
-  # type × tier keeps that tier only with this probability; otherwise it drops
-  # one tier. Makes the Legendary queen ~5× rarer than other Legendary pieces.
+  # Retention: a shop offer roll that lands on this type × tier keeps that tier
+  # only with this probability; otherwise it drops one tier. Makes the Legendary
+  # queen ~5× rarer than other Legendary pieces in the shop. Promotion rolls
+  # nothing, so retention does not apply to it (docs/02 §2.2).
   retention:
     queen: { legendary: 0.2 }
 
@@ -188,17 +199,14 @@ rarity:
 #
 # Each stage spawns a few pawns for the player (count and ranks come from the
 # template). They are stage-only: no deck slot, no durability. Their rarity is
-# rolled from rarity.pool for the act, and their promotion result is rolled at
-# generation time and shown on the pawn, so promotion is never a hidden dice roll.
+# rolled from rarity.pool for the act. On rank 8 the player chooses the piece type
+# (knight, bishop, rook or queen); the promoted piece keeps the pawn's rarity,
+# stays on the board and joins the deck. Nothing is rolled (M5.1, decisions P1–P5).
 # ---------------------------------------------------------------------------
 promotion:
-  resultTypeWeights: { knight: 35, bishop: 35, rook: 20, queen: 10 }
-  tierUpChance: 0.75              # else the result keeps the pawn's tier
-  clampToActCeiling: true         # never above rarity.pool.act<N>.ceiling
-  appliesRetention: true          # rarity.retention (e.g. Legendary queen) applies here too
-  rolledAtGeneration: true        # visible on the pawn from turn 1 (pillar 4)
-  joinsDeck: immediately          # in the deck at once, but summonable only from the next stage (deck locked)
-  overCapacity: cut_at_stage_end  # forced "cut a piece" chooser before the shop
+  clampToActCeiling: true         # the pawn's rarity is within rarity.pool.act<N>.ceiling, so the promoted piece is too (I14)
+  joinsDeck: immediately          # in the deck at once, on the board for the rest of the stage, summonable from the next stage
+  overCapacity: blocks_next_stage # an over-full deck blocks leaving the shop (deck_over_capacity) until sell/merge/cut fits it
 
 # ---------------------------------------------------------------------------
 # Deck — see docs/06-deck-durability-and-permadeath.md
@@ -222,7 +230,7 @@ deck:
     maxInputTier: unique        # Legendary pieces cannot be merged further
     excludedTypes: [king, pawn]
     cost: 0                     # free; the price is giving up three pieces
-    when: [shop, capacity_cut]  # in the shop, and as an alternative to cutting after a promotion
+    when: [shop]                # only in the shop, including to trim a deck a promotion overflowed (docs/06 §5)
 
 # ---------------------------------------------------------------------------
 # Run and stages — see docs/05 and docs/04

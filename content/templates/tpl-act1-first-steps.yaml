@@ -28,6 +28,7 @@ preconditions:
   - deployment_squares_available
   - enemy_value_in_band
   - spawned_pawns_placed
+  - no_start_check
 designNote: >-
   Tutorial set piece for run 1, Act I stage 1 (docs/08 §5). The enemy army
   is hand-placed and the knight follows a short script; if the player

@@ -41,10 +41,22 @@ describe('hasLegalQueue with skills', () => {
     for (const s of mvp) expect(s.restrictions, s.id).toContain('once_per_turn');
   });
 
+  // Ka1 cannot step (b8 covers b1 and b2, h2 covers a2): the only legal queue is the g7 pawn's promotion.
+  it('true when the only legal queue is a promotion, with each choice', () => {
+    const boxed = { a1: 'K', b8: 'r', h2: 'r', e5: 'k', g7: 'P' };
+    expect(hasLegalQueue(runOf(), stageOf(boxed), config)).toBe(true);
+    for (const promotion of PROMOTIONS) {
+      expect(resolveQueue(runOf(), stageOf(boxed), [{ type: 'MOVE', from: 'g7', to: 'g8', promotion }], config).ok).toBe(true);
+    }
+    expect(hasLegalQueue(runOf(), stageOf({ ...boxed, g8: 'n' }), config)).toBe(false);
+  });
+
   it('false when Focus is short', () => {
     expect(hasLegalQueue(withSkills('ascension'), stageOf(block, { focus: 1 }), config)).toBe(false);
   });
 });
+
+const PROMOTIONS = ['queen', 'rook', 'bishop', 'knight'] as const;
 
 /** Every interleaving of at most two skills and three moves, judged by resolveQueue. */
 function bruteForce(run: RunState, stage: StageState): boolean {
@@ -70,12 +82,17 @@ function bruteForce(run: RunState, stage: StageState): boolean {
       const here = { ...stage, board: ctx.board };
       for (const from of Object.keys(ctx.board)) {
         if (ctx.board[from]!.color !== 'white') continue;
+        const pawn = ctx.board[from]!.pieceType === 'pawn';
         for (const to of legalPlayerMoves(here, from, config)) {
-          queue.push({ type: 'MOVE', from, to });
-          const next = { ...ctx, board: applyPlayerMove(ctx.board, from, to, config).board, moveCredits: ctx.moveCredits - 1 };
-          const done = go(next, skills, moves + 1);
-          queue.pop();
-          if (done) return true;
+          // A pawn reaching rank 8 is tried with every promotion choice.
+          for (const promotion of pawn && to.endsWith('8') ? PROMOTIONS : [undefined]) {
+            queue.push({ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) });
+            const made = promotion === undefined ? undefined : { pieceType: promotion, instanceId: `p_brute_${queue.length}` };
+            const next = { ...ctx, board: applyPlayerMove(ctx.board, from, to, config, made).board, moveCredits: ctx.moveCredits - 1 };
+            const done = go(next, skills, moves + 1);
+            queue.pop();
+            if (done) return true;
+          }
         }
       }
     }

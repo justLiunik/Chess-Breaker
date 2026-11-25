@@ -107,16 +107,22 @@ describe('resolveQueue success', () => {
     const r = resolveQueue(run, st, [mv('e1', 'd2')], config);
     expect(Object.keys(r)).toEqual(['ok', 'error']);
   });
-  it('a pawn reaching rank 8 vanishes and emits pawn_promoted', () => {
+  it('a pawn reaching rank 8 becomes the chosen Hero Piece and emits pawn_promoted', () => {
     const st = stageOf({ e1: 'K', c7: 'P', h5: 'k' });
-    const r = resolveQueue(run, st, [mv('c7', 'c8')], config);
+    const r = resolveQueue(run, st, [{ type: 'MOVE', from: 'c7', to: 'c8', promotion: 'knight' }], config);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.stage.board['c8']).toBeUndefined();
+    const id = expect.stringMatching(/^p_[0-9a-f]+$/);
+    expect(r.value.stage.board['c8']).toEqual({ pieceType: 'knight', color: 'white', rarity: 'normal', instanceId: id });
     expect(r.value.stage.board['c7']).toBeUndefined();
     expect(r.value.events).toContainEqual({
-      type: 'pawn_promoted', square: 'c8', promotesTo: { pieceType: 'knight', rarity: 'normal' },
-      instanceId: expect.stringMatching(/^p_[0-9a-f]+$/),
+      type: 'pawn_promoted', square: 'c8', pieceType: 'knight', rarity: 'normal', instanceId: id,
+    });
+  });
+  it('a pawn reaching rank 8 without a promotion is refused (promotion_required)', () => {
+    const st = stageOf({ e1: 'K', c7: 'P', h5: 'k' });
+    expect(resolveQueue(run, st, [mv('c7', 'c8')], config)).toEqual({
+      ok: false, error: { kind: 'illegal_move', atStep: 0, from: 'c7', to: 'c8', reason: 'promotion_required' },
     });
   });
 });

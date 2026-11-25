@@ -37,10 +37,7 @@ export function stageOf(
     if (letter === letter.toLowerCase()) {
       board[sq] = { pieceType, color: 'black' };
     } else if (pieceType === 'pawn') {
-      board[sq] = {
-        pieceType, color: 'white', spawned: true, rarity: 'normal',
-        promotesTo: { pieceType: 'knight', rarity: 'normal' },
-      };
+      board[sq] = { pieceType, color: 'white', spawned: true, rarity: 'normal' };
     } else {
       board[sq] = { pieceType, color: 'white', instanceId: `p_${pieceType}_${sq}` };
     }
@@ -102,6 +99,15 @@ export const GAME_FENS: string[] = [
   '6k1/5ppp/3n4/2b5/8/2P1P3/1B6/R3K2N b - - 0 1',
   'r5k1/1p3ppp/2n1b3/8/8/2P2P2/3N4/R1B1KQ2 b - - 0 1',
   '2r3k1/pp1b1ppp/2n5/8/4P3/2P2N2/1B6/R3K3 b - - 0 1',
+];
+
+/**
+ * A promotion in the search tree (M5.1): GAME_FENS[0] with a White (spawned) pawn on h7 and h8 empty,
+ * Black to move. No Black reply stops it, so after every one White's replies include h7-h8 four ways
+ * (h8=Q and h8=R give check). Kept out of GAME_FENS: it has no M1 baseline.
+ */
+export const PROMOTION_FENS: string[] = [
+  '4k3/ppp2ppP/2n5/8/2P5/5P2/8/RB2K3 b - - 0 1',
 ];
 
 /**

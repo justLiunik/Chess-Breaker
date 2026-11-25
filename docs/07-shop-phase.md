@@ -17,15 +17,29 @@ stage cleared (win)  ──►  next stage generated  ──►  SHOP (with its 
 |---|---|
 | Trigger | Immediately after every **won** stage |
 | Final stage | **No shop** — results screen instead |
-| Exit conditions | Buy/leave, or skip (`Bank & continue`) |
+| Exit conditions | Buy/leave, or skip (`Bank & continue`) — only while the deck holds at most 8 pieces (the **deck gate**, below) |
 | Time limit | None. The shop never pressures. |
 | Can be re-entered | No. One visit per stage. |
 | Losing a stage | No shop; the run ends |
-| Next-stage preview | The next stage is generated as soon as this one is cleared, with the deck as it stands after the stage-end chooser, and shown in the shop as a full board: enemy formation, spawned pawns and their promotion results. **The par (`mateIn`) is never shown here** ([08 §3.1](08-progression-and-ux.md#31-coin-preview--the-load-bearing-number)). The panel reads "preparing the stage…" until generation finishes; buying never waits for it |
+| Next-stage preview | The next stage is generated as soon as this one is cleared, with the deck as it stands at the end of the stage, and shown in the shop as a full board: enemy formation and spawned pawns with their rarities. **The par (`mateIn`) is never shown here** ([08 §3.1](08-progression-and-ux.md#31-coin-preview--the-load-bearing-number)). The panel reads "preparing the stage…" until generation finishes; buying never waits for it |
 | Deck changes after the preview | The preview is proven against the deck the shop opened with. Buying cannot break it; selling or merging a piece the plan needs is the player's informed choice, and nothing is re-checked |
 
 The shop is deliberately unhurried. The *stage* is where time pressure lives; the shop is where the
 player is meant to think about the next three stages at once.
+
+**The deck gate.** A promotion can push the deck above 8 during a stage
+([02 §2.2](02-rules-framework.md#22-promotion)); a won stage still goes straight to the shop, which
+opens as usual. While the deck holds more than 8 non-king pieces:
+
+- buying a piece is refused (`deck_full`, as with a full deck);
+- selling, merging and cutting work as usual, and so do skills, repairs and rerolls;
+- leaving the shop for the next stage — `Leave shop` and `Bank & continue` alike — is refused with
+  `deck_over_capacity`. The shop reads "Deck 9/8: sell, merge or cut to continue"
+  ([08 §2](08-progression-and-ux.md#2-screen-inventory)).
+
+Cutting is always possible, so the gate never locks a run. Saving and resuming land in the shop as
+before. There is no stage-end chooser: the shop is the one place where the deck is trimmed, and the
+coins from a sale can be spent at once.
 
 ## 2. Stock generation
 
@@ -39,8 +53,8 @@ Five slots, generated from the run seed **after** the stage's coins are awarded:
 | 4 | **Piece or Skill** | A skill with probability `shop.skillChance` (20 %), else a piece |
 | 5 | **Service** | Repair — repeatable, always present (disabled when no piece is damaged) |
 
-Piece types are drawn with `shop.pieceTypeWeights` — **Knight 35 · Bishop 35 · Rook 20 · Queen 10**,
-the promotion weights; slot 1 draws from knight, bishop and rook only, with the same weights. A
+Piece types are drawn with `shop.pieceTypeWeights` — **Knight 35 · Bishop 35 · Rook 20 · Queen 10**;
+slot 1 draws from knight, bishop and rook only, with the same weights. A
 skill slot picks uniformly among the `status: mvp` skills not already in this roll's stock; if none
 is left, the slot holds a piece. Pieces are therefore far commoner than skills (decided 2026-11-13).
 Every draw reads its own named stream of the run seed (`draw(runSeed, 'shop', stageNumber, roll,
@@ -85,16 +99,18 @@ Weights are relative; `—` means weight 0, impossible. Values live in
 balance pass. The structural rules are not provisional:
 
 1. **The ceiling is hard.** Nothing in an act is above its ceiling — no shop offer, reroll,
-   recovery offer, spawned pawn or promotion result. Unique and Legendary pieces are impossible to
+   recovery offer, spawned pawn or promoted piece (which keeps its pawn's rarity). Unique and Legendary pieces are impossible to
    acquire in Act I.
 2. **Ceilings never go down.** A later act's ceiling is equal to or higher than an earlier act's.
 3. **The recovery offer is Normal.** Pity items are a floor, not a lottery.
 4. **Rerolls re-roll rarity too.** A reroll redraws type *and* tier for slots 1–4 from the same pool
    (keeping the recovery offer if it fired); it cannot raise the ceiling.
-5. **The Legendary queen is the rarest roll.** Any roll that lands on a Legendary queen — a shop
-   offer or a promotion result — keeps that tier only **20%** of the time (`rarity.retention`);
-   otherwise it becomes a Unique queen. In an Act III shop that turns a 6% Legendary chance per queen
-   offer into about 1.2%, roughly five times rarer than any other Legendary piece.
+5. **The Legendary queen is the rarest roll.** A shop offer that lands on a Legendary queen keeps
+   that tier only **20%** of the time (`rarity.retention`); otherwise it becomes a Unique queen. In
+   an Act III shop that turns a 6% Legendary chance per queen offer into about 1.2%, roughly five
+   times rarer than any other Legendary piece. Promotion rolls nothing, so retention does not apply
+   to it: a Legendary spawned pawn (Act III only) may promote to a Legendary queen
+   ([02 §2.2](02-rules-framework.md#22-promotion)).
 6. **No pity timer, no guarantee of a high tier.** A visit may offer only Normal pieces. Hidden
    "bad-luck protection" would conflict with the fair-and-provable pillar; the pool is the whole truth,
    and the shop can show it (§6).
@@ -170,8 +186,8 @@ soon as the deck is back to 4 pieces — also mid-visit, e.g. after buying slot 
 | **Reroll** | Reroll slots 1–4 (keeping an unsold recovery offer) | First reroll each visit free, then 2 coins; at most 3 per visit |
 | **Sell** | One deck piece, not the King and not `spent` | Pays `min(floor(0.5 × its current price), pricePaid)` — its type × rarity × this act's inflation (§2.2), whatever its durability, never more than it cost. The piece leaves the run |
 
-Selling is available at any time in the shop, any number of times, and in the stage-end chooser
-when a promotion overflows the deck (beside merge and cut). It never restocks or regenerates the
+Selling is available at any time in the shop, any number of times, and **only** in the shop
+(`services.sell.when: [shop]`) — including to pass the deck gate (§1). It never restocks or regenerates the
 shop: in particular, selling the deck below 4 pieces does not create a recovery offer, which is
 decided on entry from the pieces lost in the stage (§3). Selling down to the King alone is allowed,
 with a warning.
@@ -184,6 +200,7 @@ with a warning.
 | Rare knight, Act II | 14 | 7 |
 | Legendary queen, Act III | 67 | 33 |
 | Recovery knight bought in Act I, sold in Act III | 4 | 4 (half price would be 5; capped at `pricePaid`) |
+| Rare queen from a promotion, any act | — | 0 (`pricePaid` 0: a sale is in effect a cut) |
 
 Prices inflate per act by 20% and scale with rarity (§2.2,
 [05 §3](05-run-structure-and-economy.md#3-expenditure-coins--power)).
@@ -205,7 +222,8 @@ Whenever the deck holds **three pieces of the same type and tier** (each with du
 shop offers a **Merge** action on them: the three become one piece of the next tier, at full
 durability, for **no coins** ([06 §4.5](06-deck-durability-and-permadeath.md#45-merging)).
 
-- Merging is free and can be done any number of times per visit, before or after buying.
+- Merging is free and can be done any number of times per visit, before or after buying. It happens
+  only in the shop (`deck.merge.when: [shop]`).
 - It respects the act's ceiling: in Act I only Normal → Rare is possible.
 - It frees two deck slots, which is the main way to make room under the fixed capacity of 8.
 - Buying a third copy *in order to* merge is a legitimate plan, even though it always costs more
@@ -282,7 +300,7 @@ Design notes:
 | Rerolling for a higher tier in Act I | Impossible — the Act I pool's ceiling is Rare, and rerolls draw from the same pool |
 | Recovery offer fires in Act III | Still Normal; the guarantee is a piece, not a tier |
 | Capacity full, wants a higher-tier copy of an owned piece | Same "cut a piece" chooser; the cut piece's rarity is lost with it |
-| Deck over capacity from a promotion | The stage-end chooser (merge, sell or cut) runs before the shop opens, so the shop always opens with a legal deck and the coins from a sale can be spent at once |
+| Deck over capacity from a promotion | The shop opens as usual, but buying a piece is refused (`deck_full`) and leaving for the next stage is refused (`deck_over_capacity`) until a sale, merge or cut brings the deck back to 8 (the deck gate, §1). The coins from a sale can be spent at once; a promoted piece sells for 0 |
 | Sells the deck down to the King | Allowed after a warning; the next stage is still solver-checked against the deck as it is |
 | Sells a piece whose lifeline was used | Sells at the normal price; lifeline has no resale value |
 | Merge would exceed the act ceiling | The Merge action is shown disabled with the reason ("Unique unlocks in Act II") |

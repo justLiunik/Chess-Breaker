@@ -121,4 +121,55 @@ describe('deploymentCandidates', () => {
     const run = deckRun('starter', 0, 0);
     expect(deploymentCandidates(run, act1[0]!, config)).toEqual(deploymentCandidates(run, act1[0]!, config));
   });
+
+  it('deployment candidates summon at most one queen', () => {
+    // A Normal and a Unique queen that both fit 18 spawn points: before the limit, the only maximal
+    // subset held both, and startStage refused every candidate (queen_limit).
+    const queen = (instanceId: string, rarity: 'normal' | 'unique'): PieceInstance => ({
+      instanceId, pieceType: 'queen', rarity, durability: 2, durabilityMax: 2, origin: 'shop', acquiredAtStage: 0, status: 'in_deck',
+    });
+    const base = kingOnly(deckRun('starter', 0, 0));
+    const run = deepFreeze({ ...base, deck: [...base.deck, queen('q-normal', 'normal'), queen('q-unique', 'unique')] });
+    const stage = deepFreeze({ ...act1[0]!, spawnPoints: 18 });
+    expect(spawnCostOf('queen', 'normal', config) + spawnCostOf('queen', 'unique', config)).toBeLessThanOrEqual(18);
+    expect(config.deployment.maxQueenSummons).toBe(1);
+
+    const cands = deploymentCandidates(run, stage, config);
+    expect(cands.length).toBeGreaterThan(0);
+    const queensOf = (c: { instanceId: string }[]) => c.filter((p) => byId(run, p.instanceId).pieceType === 'queen').map((p) => p.instanceId);
+    for (const c of cands) {
+      expect(queensOf(c)).toHaveLength(1); // one queen, and nothing else fits beside it (the limit makes it maximal)
+      expect(startStage(run, stage, c, config).ok).toBe(true);
+    }
+    // Both queens are tried, each on its own.
+    expect(new Set(cands.flatMap(queensOf))).toEqual(new Set(['q-normal', 'q-unique']));
+  });
+
+  it('no candidate gives check at START', () => {
+    // Black Ke8 and pawns d7 and f7 on an open e-file: a rook on e1-e4 checks the king, and the
+    // e-file is where the rook's squares score best (most moves into ranks 5-8).
+    const board = {
+      d7: { pieceType: 'pawn', color: 'black', stageId: 's01' },
+      f7: { pieceType: 'pawn', color: 'black', stageId: 's02' },
+      e8: { pieceType: 'king', color: 'black', stageId: 's03' },
+    } as StageState['board'];
+    const stage = deepFreeze({ ...act1[0]!, board });
+    const base = kingOnly(deckRun('mid', 0, 0));
+    const rook: PieceInstance = {
+      instanceId: 'r-1', pieceType: 'rook', rarity: 'normal', durability: 2, durabilityMax: 2, origin: 'shop', acquiredAtStage: 0, status: 'in_deck',
+    };
+    const run = deepFreeze({ ...base, deck: [...base.deck, rook] });
+    const started = startStage(run, stage, [{ instanceId: base.deck[0]!.instanceId, to: 'a1' }, { instanceId: 'r-1', to: 'e2' }], config);
+    expect(started.ok || started.error).toEqual({ kind: 'invalid_deployment', to: 'e2', reason: 'gives_check' });
+
+    const cands = deploymentCandidates(run, stage, config);
+    expect(cands.some((c) => c.some((p) => p.instanceId === 'r-1'))).toBe(true);
+    for (const c of cands) {
+      expect(startStage(run, stage, c, config).ok).toBe(true);
+      const placed = { ...board };
+      for (const p of c) placed[p.to] = { pieceType: byId(run, p.instanceId).pieceType, color: 'white', instanceId: p.instanceId };
+      const b = internal.fromBoard(placed);
+      expect(internal.isAttacked(b, toIndex('e8'), 'white')).toBe(false);
+    }
+  });
 });

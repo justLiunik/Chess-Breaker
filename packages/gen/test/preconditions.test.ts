@@ -14,6 +14,7 @@ const ALL: PreconditionId[] = [
   'enemy_value_in_band',
   'deployment_squares_available',
   'spawned_pawns_placed',
+  'no_start_check',
 ];
 
 const TYPES: Record<string, BoardPiece['pieceType']> = {
@@ -22,7 +23,7 @@ const TYPES: Record<string, BoardPiece['pieceType']> = {
 
 /**
  * A board as G2-G4 leave it: Black pieces from `'Kg8 Pf7 …'`, and spawned White pawns on the
- * squares of `spawned` (Normal, promoting to a Normal knight), every piece with a stageId.
+ * squares of `spawned` (Normal), every piece with a stageId.
  */
 function board(black: string, spawned = ''): Record<Square, BoardPiece> {
   const out: Record<Square, BoardPiece> = {};
@@ -34,7 +35,7 @@ function board(black: string, spawned = ''): Record<Square, BoardPiece> {
   for (const sq of spawned.split(' ').filter(Boolean)) {
     out[sq] = {
       pieceType: 'pawn', color: 'white', spawned: true, stageId: id(),
-      rarity: 'normal', promotesTo: { pieceType: 'knight', rarity: 'normal' },
+      rarity: 'normal',
     };
   }
   return out;
@@ -302,19 +303,17 @@ describe('spawned_pawns_placed', () => {
     return stageOf(BASE_T, { ...b, [sq]: { ...board('', 'd3').d3!, ...over } });
   };
 
-  it('passes a Rare pawn promoting to a Rare piece in Act I', () => {
-    expect(failing(ROOK, pawn({ rarity: 'rare', promotesTo: { pieceType: 'bishop', rarity: 'rare' } }), BASE_T)).toEqual([]);
+  it('passes a Rare pawn in Act I', () => {
+    expect(failing(ROOK, pawn({ rarity: 'rare' }), BASE_T)).toEqual([]);
   });
 
   it('fails a pawn off the spawn ranks', () => {
     expect(failing(ROOK, pawn({}, 'e4'), BASE_T)).toEqual(only('spawned_pawns_placed'));
   });
 
-  it('fails a rarity or promotesTo above the act ceiling, or missing', () => {
+  it('fails a rarity above the act ceiling, or missing', () => {
     expect(failing(ROOK, pawn({ rarity: 'unique' }), BASE_T)).toEqual(only('spawned_pawns_placed'));
-    expect(failing(ROOK, pawn({ promotesTo: { pieceType: 'rook', rarity: 'unique' } }), BASE_T)).toEqual(only('spawned_pawns_placed'));
     expect(failing(ROOK, pawn({ rarity: undefined }), BASE_T)).toEqual(only('spawned_pawns_placed'));
-    expect(failing(ROOK, pawn({ promotesTo: undefined }), BASE_T)).toEqual(only('spawned_pawns_placed'));
   });
 
   it('fails a count outside the range; extraPawns raises the upper end', () => {
@@ -324,5 +323,17 @@ describe('spawned_pawns_placed', () => {
     expect(failing(ROOK, two, BASE_T)).toEqual(only('spawned_pawns_placed'));
     expect(failing(ROOK, two, BASE_T, 1)).toEqual([]);
     expect(failing(ROOK, none, BASE_T, 1)).toEqual(only('spawned_pawns_placed'));
+  });
+});
+
+describe('no_start_check', () => {
+  it('no_start_check fails when a spawned pawn attacks the black king', () => {
+    const T = tpl({ id: 'tpl-test-d6', spawnedPawns: { count: [1, 1], ranks: [6] }, preconditions: ALL });
+    const s = stageOf(T, board('Ke7 Pa7 Pb7 Pc7 Pd7 Pf7 Pg7 Ph7', 'd6')); // d6 attacks e7
+    expect(failing(ROOK, s, T)).toEqual(only('no_start_check'));
+  });
+
+  it('no_start_check passes on a quiet board', () => {
+    expect(failing(ROOK, base(), BASE_T)).toEqual([]);
   });
 });

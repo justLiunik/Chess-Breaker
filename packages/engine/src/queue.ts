@@ -1,5 +1,6 @@
 import type {
-  Action, BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, Result, RunState, Square, StageState,
+  Action, BoardPiece, CommitError, EngineConfig, GameEvent, PieceInstance, PromotionType, Rarity, Result, RunState,
+  Square, StageState,
 } from './types';
 import { planPlayerMove } from './legality';
 import { durabilityMaxOf, hasBonusMove } from './abilities';
@@ -43,23 +44,40 @@ export function recordMove(ledger: BonusLedger, piece: BoardPiece, config: Engin
   else if (!ledger.has(piece.instanceId!)) ledger.set(piece.instanceId!, 'earned');
 }
 
+/** A promotion as a MOVE plays it: the chosen type and the new Hero Piece's `instanceId`. */
+export type Promotion = { pieceType: PromotionType; instanceId: string };
+
 /**
- * Plays a MOVE on `board`. A multi-capture's first square is derived from the board (planPlayerMove);
- * both captured pieces emit a `capture` event, X then Y.
+ * Plays a legal MOVE on `board`. A multi-capture's first square is derived from the board
+ * (planPlayerMove); both captured pieces emit a `capture` event, X then Y. A move that brings a pawn
+ * to rank 8 needs `promotion` (it throws without one): the pawn becomes that Hero Piece, with the
+ * pawn's rarity and the given `instanceId`, and `pawn_promoted` follows the move's other events.
  */
-export function applyPlayerMove(board: Board, from: Square, to: Square, config: EngineConfig): Applied {
-  return playMove(board, from, to, planPlayerMove(board, from, to, config).via, config);
+export function applyPlayerMove(
+  board: Board, from: Square, to: Square, config: EngineConfig, promotion?: Promotion,
+): Applied {
+  const mover = board[from];
+  if (promotion === undefined && mover?.color === 'white' && mover.pieceType === 'pawn' && to.endsWith('8')) {
+    throw new Error(`applyPlayerMove: ${from}-${to} promotes and needs a promotion`);
+  }
+  return playMove(board, from, to, planPlayerMove(board, from, to, config, promotion?.pieceType).via, config, promotion);
 }
 
 type Applied = {
   board: Board;
   events: GameEvent[];
   salvage: number;
-  promoted?: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> };
+  /** The deck instance a promotion adds, when the move promoted. */
+  promoted?: PieceInstance;
 };
 
-/** `applyPlayerMove` for a move already planned: `first` is the multi-capture's first square, else null. */
-function playMove(board: Board, from: Square, to: Square, first: Square | null, config: EngineConfig): Applied {
+/**
+ * `applyPlayerMove` for a move already planned: `first` is the multi-capture's first square, else
+ * null; `promotion` is given exactly when the move promotes.
+ */
+function playMove(
+  board: Board, from: Square, to: Square, first: Square | null, config: EngineConfig, promotion?: Promotion,
+): Applied {
   const mover = board[from] as BoardPiece;
   const next: Board = { ...board };
   delete next[from];
@@ -67,7 +85,6 @@ function playMove(board: Board, from: Square, to: Square, first: Square | null, 
     { type: 'move', from, to, pieceType: mover.pieceType, color: mover.color },
   ];
   let salvage = 0;
-  let promoted: { square: Square; promotesTo: NonNullable<BoardPiece['promotesTo']> } | undefined;
 
   for (const sq of first === null ? [to] : [first, to]) {
     const captured = board[sq];
@@ -83,13 +100,23 @@ function playMove(board: Board, from: Square, to: Square, first: Square | null, 
     if (sq !== to) delete next[sq];
   }
 
-  if (mover.pieceType === 'pawn' && mover.color === 'white' && to.endsWith('8')) {
-    delete next[to];
-    if (mover.promotesTo) promoted = { square: to, promotesTo: mover.promotesTo };
-  } else {
+  if (promotion === undefined) {
     next[to] = mover;
+    return { board: next, events, salvage };
   }
-  return { board: next, events, salvage, ...(promoted && { promoted }) };
+  // A promotion (docs/02 §2.2): the chosen Hero Piece with the pawn's rarity, joining the deck at full
+  // durability. It paid nothing, so it sells for nothing (pricePaid 0). resolveStep, which knows the
+  // run, sets acquiredAtStage.
+  const { pieceType, instanceId } = promotion;
+  const rarity: Rarity = mover.rarity ?? 'normal';
+  next[to] = { pieceType, color: 'white', rarity, instanceId };
+  events.push({ type: 'pawn_promoted', square: to, pieceType, rarity, instanceId });
+  const durability = durabilityMaxOf(pieceType, rarity, config);
+  const promoted: PieceInstance = {
+    instanceId, pieceType, rarity, durability, durabilityMax: durability, origin: 'promotion',
+    acquiredAtStage: 0, pricePaid: 0, status: 'in_deck',
+  };
+  return { board: next, events, salvage, promoted };
 }
 
 export function resolveQueue(
@@ -178,24 +205,19 @@ export function resolveStep(r: Resolving, action: Action, config: EngineConfig):
   const mover = ctx.board[action.from];
   const free = mover !== undefined && freeBonus(r.ledger, mover, config);
   if (!free && ctx.moveCredits < 1) return { ok: false, error: { kind: 'credits_exceeded', atStep } };
-  const { reason, via } = planPlayerMove(ctx.board, action.from, action.to, config);
+  const { reason, via } = planPlayerMove(ctx.board, action.from, action.to, config, action.promotion);
   if (reason) return { ok: false, error: { kind: 'illegal_move', atStep, from: action.from, to: action.to, reason } };
-  const applied = playMove(ctx.board, action.from, action.to, via, config);
+  // planPlayerMove accepts a `promotion` exactly on a move that promotes.
+  const promotion: Promotion | undefined = action.promotion === undefined ? undefined : {
+    pieceType: action.promotion,
+    instanceId: 'p_' + hash(r.stage.stageSeed, r.stage.turnsUsed, atStep, action.to).toString(16),
+  };
+  const applied = playMove(ctx.board, action.from, action.to, via, config, promotion);
   ctx.board = applied.board;
   const events = [...r.events, ...applied.events];
-  let promotions = r.promotions;
-  if (applied.promoted) {
-    const { stage } = r;
-    const { square, promotesTo } = applied.promoted;
-    const instanceId = 'p_' + hash(stage.stageSeed, stage.turnsUsed, atStep, square).toString(16);
-    const durability = durabilityMaxOf(promotesTo.pieceType, promotesTo.rarity, config);
-    promotions = [...promotions, {
-      instanceId, pieceType: promotesTo.pieceType, rarity: promotesTo.rarity, durability,
-      durabilityMax: durability, origin: 'promotion',
-      acquiredAtStage: ctx.run.actIndex * 3 + ctx.run.stageIndex, status: 'in_deck',
-    }];
-    events.push({ type: 'pawn_promoted', square, promotesTo, instanceId });
-  }
+  const promotions = applied.promoted === undefined ? r.promotions : [...r.promotions, {
+    ...applied.promoted, acquiredAtStage: ctx.run.actIndex * 3 + ctx.run.stageIndex,
+  }];
   const ledger: BonusLedger = new Map(r.ledger);
   recordMove(ledger, mover!, config, free);
   if (!free) ctx.moveCredits--;
