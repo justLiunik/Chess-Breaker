@@ -42,4 +42,11 @@ describe('Board clue overlay', () => {
     expect(label).toContain('you no longer have this piece');
     expect(square('a3').querySelector('[data-clue="bishop"]')).not.toBeNull();
   });
+
+  it('a noted mark gets data-clue-note and a plain mark does not', () => {
+    const bishop: BoardPiece = { pieceType: 'bishop', color: 'white', rarity: 'normal' };
+    render(<Board stage={{ board: {} }} overlays={{ clue: [{ square: 'a3', piece: bishop, note: 'this piece is spent' }, { square: 'b3', piece: bishop }] }} />);
+    expect(square('a3').querySelector('.clue-ghost')!.hasAttribute('data-clue-note')).toBe(true);
+    expect(square('b3').querySelector('.clue-ghost')!.hasAttribute('data-clue-note')).toBe(false);
+  });
 });

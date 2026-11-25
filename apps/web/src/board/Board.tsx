@@ -138,7 +138,7 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
           onDragOver={(e) => { if (onDrop) e.preventDefault(); }}
           onDrop={(e) => { e.preventDefault(); onDrop?.(sq, e); }}
         >
-          {clue && <span className="clue-ghost" data-clue={clue.piece.pieceType}><PieceGlyph piece={clue.piece} rarity={clue.piece.rarity} /></span>}
+          {clue && <span className="clue-ghost" data-clue={clue.piece.pieceType} {...(clue.note ? { 'data-clue-note': clue.note } : {})}><PieceGlyph piece={clue.piece} rarity={clue.piece.rarity} /></span>}
           {piece && <PieceGlyph piece={piece} rarity={piece.color === 'white' ? piece.rarity : undefined} />}
           {attackers && (
             <svg className="threat" data-threat={attackers.join(' ')} viewBox="0 0 20 20" aria-hidden="true" focusable="false">

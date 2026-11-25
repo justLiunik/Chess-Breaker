@@ -278,6 +278,11 @@ mis-chosen deployment; a mis-clicked plan is fixed with UNDO before COMMIT.
     proven solution for this stage".
   - **A piece that is gone.** If the clue uses a piece that was sold, cut or merged in the shop after
     the stage was generated, its square is still marked and labelled "you no longer have this piece".
+  - **A piece START spent.** A clue piece that START spent shows "this piece is spent".
+  - **Both notes are visible.** The ghost gets a dashed ring and a greyed glyph, and the note is listed
+    beside the board while the clue is shown.
+  - **The Skip hint.** The sentence "Use Skip stage (dev) if you are stuck." appears only with the dev
+    toggle on.
   - **Moves stay hidden.** The clue never shows moves.
 - **Hints land in M6** (they need a hint generator); M5 has none.
 - **Two hints per stage**, each a sentence of intent: "Your rook is doing nothing. The enemy queen

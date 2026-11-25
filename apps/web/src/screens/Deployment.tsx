@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { deploymentStatus, threatMap } from '@checkbreaker/engine';
 import type { BoardPiece, PieceInstance, Square, StageState } from '@checkbreaker/engine';
 import { Board } from '../board/Board';
@@ -25,16 +25,14 @@ export function Deployment() {
   const [hover, setHover] = useState<Square | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   // Which problem is the latest: a refused drop here, or the run layer's refusal of START.
-  const [showClue, setShowClue] = useState(false);
   const [latest, setLatest] = useState<'local' | 'run'>('local');
+  // Deployment remounts on every phase change, so the clue starts hidden on each entry (a restart included).
+  const [showClue, setShowClue] = useState(false);
 
   useShortcuts({ escape: () => setSelected(null) });
 
   const run = session?.run;
   const stage = session?.stage ?? null;
-  // A new stage starts with the clue hidden (a restart keeps the same stage, so it keeps the clue shown).
-  const stageSeed = stage?.stageSeed;
-  useEffect(() => { setShowClue(false); }, [stageSeed]);
   const status = useMemo(
     () => (run && stage ? deploymentStatus(run, stage, placements, engineConfig) : null),
     [run, stage, placements],
@@ -123,6 +121,7 @@ export function Deployment() {
     const note = !inst ? 'you no longer have this piece' : inst.status === 'spent' ? 'this piece is spent' : undefined;
     return { square: c.to, piece: { pieceType: c.pieceType, color: 'white', ...(c.rarity ? { rarity: c.rarity } : {}) }, ...(note ? { note } : {}) };
   });
+  const clueNotes = clueMarks.filter((m) => m.note);
 
   const stagePieces = Object.entries(stage.board)
     .filter(([, p]) => p.color === 'white' && p.pieceType === 'pawn')
@@ -216,11 +215,16 @@ export function Deployment() {
               <ul>{stagePieces.map((t) => <li key={t}>{t}</li>)}</ul>
             </div>
           )}
-          <button type="button" aria-pressed={showClue} disabled={clue === null} onClick={() => setShowClue(!showClue)}>
+          <button type="button" disabled={clue === null} onClick={() => setShowClue(!showClue)}>
             {showClue ? 'Hide the winning setup' : 'Show a winning setup'}
           </button>
           {clue === null && (
             <p data-testid="no-clue">No proven solution for this stage.{dev ? ' Use Skip stage (dev) if you are stuck.' : ''}</p>
+          )}
+          {showClue && clueNotes.length > 0 && (
+            <ul data-testid="clue-notes">
+              {clueNotes.map((m) => <li key={m.square}>{`${m.square}, ${PIECE_NAME[m.piece.pieceType]}: ${m.note}`}</li>)}
+            </ul>
           )}
           <button
             type="button"

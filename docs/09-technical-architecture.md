@@ -557,6 +557,8 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
   (`promotesTo` gone, the `chooser` phase gone, promoted pieces carry `pricePaid: 0`). A version 1 save
   is refused with the existing `unknown_version` message, never migrated (decision P8 of the
   [M5.1 spec](superpowers/specs/2026-11-17-promotion-and-start-check-design.md)).
+- The M5.1 placement clue adds optional `clue` and `next.clue` keys to the save
+  (`{ instanceId, to, pieceType, rarity? }[]` or `null`); an absent key loads as `null`.
 - **No server.** A lost save is a lost run; the UI says so once and never nags.
 
 ## 9. Testing strategy

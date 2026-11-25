@@ -321,8 +321,10 @@ describe('Deployment screen', () => {
       expect(square('e1').getAttribute('aria-label')).toContain('clue: white king');
       expect(square('a3').getAttribute('aria-label')).toContain('clue: white bishop');
       expect(showButton().textContent).toBe('Hide the winning setup');
-      expect(showButton().getAttribute('aria-pressed')).toBe('true');
+      expect(showButton().hasAttribute('aria-pressed')).toBe(false);
+      expect(screen.queryByTestId('clue-notes')).toBeNull();
       await u.click(showButton());
+      expect(showButton().textContent).toBe('Show a winning setup');
       expect(square('e1').getAttribute('aria-label')).not.toContain('clue:');
       expect(square('a3').getAttribute('aria-label')).not.toContain('clue:');
     });
@@ -384,12 +386,18 @@ describe('Deployment screen', () => {
       await setupClue((deck) => deck.filter((i) => i.instanceId !== 'p_bishop_04'));
       await user().click(showButton());
       expect(square('a3').getAttribute('aria-label')).toContain('you no longer have this piece');
+      expect(within(screen.getByTestId('clue-notes')).getByText('a3, bishop: you no longer have this piece')).toBeTruthy();
+      expect(square('a3').querySelector('.clue-ghost')!.hasAttribute('data-clue-note')).toBe(true);
+      await user().click(showButton());
+      expect(screen.queryByTestId('clue-notes')).toBeNull();
     });
 
     it('a clue piece spent by START is labelled after a restart', async () => {
       await setupClue((deck) => deck.map((i) => (i.instanceId === 'p_bishop_04' ? { ...i, status: 'spent' as const, durability: 0 } : i)));
       await user().click(showButton());
       expect(square('a3').getAttribute('aria-label')).toContain('this piece is spent');
+      expect(within(screen.getByTestId('clue-notes')).getByText('a3, bishop: this piece is spent')).toBeTruthy();
+      expect(square('a3').querySelector('.clue-ghost')!.hasAttribute('data-clue-note')).toBe(true);
     });
   });
 });
