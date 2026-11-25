@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { interestOf } from '@checkbreaker/engine';
 import type { Action, Award, PieceInstance, PromotionType, StageState } from '@checkbreaker/engine';
-import { commit, expectedSeed, leave, newRun, provideStage, repair, sell, start } from '../src/session';
+import { commit, expectedSeed, leave, newRun, provideStage, repair, start } from '../src/session';
+import { loadSave, serializeSave } from '../src/save';
 import type { RunEvent, RunResult, RunSession } from '../src/types';
 import { ROOK_ID, deepFreeze, mateInOneStage, promotionOverflowStage, runConfig as c, runWithRook } from './fixtures';
 
@@ -67,7 +68,8 @@ describe('a whole run from a stub generator', () => {
     }
     expect(requests).toEqual(['0-0', '0-1', '0-2', '1-0', '1-1', '1-2', '2-0', '2-1', '2-2']);
 
-    expect(s).toMatchObject({ phase: 'ended', outcome: { result: 'won' }, stage: null, shop: null, next: null, chooser: null, tally: null });
+    expect(s).toMatchObject({ phase: 'ended', outcome: { result: 'won' }, stage: null, shop: null, next: null, tally: null });
+    expect('chooser' in s).toBe(false);
     expect(s.run.status).toBe('won');
     expect(log.events.at(-1)).toEqual({ type: 'run_ended', result: 'won' });
     expect(s.run.history).toHaveLength(9);
@@ -92,7 +94,7 @@ describe('a whole run from a stub generator', () => {
     expect(s.run.loadout).toEqual([{ skillId: 'twin_step' }]);
   });
 
-  it('a chooser after stage 9 ends the run won once the deck fits', () => {
+  it('a promotion that overflows the deck in stage 9 ends the run won at 9 pieces; the save still loads', () => {
     const fresh = newRun(SEED, c);
     let s = deepFreeze({ ...fresh, run: runWithRook(fresh.run) });
     const log: Log = { events: [], shopActs: [], awards: [] };
@@ -105,14 +107,17 @@ describe('a whole run from a stub generator', () => {
     });
     const room = c.deck.capacity - s.run.deck.filter(p => p.pieceType !== 'king').length;
     s = deepFreeze({ ...s, run: { ...s.run, deck: [...s.run.deck, ...Array.from({ length: room }, (_, k) => fill(k))] } });
+    const before = log.events.length;
     s = playStage(s, 8, log, promotionOverflowStage, [mv('b7', 'b8', 'knight'), mv('e1', 'e8')]);
-    expect(s).toMatchObject({ phase: 'chooser', chooser: { overCapacity: 1 } });
-    expect(s.run.status).toBe('in_progress');
+    // after the final stage the deck size no longer matters: no shop, no gate
+    expect(s).toMatchObject({ phase: 'ended', outcome: { result: 'won' }, shop: null, next: null });
+    expect(s.run.status).toBe('won');
+    expect(s.run.deck.filter(p => p.pieceType !== 'king')).toHaveLength(c.deck.capacity + 1);
     expect(s.run.history).toHaveLength(9);
-    const { session, events } = value(sell(s, 'p_fill_0', c));
-    expect(session).toMatchObject({ phase: 'ended', outcome: { result: 'won' }, chooser: null, shop: null, next: null });
-    expect(session.run.status).toBe('won');
-    expect(events.map(e => e.type)).toEqual(['piece_sold', 'run_ended']);
+    expect(log.events.slice(before).map(e => e.type)).not.toContain('shop_opened');
+    expect(log.events.at(-1)).toEqual({ type: 'run_ended', result: 'won' });
     expect(log.shopActs).toEqual([1, 1, 1, 2, 2, 2, 3, 3]);
+    const back = loadSave(serializeSave(s), c);
+    expect(back).toEqual({ ok: true, value: s });
   });
 });

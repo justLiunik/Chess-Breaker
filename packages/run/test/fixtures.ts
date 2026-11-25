@@ -87,6 +87,17 @@ export function promotionOverflowStage(seed: string): StageState {
 }
 
 /**
+ * Deployment: a spawned pawn on b7 promotes on turn 1 (b7-b8=Q gives check), and the enemy's only reply,
+ * the a6 knight, takes the new piece on b8 in the same COMMIT; Re1-e8 then mates on turn 2 (Black king h8,
+ * pawns g7/h7). Review Focus 2.
+ */
+export function promotionCapturedStage(seed: string): StageState {
+  return deploymentStage({ h8: 'k', g7: 'p', h7: 'p', a6: 'n', b7: 'P' }, {
+    stageSeed: seed, enemyPolicy: { type: 'scripted', line: ['a6b8'], fallbackDepth: 1 },
+  });
+}
+
+/**
  * Deployment: spawned pawns on b7 and c7 promote on turns 1 and 2 (b7-b8, c7-c8), then Re1-e8 mates on
  * turn 3 (Black king h8, pawns g7/h7, an a7 pawn the scripted enemy pushes a7-a6-a5).
  */

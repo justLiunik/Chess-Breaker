@@ -22,6 +22,13 @@ describe('save.ts enum lists', () => {
     expect(inline).toEqual([]);
   });
 
+  it('the phase list has no chooser (M5.1: a won stage goes straight to the shop)', () => {
+    const phases = /^const PHASES = \[([^\]]*)\] as const satisfies readonly RunPhase\[\];\r?$/m.exec(source);
+    expect(phases).not.toBeNull();
+    expect(phases![1]!.split(',').map((p) => p.trim().replace(/'/g, ''))).toEqual(['awaiting_stage', 'deployment', 'action', 'shop', 'ended']);
+    expect(source).not.toMatch(/chooser/i);
+  });
+
   it('every named list is `as const satisfies` its type and has a completeness check', () => {
     const lists = [...source.matchAll(/^const ([A-Z_]+) = \[[^\]]*\] as const satisfies readonly .+;\r?$/gm)].map((m) => m[1]!);
     expect(lists.length).toBeGreaterThanOrEqual(16);

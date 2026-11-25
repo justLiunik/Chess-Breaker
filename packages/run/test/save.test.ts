@@ -12,7 +12,7 @@ import {
 const SEED = 'C0DE-5A7E';
 const SAVED_AT = '2026-11-16T09:30:00.000Z';
 const KING_ROOK = [{ instanceId: 'p_king_01', to: 'd1' }, { instanceId: ROOK_ID, to: 'e1' }];
-const ALL_PHASES: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'];
+const ALL_PHASES: RunPhase[] = ['awaiting_stage', 'deployment', 'action', 'shop', 'ended'];
 const mv = (from: string, to: string, promotion?: PromotionType): Action[] =>
   [{ type: 'MOVE', from, to, ...(promotion !== undefined && { promotion }) }];
 const nonKing = (s: RunSession): number => s.run.deck.filter(p => p.pieceType !== 'king').length;
@@ -59,7 +59,7 @@ type Step = [label: string, act: (s: RunSession) => RunResult];
 
 /**
  * Three stages from a full deck (8 non-king pieces) and a wallet that affords a purchase: a promotion
- * overflows the deck (chooser), the shop sells, buys and rerolls twice and gets stage I-2 before leaving;
+ * overflows the deck, the shop opens at 9 pieces, sells twice, buys and rerolls twice and gets stage I-2 before leaving;
  * the next shop is left first (awaiting_stage); stage I-3 grants the free Twin Step, a turn is played
  * (the Twin Step leaves the King a way out of the rook net, so it is check, not mate) and the run is abandoned.
  */
@@ -67,8 +67,8 @@ const SCRIPT: Step[] = [
   ['provide stage I-1', s => provideStage(s, stub(promotionOverflowStage)(s), c)],
   ['deploy king + rook', s => start(s, KING_ROOK, c)],
   ['promote b7-b8: the deck overflows mid-stage', s => commit(s, mv('b7', 'b8', 'knight'), c)],
-  ['mate: the chooser opens', s => commit(s, mv('e1', 'e8'), c)],
-  ['sell in the chooser: the shop opens', s => sell(s, 'p_fill_01', c)],
+  ['mate: the shop opens at 9 pieces', s => commit(s, mv('e1', 'e8'), c)],
+  ['sell in the shop: the deck fits again', s => sell(s, 'p_fill_01', c)],
   ['sell in the shop for room', s => sell(s, 'p_fill_02', c)],
   ['buy a piece', buyAffordablePiece],
   ['free reroll', s => reroll(s, c)],
@@ -125,7 +125,7 @@ describe('the scripted run', () => {
     expect(new Set(sessions.map(s => s.phase))).toEqual(new Set(ALL_PHASES));
     expect(nonKing(sessions[0]!)).toBe(c.deck.capacity);
     expect(sessions.some(s => s.phase === 'action' && nonKing(s) > c.deck.capacity)).toBe(true);
-    expect(sessions.some(s => s.phase === 'chooser')).toBe(true);
+    expect(sessions.some(s => s.phase === 'shop' && nonKing(s) > c.deck.capacity)).toBe(true);
     const shopAfter = sessions.find(s => s.phase === 'shop' && s.shop!.rerollsUsed === 2);
     expect(shopAfter).toBeDefined();
     expect(shopAfter!.run.deck.some(p => p.origin === 'shop')).toBe(true);
@@ -211,7 +211,7 @@ describe('save and resume', () => {
 describe('serializeSave', () => {
   it('writes { version, savedAt?, session }, with savedAt only when the caller passes one', () => {
     const s = newRun(SEED, c);
-    expect(SAVE_VERSION).toBe(1);
+    expect(SAVE_VERSION).toBe(2);
     const bare = JSON.parse(serializeSave(s));
     expect(bare).toEqual({ version: SAVE_VERSION, session: s });
     expect('savedAt' in bare).toBe(false);
@@ -226,14 +226,25 @@ describe('loadSave refusals', () => {
   const save = (version: unknown) => JSON.stringify({ version, session: s });
 
   it('an unknown or future version names the version', () => {
-    const v2 = refusal(save(2));
-    expect(v2).toMatchObject({ kind: 'unknown_version', version: 2 });
-    expect((v2 as { message: string }).message).toMatch(/\b2\b/);
+    const v3 = refusal(save(3));
+    expect(v3).toMatchObject({ kind: 'unknown_version', version: 3 });
+    expect((v3 as { message: string }).message).toMatch(/\b3\b/);
+    expect((v3 as { message: string }).message).toContain('newer build');
     const str = refusal(save('1'));
     expect(str).toMatchObject({ kind: 'unknown_version', version: '1' });
     expect((str as { message: string }).message).toContain('"1"');
     expect(refusal(save(0))).toMatchObject({ kind: 'unknown_version', version: 0 });
     expect(refusal(JSON.stringify({ session: s }))?.kind).toBe('unknown_version');
+  });
+
+  it('a version 1 save is refused with unknown_version', () => {
+    // a pre-M5.1 save: version 1, the session still carrying the chooser field; never migrated (P8)
+    const v1 = refusal(JSON.stringify({ version: 1, savedAt: SAVED_AT, session: { ...s, chooser: null } }));
+    expect(v1).toEqual({
+      kind: 'unknown_version', version: 1, message: 'unknown save version 1; this build reads save version 2',
+    });
+    // the same session under the current version loads (the old key is dropped)
+    expect(loaded(JSON.stringify({ version: SAVE_VERSION, session: { ...s, chooser: null } }))).toEqual(s);
   });
 
   it('values nested 10,000+ deep (parse fine, overflow a recursive stringify) are typed refusals, never a throw', () => {
@@ -254,9 +265,9 @@ describe('loadSave refusals', () => {
       const version = run(`{"version":${deep},"session":${session}}`);
       expect(version?.kind).toBe('unknown_version');
       expect((version as { message: string }).message).toContain(`unknown save version ${shown}`);
-      expect(run(`{"version":1,"savedAt":${deep},"session":${session}}`)?.kind).toBe('malformed');
-      expect(run(`{"version":1,"session":${deep}}`)?.kind).toBe('invalid_session');
-      expect(run(`{"version":1,"session":${seedless.replace('"__DEEP__"', deep)}}`)).toMatchObject({
+      expect(run(`{"version":${SAVE_VERSION},"savedAt":${deep},"session":${session}}`)?.kind).toBe('malformed');
+      expect(run(`{"version":${SAVE_VERSION},"session":${deep}}`)?.kind).toBe('invalid_session');
+      expect(run(`{"version":${SAVE_VERSION},"session":${seedless.replace('"__DEEP__"', deep)}}`)).toMatchObject({
         kind: 'invalid_session', detail: 'session.run.seed: expected a string',
       });
     }
@@ -267,7 +278,7 @@ describe('loadSave refusals', () => {
     for (const bad of [text.slice(0, -1), text.slice(0, text.length >> 1), '', '{', 'null', '[]', '42', '"save"', 'true']) {
       expect(refusal(bad)?.kind, JSON.stringify(bad.slice(0, 20))).toBe('malformed');
     }
-    expect(refusal(JSON.stringify({ version: 1, savedAt: 42, session: s }))?.kind).toBe('malformed');
+    expect(refusal(JSON.stringify({ version: SAVE_VERSION, savedAt: 42, session: s }))?.kind).toBe('malformed');
   });
 
   it('a session with two Kings, or none, is invalid', () => {
@@ -284,7 +295,7 @@ describe('loadSave refusals', () => {
     expect(refusal(saveWith(s, x => { x.run.loadout = fill(c.run.loadoutSlots + 1); }))?.kind).toBe('invalid_session');
   });
 
-  it('a deck over capacity is invalid outside action, the chooser and a lost run', () => {
+  it('a deck over capacity is invalid outside action, the shop and the end of a run', () => {
     const { sessions } = snapshots();
     const over = (x: any, k: number) => {
       for (let i = 0; i < k; i++) x.run.deck.push(normal(`p_over_${i}`, 'knight'));
@@ -292,10 +303,30 @@ describe('loadSave refusals', () => {
     for (const snap of sessions) {
       const room = c.deck.capacity - nonKing(snap);
       const text = saveWith(snap, x => over(x, room + 1));
-      const exempt = snap.phase === 'action' || snap.phase === 'chooser' || snap.outcome?.result === 'lost';
+      const exempt = snap.phase === 'action' || snap.phase === 'shop' || snap.phase === 'ended';
       if (exempt) expect(refusal(text), snap.phase).toBeNull();
       else expect(refusal(text)?.kind, snap.phase).toBe('invalid_session');
       if (room >= 0) expect(refusal(saveWith(snap, x => over(x, room))), snap.phase).toBeNull();
+    }
+    // a run won with a promotion in its last stage: the size no longer matters
+    const ended = sessions.at(-1)!;
+    const won = saveWith(ended, x => { x.outcome = { result: 'won' }; x.run.status = 'won'; over(x, c.deck.capacity + 1 - nonKing(ended)); });
+    expect(refusal(won)).toBeNull();
+    expect(ALL_PHASES.filter(ph => !sessions.some(x => x.phase === ph))).toEqual([]);
+  });
+
+  it('a save in the shop with 9 pieces reloads and is still gated', () => {
+    const { sessions } = snapshots();
+    const nine = sessions.find(x => x.phase === 'shop' && nonKing(x) === c.deck.capacity + 1)!;
+    expect(nine).toBeDefined();
+    const gate = { ok: false, error: { kind: 'deck_over_capacity', size: c.deck.capacity + 1, capacity: c.deck.capacity } };
+    for (const snap of [nine, ok(provideStage(nine, stub(mateInOneStage)(nine), c)).session]) {
+      const back = loaded(serializeSave(snap, SAVED_AT));
+      expect(back).toEqual(snap);
+      expect(leave(back, c)).toEqual(gate);
+      const fits = ok(sell(back, 'p_fill_01', c)).session;
+      expect(nonKing(fits)).toBe(c.deck.capacity);
+      expect(ok(leave(fits, c)).session.phase).toBe(snap.next!.stage ? 'deployment' : 'awaiting_stage');
     }
   });
 
@@ -306,7 +337,6 @@ describe('loadSave refusals', () => {
       ['awaiting_stage', x => { x.next = null; }],
       ['deployment', x => { x.stage = null; }],
       ['action', x => { x.stage = null; }],
-      ['chooser', x => { x.chooser = null; }],
       ['shop', x => { x.shop = null; }],
       ['shop', x => { x.next = null; }],
       ['ended', x => { x.outcome = null; }],
@@ -330,7 +360,7 @@ describe('loadSave refusals', () => {
     ];
     for (const edit of wrong) expect(refusal(saveWith(s, edit))?.kind, edit.toString()).toBe('invalid_session');
     for (const session of [null, 7, 'session', [], {}]) {
-      expect(refusal(JSON.stringify({ version: 1, session }))?.kind, JSON.stringify(session)).toBe('invalid_session');
+      expect(refusal(JSON.stringify({ version: SAVE_VERSION, session }))?.kind, JSON.stringify(session)).toBe('invalid_session');
     }
   });
 

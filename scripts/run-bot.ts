@@ -15,8 +15,8 @@ import type { Action, EndReason } from '@checkbreaker/engine';
 import { generateStage } from '@checkbreaker/gen';
 import type { GenContent, Solution } from '@checkbreaker/gen';
 import {
-  abandon, applyChooserMove, applyShopMove, chooseChooserAction, chooseShopAction, commit, fallbackPlacements,
-  fallbackQueue, loadSave, memoryStorage, newRun, provideStage, serializeSave, start,
+  abandon, applyShopMove, chooseShopAction, commit, fallbackPlacements, fallbackQueue, loadSave, memoryStorage, newRun,
+  provideStage, serializeSave, start,
 } from '@checkbreaker/run';
 import type { GenRequest, RunResult, RunSession } from '@checkbreaker/run';
 
@@ -39,7 +39,7 @@ type StageLog = {
   outcome: 'win' | 'loss' | 'abandoned';
   turns: number;
   coins: number; // wallet after the stage (award, overtime and salvage applied)
-  deck: number; // non-king pieces after the stage (before the chooser, if one opened)
+  deck: number; // non-king pieces after the stage (a promotion may leave it over 8; the shop trims it)
 };
 type RunLog = {
   seed: string;
@@ -172,18 +172,12 @@ function playRun(seed: string, rc: RunConfig, generate: (r: GenRequest) => Retur
           supply();
           break;
         }
+        // The next stage's solution is known here, so its pieces are protected: a merge never takes them, and the
+        // sale that trims a deck a promotion overflowed takes one only when nothing else can go (the deck gate).
         const protectedIds = new Set(solution?.placements.map(p => p.instanceId) ?? []);
         const m = chooseShopAction(s, protectedIds, rc);
         if (!apply(applyShopMove(s, m, rc), `shop ${m.kind}`)) giveUp('bot_failure');
         else if (m.kind !== 'leave') log.actions[m.kind]++;
-        break;
-      }
-
-      case 'chooser': {
-        // The next stage is requested only once the chooser closes, so nothing is protected here.
-        const m = chooseChooserAction(s, new Set(), rc);
-        if (!apply(applyChooserMove(s, m, rc), `chooser ${m.kind}`)) giveUp('bot_failure');
-        else log.actions[m.kind]++;
         break;
       }
 

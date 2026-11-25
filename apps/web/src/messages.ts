@@ -80,7 +80,6 @@ const PHASE: Record<RunPhase, string> = {
   awaiting_stage: 'waiting for the next stage',
   deployment: 'deployment',
   action: 'the action phase',
-  chooser: 'the deck chooser',
   shop: 'the shop',
   ended: 'a finished run',
 };
@@ -109,6 +108,11 @@ export function runErrorText(e: RunError): string {
       return `Not enough coins: it costs ${e.price}, you have ${e.coins}.`;
     case 'deck_full':
       return 'Your deck is full. Sell or cut a piece first.';
+    case 'deck_over_capacity': {
+      const over = e.size - e.capacity;
+      return `Your deck holds ${e.size} pieces, over the limit of ${e.capacity}. `
+        + `Sell, merge or cut ${over === 1 ? 'a piece' : `${over} pieces`} before the next stage.`;
+    }
     case 'loadout_full':
       return 'Your skill loadout is full. Replace a skill instead.';
     case 'replace_not_needed':

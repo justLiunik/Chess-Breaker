@@ -3,7 +3,7 @@ import { useShortcuts } from '../input/shortcuts';
 import { useReducedMotion } from '../settings';
 import { useRun } from '../state/store';
 
-/** After a mate: the position the player left, then what the stage paid. Continue goes on to the chooser or shop. */
+/** After a mate: the position the player left, then what the stage paid. Continue goes on to the shop or the run results. */
 export function StageResults() {
   const { session, lastCommit, dispatch } = useRun();
   const motionReduced = useReducedMotion();

@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { abandon, commit, expectedSeed, loadSave, memoryStorage, newRun, provideStage, serializeSave, start } from '@checkbreaker/run';
+import {
+  SAVE_VERSION, abandon, commit, expectedSeed, loadSave, memoryStorage, newRun, provideStage, serializeSave, start,
+} from '@checkbreaker/run';
 import type { RunSession, RunStorage } from '@checkbreaker/run';
 import type { StageState } from '@checkbreaker/engine';
 import { App } from '../src/App';
@@ -29,7 +31,7 @@ function actionSession(mut?: (s: RunSession) => void, stage?: (s: StageState) =>
   mut?.(s);
   return s;
 }
-/** The same after the mate: the Shop (or the Chooser when the mutation left the deck over capacity). */
+/** The same after the mate: the Shop, even when the mutation left the deck over capacity. */
 function wonSession(mut?: (s: RunSession) => void): RunSession {
   return ok(commit(actionSession(mut), [STARTER_MATE.move], c)).session;
 }
@@ -62,7 +64,7 @@ describe('Title', () => {
 
   it('shows a corrupt save once, and New run replaces it', async () => {
     const storage = memoryStorage();
-    storage.write('{"version":1,"session":{"nope":true}}');
+    storage.write(JSON.stringify({ version: SAVE_VERSION, session: { nope: true } }));
     const bad = loadSave(storage.read()!, c);
     if (bad.ok) throw new Error('fixture should be corrupt');
     const { u } = await mount(null, testStageSource(), storage);
@@ -268,15 +270,19 @@ describe('Shop', () => {
   });
 });
 
-describe('Chooser', () => {
-  it('shows the over-capacity count and closes when the deck fits', async () => {
+describe('a deck over capacity after a win (no Chooser screen, M5.1)', () => {
+  it('a shop save at 9 pieces opens the Shop; a cut there brings the deck back to 8', async () => {
     const s = wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); });
-    expect(s.phase).toBe('chooser');
-    const { u } = await mount(s);
-    expect(screen.getByTestId('chooser').textContent).toMatch(/1 piece over/);
-    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Cut/ }));
+    expect(s.phase).toBe('shop');
+    expect(s.run.deck.filter((p) => p.pieceType !== 'king')).toHaveLength(c.deck.capacity + 1);
+    const { u, storage } = await mount(s);
     expect(screen.queryByTestId('chooser')).toBeNull();
     expect(screen.getByTestId('shop')).toBeTruthy();
+    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Cut/ }));
+    expect(screen.getByTestId('shop')).toBeTruthy();
+    const saved = loadSave(storage.read()!, c);
+    if (!saved.ok) throw new Error('save');
+    expect(saved.value.run.deck.filter((p) => p.pieceType !== 'king')).toHaveLength(c.deck.capacity);
   });
 });
 
@@ -534,7 +540,6 @@ describe('resume', () => {
     ['deployment', () => ok(provideStage(newRun(SEED, c), starterMateStage(expectedSeed(SEED, 0, 0)), c)).session, 'run-map'],
     ['action', () => actionSession(), 'action-screen'],
     ['shop', () => wonSession(), 'shop'],
-    ['chooser', () => wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); }), 'chooser'],
     ['awaiting_stage', () => newRun(SEED, c), 'building', never],
     ['ended', () => ok(abandon(wonSession())).session, 'run-results'],
   ];

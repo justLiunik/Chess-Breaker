@@ -6,8 +6,12 @@ import type {
 import type { RunConfig } from '@checkbreaker/content';
 import type { GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
 
-/** The save file's format version (spec section 8.5); `loadSave` reads this version only. */
-export const SAVE_VERSION = 1;
+/**
+ * The save file's format version (spec section 8.5); `loadSave` reads this version only. 2 from M5.1: the
+ * stage-end deck phase is gone and promoted pieces carry `pricePaid: 0`. A version 1 save is refused with
+ * `unknown_version`, never migrated (M5.1 spec decision P8).
+ */
+export const SAVE_VERSION = 2;
 
 export type SaveError =
   | { kind: 'malformed'; detail: string }
@@ -43,8 +47,9 @@ export function serializeSave(s: RunSession, savedAt?: string): string {
  * Reads a save written by `serializeSave`. Never throws: text that is not a JSON save object is `malformed`,
  * a version other than SAVE_VERSION is `unknown_version`, and a session of the wrong shape or breaking an
  * invariant is `invalid_session` (spec section 8.5): exactly one King; the non-king deck within
- * `deck.capacity` except in action, the chooser, or a run lost mid-stage (promotions join the deck during a
- * stage and only the chooser trims them); the loadout within `run.loadoutSlots`; each phase has its fields.
+ * `deck.capacity` except in action, the shop, or a run that ended (promotions join the deck during a stage,
+ * the shop's deck gate trims it before the next stage, and after the run the size no longer matters); the
+ * loadout within `run.loadoutSlots`; each phase has its fields.
  */
 export function loadSave(text: string, c: RunConfig): Result<RunSession, SaveError> {
   let parsed: unknown;
@@ -96,7 +101,7 @@ class Invalid extends Error {}
  * a compile-time check that it misses none: a union member absent from its list turns the paired constant
  * into `never`, which `true` is not assignable to.
  */
-const PHASES = ['awaiting_stage', 'deployment', 'action', 'chooser', 'shop', 'ended'] as const satisfies readonly RunPhase[];
+const PHASES = ['awaiting_stage', 'deployment', 'action', 'shop', 'ended'] as const satisfies readonly RunPhase[];
 const _phases: Exclude<RunPhase, typeof PHASES[number]> extends never ? true : never = true;
 const PIECE_TYPES = ['king', 'pawn', 'knight', 'bishop', 'rook', 'queen'] as const satisfies readonly PieceType[];
 const _pieceTypes: Exclude<PieceType, typeof PIECE_TYPES[number]> extends never ? true : never = true;
@@ -372,9 +377,6 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
         piecesLost: num(own(t, 'piecesLost'), `${at}.piecesLost`),
       };
     }),
-    chooser: nullable(own(s, 'chooser'), 'session.chooser', (x, at) => (
-      { overCapacity: int(own(obj(x, at), 'overCapacity'), `${at}.overCapacity`, 1) }
-    )),
     shop: nullable(own(s, 'shop'), 'session.shop', (x, at) => checkShop(x, at, c)),
     next: nullable(own(s, 'next'), 'session.next', (x, at) => {
       const n = obj(x, at);
@@ -402,14 +404,14 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
   const kings = deck.filter(p => p.pieceType === 'king').length;
   if (kings !== 1) bad('session.run.deck', `expected exactly one King, found ${kings}`);
   const nonKing = deck.length - kings;
-  const midStage = phase === 'action' || phase === 'chooser' || (phase === 'ended' && session.outcome?.result === 'lost');
-  if (!midStage && nonKing > c.deck.capacity) {
+  const mayOverflow = phase === 'action' || phase === 'shop' || phase === 'ended';
+  if (!mayOverflow && nonKing > c.deck.capacity) {
     bad('session.run.deck', `${nonKing} non-king pieces exceed the capacity of ${c.deck.capacity} in phase ${phase}`);
   }
   const loadout = run.loadout.length;
   if (loadout > c.run.loadoutSlots) bad('session.run.loadout', `${loadout} skills exceed the ${c.run.loadoutSlots} loadout slots`);
   const needs: Partial<Record<RunPhase, (keyof RunSession)[]>> = {
-    awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], chooser: ['chooser'], shop: ['shop', 'next'], ended: ['outcome'],
+    awaiting_stage: ['next'], deployment: ['stage'], action: ['stage'], shop: ['shop', 'next'], ended: ['outcome'],
   };
   const inStage = phase === 'deployment' || phase === 'action';
   if (inStage !== (session.entryStage !== null)) {

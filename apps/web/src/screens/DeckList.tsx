@@ -7,7 +7,7 @@ import { runConfig } from '../config';
 import { runErrorText } from '../messages';
 import { useRun } from '../state/store';
 
-export type DeckMode = 'view' | 'chooser' | 'shop';
+export type DeckMode = 'view' | 'shop';
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 export const pieceLabel = (p: Pick<PieceInstance, 'pieceType' | 'rarity'>): string =>
@@ -17,7 +17,7 @@ const STATUS: Partial<Record<PieceInstance['status'], string>> = { spent: 'spent
 
 /**
  * The deck in the run's own order (never re-sorted, so a row does not jump when its durability changes).
- * In the shop and the chooser each row offers Sell / Cut (and Repair in the shop) and can be ticked for a merge.
+ * In the shop each row offers Sell / Cut (and Repair for a damaged piece) and can be ticked for a merge.
  * Whether an action is possible is asked of the run layer's own functions on the current run; the UI decides nothing.
  */
 export function DeckList({ mode }: { mode: DeckMode }) {
