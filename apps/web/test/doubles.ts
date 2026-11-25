@@ -53,7 +53,8 @@ export function testStageSource(): StageSource {
         : deploymentStage({ h8: 'k', g7: 'p', h7: 'p' }, {
           stageSeed: seed, mateIn: 4, enemyPolicy: { type: 'scripted', line: ['h7h6'], fallbackDepth: 1 },
         });
-      return Promise.resolve({ id, ok: true as const, stage, provenance: null, ms: 0 });
+      const clue = req.actIndex === 0 && req.stageIndex === 0 ? STARTER_MATE.placements : null;
+      return Promise.resolve({ id, ok: true as const, stage, provenance: null, ms: 0, clue });
     },
   };
 }

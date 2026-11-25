@@ -23,7 +23,7 @@ function stubSource(seen: { templateId?: string; req: GenRequest }[] = []): Stag
     request(id, req, templateId) {
       seen.push({ templateId, req });
       const i = Number(req.run.seed.slice(req.run.seed.lastIndexOf('-') + 1));
-      return Promise.resolve({ id, ok: true as const, stage: null as never, provenance: null, ms: i + 1 });
+      return Promise.resolve({ id, ok: true as const, stage: null as never, provenance: null, ms: i + 1, clue: null });
     },
   };
 }

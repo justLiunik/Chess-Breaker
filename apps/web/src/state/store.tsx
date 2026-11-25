@@ -125,7 +125,7 @@ export function RunProvider({ source, storage, children }: { source: StageSource
     sourceRef.current.request(id, wanted).then((answer) => {
       if (pendingRef.current?.id !== id || answer.id !== id) return; // stale: the run moved on
       if (!answer.ok) return fail(answer.message);
-      const r = provideStage(sessionRef.current!, answer.stage, runConfig);
+      const r = provideStage(sessionRef.current!, answer.stage, runConfig, answer.clue);
       pendingRef.current = null;
       if (!r.ok) {
         failedRef.current = wanted;

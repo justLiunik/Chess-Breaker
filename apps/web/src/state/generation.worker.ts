@@ -4,6 +4,7 @@ import { parseFormations, parseGenConfig, parseTemplates } from '@checkbreaker/c
 import type { GenConfig } from '@checkbreaker/content/parse';
 import type { GenRequest } from '@checkbreaker/run';
 import { genTexts } from './genContent';
+import { clueOf } from './stageSource';
 import type { StageAnswer } from './stageSource';
 
 type Loaded = { config: GenConfig; content: GenContent };
@@ -31,7 +32,7 @@ self.onmessage = (e: MessageEvent<{ id: number; request: GenRequest; templateId?
       ? content
       : { ...content, templates: content.templates.filter((t) => t.id === templateId) };
     const out = generateStage(request, offered, config);
-    answer = { id, ok: true, stage: out.stage, provenance: out.provenance, ms: performance.now() - t0 };
+    answer = { id, ok: true, stage: out.stage, provenance: out.provenance, ms: performance.now() - t0, clue: clueOf(out.solution) };
   } catch (err) {
     answer = { id, ok: false, message: err instanceof Error ? err.message : String(err) };
   }
