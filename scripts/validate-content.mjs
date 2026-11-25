@@ -797,7 +797,10 @@ const REMOVED_PROMOTION_KEYS = ['resultTypeWeights', 'tierUpChance', 'appliesRet
   }
 }
 
-// 2a''''. Templates: spawned pawns stay out of the enemy zone.
+// 2a''''. Templates: spawned pawns stay out of the enemy zone and on rank 6 or lower. G5's
+// no_first_turn_mate moves only summons, never a spawned pawn, so a pawn on rank 7 could promote
+// and mate on turn 1 (b7-b8=Q#) without G5 seeing it (docs/04 §4).
+const MAX_SPAWN_RANK = 6;
 for (const t of templates) {
   const sp = t.spawnedPawns;
   if (!sp) continue;
@@ -812,7 +815,12 @@ for (const t of templates) {
     fail(`${t.id}: spawnedPawns.ranks overlap enemyZone on rank(s) ${overlap.join(', ')}`);
     problems += 1;
   }
-  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, clear of the enemy zone`);
+  const high = sp.ranks.filter((r) => r > MAX_SPAWN_RANK);
+  if (high.length > 0) {
+    fail(`${t.id}: spawnedPawns.ranks ${high.join(', ')} above ${MAX_SPAWN_RANK}: spawned pawns stand on rank ${MAX_SPAWN_RANK} or lower; G5 moves summons only, so a pawn on rank 7 could promote-mate on turn 1 (docs/04 §4)`);
+    problems += 1;
+  }
+  if (problems === 0) ok(`${t.id}: ${lo}–${hi} spawned pawn(s) on ranks ${sp.ranks.join('/')}, clear of the enemy zone and at most rank ${MAX_SPAWN_RANK}`);
 }
 
 // 2a-sell. Selling deck pieces (docs/07 §4). The sell factor must stay at or

@@ -68,7 +68,7 @@ rarity pool ([06 §4](06-deck-durability-and-permadeath.md#4-piece-categories-an
 
 Spawned-pawn ranks are a real design dial. Closer to rank 8 makes promotion a cheap side-objective;
 further away makes it a costly detour from the par. With no turn limit, rank 8 is always reachable;
-the validator rejects a template whose spawn ranks overlap `enemyZone`.
+the validator rejects a template whose spawn ranks overlap `enemyZone` or lie above rank 6 (§4).
 Spawn ranks may lie inside the deployment ranks (3 and 4 usually do): a spawned pawn simply takes a
 square the player could otherwise deploy on, and `deployment_squares_available` counts it.
 
@@ -186,6 +186,9 @@ one piece to cover the squares another needs to mate. A deployment of three or m
 combines into a turn-1 mate is possible in principle; the spawn-point budget keeps it rare (at most
 three summons in Act I), and finding one is a reward for reading the board, not a bug. If playtests
 show it happening, the check widens to triples (tracked in [10](10-roadmap-and-milestones.md)).
+It also moves only the summons, never a spawned pawn, and since M5.1 a pawn on rank 7 could promote
+and mate on turn 1 (`b7-b8=Q#`) without the check seeing it, so spawn ranks stop at 6 (the template
+schema and the validator refuse rank 7).
 
 ## 5. The solver
 
