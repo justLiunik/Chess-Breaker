@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CommitError, DropRefusal } from '@checkbreaker/engine';
 import type { RunError, SaveError } from '@checkbreaker/run';
-import { commitErrorText, dropRefusalText, runErrorText, saveErrorText } from '../src/messages';
+import { commitErrorText, deckGateText, dropRefusalText, runErrorText, saveErrorText } from '../src/messages';
 
 const commit: Record<CommitError['kind'], CommitError> = {
   king_in_check_at_end: { kind: 'king_in_check_at_end', square: 'e1', checkers: ['e8'], afterRevert: false },
@@ -104,6 +104,8 @@ describe('error messages', () => {
     checkTable(reasons.map((reason) => commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason })));
     expect(commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason: 'gives_check' })).toMatch(/check/i);
     expect(commitErrorText({ kind: 'invalid_deployment', to: 'c4', reason: 'queen_limit' })).toMatch(/queen/i);
+    expect(dropRefusalText('gives_check')).toMatch(/block the line first/i);
+    expect(deckGateText({ size: 9, capacity: 8 })).toBe('Deck 9/8: sell, merge or cut to continue');
     const drops: DropRefusal[] = [
       'occupied', 'outside_zone', 'king_in_check', 'gives_check', 'queen_limit', 'not_in_deck', 'duplicate', 'spawn_points_exceeded',
     ];

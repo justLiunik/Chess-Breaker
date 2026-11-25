@@ -76,6 +76,21 @@ describe('Title', () => {
     expect(loadSave(storage.read()!, c).ok).toBe(true);
   });
 
+  it('an old version 1 save shows the version message once and New run replaces it', async () => {
+    const storage = memoryStorage();
+    storage.write(JSON.stringify({ version: 1, savedAt: at, session: {} }));
+    const old = loadSave(storage.read()!, c);
+    if (old.ok) throw new Error('a version 1 save must be refused');
+    expect(old.error.kind).toBe('unknown_version');
+    const { u } = await mount(null, testStageSource(), storage);
+    expect(screen.getAllByText(saveErrorText(old.error))).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Continue/ })).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'New run' }));
+    await flush();
+    expect(screen.queryByText(saveErrorText(old.error))).toBeNull();
+    expect(loadSave(storage.read()!, c).ok).toBe(true);
+  });
+
   it('asks before New run replaces a valid save; Cancel keeps it', async () => {
     const storage = memoryStorage();
     storage.write(serializeSave(wonSession(), at));
@@ -283,6 +298,25 @@ describe('a deck over capacity after a win (no Chooser screen, M5.1)', () => {
     const saved = loadSave(storage.read()!, c);
     if (!saved.ok) throw new Error('save');
     expect(saved.value.run.deck.filter((p) => p.pieceType !== 'king')).toHaveLength(c.deck.capacity);
+  });
+});
+
+describe('the shop deck gate (M5.1)', () => {
+  const overfull = () => wonSession((x) => { for (let i = 0; i < 5; i++) x.run.deck.push(knight(i)); });
+
+  it('the shop disables next stage at 9 pieces and names why', async () => {
+    await mount(overfull());
+    const leave = screen.getByRole('button', { name: 'Leave shop' });
+    expect(leave.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTestId('deck-gate').textContent).toBe('Deck 9/8: sell, merge or cut to continue');
+    expect(leave.getAttribute('title')).toBe('Deck 9/8: sell, merge or cut to continue');
+  });
+
+  it('selling down to 8 enables it', async () => {
+    const { u } = await mount(overfull());
+    await u.click(within(screen.getByTestId('deck-piece-p_x_0')).getByRole('button', { name: /Sell/ }));
+    expect(screen.getByRole('button', { name: 'Leave shop' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByTestId('deck-gate')).toBeNull();
   });
 });
 

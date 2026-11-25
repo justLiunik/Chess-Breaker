@@ -18,7 +18,7 @@ const DEPLOY_REASON: Record<Extract<CommitError, { kind: 'invalid_deployment' }>
   outside_zone: 'that square is outside your deployment zone',
   king_missing: 'your King must be placed first',
   king_in_check: 'the King would start in check',
-  gives_check: 'a piece there would give check to the enemy King at the start',
+  gives_check: 'a piece there would give check to the enemy King at START; block the line first or choose another square',
   queen_limit: 'only one Queen can be summoned per stage',
   not_in_deck: 'that piece is not in your deck',
   duplicate: 'that piece is already placed',
@@ -177,6 +177,11 @@ const DROP_REASON: Record<DropRefusal, string> = {
 /** Why `deploymentStatus(...).drop` refused a placement. */
 export function dropRefusalText(reason: DropRefusal): string {
   return `Cannot place it there: ${DROP_REASON[reason]}.`;
+}
+
+/** The shop's gate line for a refused `leave`, as in "Deck 9/8: sell, merge or cut to continue". */
+export function deckGateText(e: { size: number; capacity: number }): string {
+  return `Deck ${e.size}/${e.capacity}: sell, merge or cut to continue`;
 }
 
 function assertNever(x: never): never {

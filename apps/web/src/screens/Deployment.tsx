@@ -97,14 +97,18 @@ export function Deployment() {
   };
 
   // While the King is selected or dragged, mark the deployment squares where it would start in check.
-  const king = run.deck.find((i) => i.pieceType === 'king');
-  const kingActive = king !== undefined && (selected === king.instanceId || dragging === king.instanceId);
+  // While a piece is selected or dragged, mark the squares the engine refuses for START-safety reasons:
+  // the King starting in check, a piece giving check, or a second queen.
+  const activeId = selected ?? dragging;
   const marks: Mark[] = [];
-  if (king && kingActive) {
-    const judge = statusFor(king.instanceId);
+  if (activeId) {
+    const judge = statusFor(activeId);
     for (const sq of hatch) {
-      const v = judge.drop(king.instanceId, sq);
-      if (!v.ok && v.reason === 'king_in_check') marks.push({ square: sq, kind: 'king-unsafe', label: 'King would start in check here' });
+      const v = judge.drop(activeId, sq);
+      if (v.ok) continue;
+      if (v.reason === 'king_in_check') marks.push({ square: sq, kind: 'king-unsafe', label: 'King would start in check here' });
+      else if (v.reason === 'gives_check') marks.push({ square: sq, kind: 'deploy-refused', label: 'Gives check to the enemy King at START: block the line first or choose another square' });
+      else if (v.reason === 'queen_limit') marks.push({ square: sq, kind: 'deploy-refused', label: 'One queen per stage' });
     }
   }
 

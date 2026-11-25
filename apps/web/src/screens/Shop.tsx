@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { buy as tryBuy, rerollShop, rerollsLeft } from '@checkbreaker/run';
+import { buy as tryBuy, leave as tryLeave, rerollShop, rerollsLeft } from '@checkbreaker/run';
 import { Board } from '../board/Board';
 import { PieceGlyph } from '../board/pieces';
 import { engineConfig, runConfig, skillNames, skillTexts } from '../config';
 import { Header } from '../hud/Header';
 import { useShortcuts } from '../input/shortcuts';
 import { useReducedMotion } from '../settings';
-import { runErrorText } from '../messages';
+import { deckGateText, runErrorText } from '../messages';
 import { useRun } from '../state/store';
 import { GenFailure } from './Building';
 import { DeckList, pieceLabel } from './DeckList';
@@ -27,6 +27,10 @@ export function Shop() {
   const roll = rerollShop(run, shop, c);
   const rollCost = roll.ok ? roll.value.cost : roll.error.kind === 'insufficient_coins' ? roll.error.price : null;
   const left = rerollsLeft(shop, c);
+
+  // The deck gate is the run layer's own answer to a dry run of leave, not a recount here.
+  const gate = tryLeave(session, c);
+  const gateText = !gate.ok && gate.error.kind === 'deck_over_capacity' ? deckGateText(gate.error) : null;
 
   const buy = (slot: number): void => {
     // A buy the run layer refuses only for a full loadout asks which skill to replace.
@@ -90,7 +94,12 @@ export function Shop() {
               : <p role="status">The next stage is being prepared…</p>}
         </aside>
       </div>
-      <p><button type="button" className="start" onClick={() => dispatch({ type: 'leave' })}>Leave shop</button></p>
+      {gateText && <p role="status" className="error" data-testid="deck-gate">{gateText}</p>}
+      <p>
+        <button type="button" className="start" disabled={gateText !== null} title={gateText ?? undefined} onClick={() => dispatch({ type: 'leave' })}>
+          Leave shop
+        </button>
+      </p>
       {choosing !== null && (
         <div className="confirm" role="dialog" aria-modal="true" aria-label="Replace a skill">
           <p>Your skill loadout is full. Which skill does {skillNames[(shop.slots[choosing - 1] as { skillId: string }).skillId]} replace?</p>

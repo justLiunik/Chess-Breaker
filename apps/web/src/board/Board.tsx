@@ -63,7 +63,7 @@ const samePiece = (a: BoardPiece | undefined, b: BoardPiece | undefined): boolea
 function MarkIcon({ kind }: { kind: string }) {
   return (
     <svg className={`mark-icon mark-${kind}`} data-mark={kind} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-      {kind === 'king-unsafe'
+      {kind === 'king-unsafe' || kind === 'deploy-refused'
         ? <><path d="M3 3H17V12L10 18L3 12Z" /><path d="M7 6L13 12M13 6L7 12" /></>
         : <circle cx="10" cy="10" r="4" />}
     </svg>

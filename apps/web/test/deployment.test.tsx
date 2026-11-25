@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pendingBase, spawnCostOf } from '@checkbreaker/engine';
+import type { PieceInstance } from '@checkbreaker/engine';
 import { memoryStorage, newRun, serializeSave } from '@checkbreaker/run';
 import { engineConfig, runConfig } from '../src/config';
 import { dropRefusalText } from '../src/messages';
@@ -20,8 +21,9 @@ function Probe() {
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
 /** A run whose deck also holds a Normal rook (the starter deck has none), continued into stage 0. */
-async function setup(source: StageSource = testStageSource()) {
+async function setup(source: StageSource = testStageSource(), extra: PieceInstance[] = []) {
   const session = newRun('7F3A-2210', runConfig);
+  session.run.deck.push(...extra);
   session.run.deck.push({
     instanceId: 'p_rook_01', pieceType: 'rook', rarity: 'normal', durability: 2, durabilityMax: 2,
     origin: 'reward', acquiredAtStage: 0, status: 'in_deck',
@@ -236,6 +238,48 @@ describe('Deployment screen', () => {
       expect(square('a1').querySelector('[data-mark="king-unsafe"]')).not.toBeNull();
       fireEvent.dragEnd(trayPiece('p_king_01'), { dataTransfer: t });
       expect(square('a1').querySelector('[data-mark="king-unsafe"]')).toBeNull();
+    });
+  });
+
+  describe('START-check and queen marks (M5.1)', () => {
+    /** The h7 pawn is gone, so a rook on the h-file gives check to the h8 king. */
+    const open = (): StageSource => {
+      const inner = testStageSource();
+      return {
+        async request(id, req) {
+          const a = await inner.request(id, req);
+          if (!a.ok) return a;
+          delete a.stage.board.h7;
+          return a;
+        },
+      };
+    };
+    const queen = (n: number): PieceInstance => ({
+      instanceId: `p_queen_${n}`, pieceType: 'queen', rarity: 'normal', durability: 2, durabilityMax: 2,
+      origin: 'reward', acquiredAtStage: 0, status: 'in_deck',
+    });
+
+    it('deployment marks a checking square gives_check and names the way out', async () => {
+      await setup(open());
+      const u = user();
+      await u.click(trayPiece('p_rook_01'));
+      expect(square('h1').querySelector('[data-mark="deploy-refused"]')).not.toBeNull();
+      expect(square('h1').getAttribute('aria-label')).toMatch(/gives check.*block the line first/i);
+      expect(square('b1').querySelector('[data-mark="deploy-refused"]')).toBeNull();
+      await u.click(square('h1'));
+      expect(screen.getByRole('alert').textContent).toMatch(/block the line first/i);
+      expect(square('h1').getAttribute('aria-label')).not.toMatch(/white rook/);
+    });
+
+    it('a second queen in the tray reads one queen per stage', async () => {
+      await setup(testStageSource(), [queen(7), queen(8)]);
+      const u = user();
+      await u.click(trayPiece('p_queen_7'));
+      await u.click(square('b1'));
+      expect(trayPiece('p_queen_8').textContent).toMatch(/one queen per stage/i);
+      expect(trayPiece('p_queen_8').hasAttribute('disabled')).toBe(true);
+      await u.click(trayPiece('p_queen_7'));
+      expect(trayPiece('p_queen_8').textContent).not.toMatch(/one queen per stage/i);
     });
   });
 
