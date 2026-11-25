@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Action, PieceInstance, PromotionType, StageState } from '@checkbreaker/engine';
 import * as runPackage from '../src';
-import { abandon, buy, commit, expectedSeed, leave, newRun, provideStage, repair, reroll, sell, start } from '../src/session';
+import { abandon, buy, commit, devSkipStage, expectedSeed, leave, newRun, provideStage, repair, reroll, sell, start } from '../src/session';
 import { SAVE_VERSION, loadSave, memoryStorage, serializeSave } from '../src/save';
 import type { SaveError } from '../src/save';
 import type { RunEvent, RunPhase, RunResult, RunSession } from '../src/types';
@@ -472,5 +472,67 @@ describe('memoryStorage', () => {
     expect(runPackage.serializeSave).toBe(serializeSave);
     expect(runPackage.memoryStorage).toBe(memoryStorage);
     expect(runPackage.SAVE_VERSION).toBe(SAVE_VERSION);
+  });
+});
+
+describe('the placement clue in a save', () => {
+  const ENTRY = { instanceId: 'p_king_01', to: 'e1' };
+  const deployed = (): RunSession => {
+    const s = newRun(SEED, c);
+    return ok(provideStage(s, stub(mateInOneStage)(s), c, [ENTRY])).session;
+  };
+  /** A shop session whose next stage (with its clue) has already been provided. */
+  const shopWithClue = (): RunSession => {
+    const shop = ok(devSkipStage(deployed(), c)).session;
+    return ok(provideStage(shop, stub(mateInOneStage)(shop), c, [ENTRY])).session;
+  };
+  const detail = (text: string): string | undefined => {
+    const e = refusal(text);
+    return e?.kind === 'invalid_session' ? e.detail : undefined;
+  };
+
+  it('a clue round-trips through the save', () => {
+    const s = deployed();
+    expect(s.clue).toEqual([{ ...ENTRY, pieceType: 'king' }]);
+    expect(loaded(serializeSave(s))).toEqual(s);
+    const shop = shopWithClue();
+    expect(shop.next!.clue).not.toBeNull();
+    expect(loaded(serializeSave(shop))).toEqual(shop);
+  });
+
+  it('a save without clue keys loads with null clues (version 2 saves written before the clue)', () => {
+    const d = loaded(saveWith(deployed(), x => { delete x.clue; }));
+    expect(d.clue).toBeNull();
+    const shop = loaded(saveWith(shopWithClue(), x => { delete x.clue; delete x.next.clue; }));
+    expect(shop.clue).toBeNull();
+    expect(shop.next!.clue).toBeNull();
+  });
+
+  it.each<[string, (e: any, x: any) => void]>([
+    ['instanceId not a string', e => { e.instanceId = 7; }],
+    ['to outside the deployment ranks', e => { e.to = 'e5'; }],
+    ['to not a square', e => { e.to = 'z9'; }],
+    ['pieceType pawn', e => { e.pieceType = 'pawn'; }],
+    ['rarity shiny', e => { e.rarity = 'shiny'; }],
+    ['duplicate instanceId', (_e, x) => { x.clue.push({ ...x.clue[0], to: 'd1' }); }],
+    ['duplicate square', (_e, x) => { x.clue.push({ ...x.clue[0], instanceId: 'p_rook_02' }); }],
+    ['clue not an array', (_e, x) => { x.clue = { not: 'an array' }; }],
+  ])('loadSave refuses a malformed clue: %s', (_label, edit) => {
+    const text = saveWith(deployed(), x => edit(x.clue[0], x));
+    expect(refusal(text)).toMatchObject({ kind: 'invalid_session' });
+    expect(detail(text)).toMatch(/session\.clue/);
+  });
+
+  it('loadSave refuses a clue outside deployment and action', () => {
+    const shop = shopWithClue();
+    const text = saveWith(shop, x => { x.clue = [{ ...ENTRY, pieceType: 'king' }]; });
+    expect(refusal(text)).toMatchObject({ kind: 'invalid_session' });
+    expect(detail(text)).toContain('session.clue: must be null in phase shop');
+  });
+
+  it('loadSave refuses a malformed next.clue', () => {
+    const text = saveWith(shopWithClue(), x => { x.next.clue[0].to = 'e5'; });
+    expect(refusal(text)).toMatchObject({ kind: 'invalid_session' });
+    expect(detail(text)).toMatch(/session\.next\.clue/);
   });
 });

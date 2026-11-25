@@ -20,7 +20,7 @@ function deployedAt(n: number): RunSession {
   const fresh = newRun(SEED, c);
   const run = { ...runWithRook(fresh.run), actIndex: Math.floor(n / 3), stageIndex: n % 3 };
   const request = { ...fresh.next!.request, run, actIndex: run.actIndex, stageIndex: run.stageIndex };
-  const s: RunSession = { ...fresh, run, next: { request, stage: null } };
+  const s: RunSession = { ...fresh, run, next: { request, stage: null, clue: null } };
   return ok(provideStage(s, mateInOneStage(expectedSeed(SEED, run.actIndex, run.stageIndex)), c)).session;
 }
 

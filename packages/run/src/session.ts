@@ -1,7 +1,9 @@
 import { commitQueue, durabilityMaxOf, endStage, hash, pendingBase, startStage } from '@checkbreaker/engine';
 import type { Action, PieceInstance, Result, RunState, Square, StageState } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { GenRequest, Offer, RunError, RunEvent, RunPhase, RunResult, RunSession, StageTally } from './types';
+import type {
+  ClueSquare, CluePlacement, GenRequest, Offer, RunError, RunEvent, RunPhase, RunResult, RunSession, StageTally,
+} from './types';
 import { cutPiece, mergePieces, repairPiece, sellPiece } from './deck';
 import { buyOffer, openShop, rerollShop } from './shop';
 
@@ -63,8 +65,8 @@ export function newRun(seed: string, c: RunConfig): RunSession {
     deck, loadout: [], history: [], rngCursor: 0, status: 'in_progress',
   };
   return {
-    version: 1, run, phase: 'awaiting_stage', stage: null, entryStage: null, tally: null, shop: null,
-    next: { request: requestFor(run, 0, c), stage: null }, outcome: null,
+    version: 1, run, phase: 'awaiting_stage', stage: null, entryStage: null, clue: null, tally: null, shop: null,
+    next: { request: requestFor(run, 0, c), stage: null, clue: null }, outcome: null,
   };
 }
 
@@ -74,7 +76,9 @@ export function newRun(seed: string, c: RunConfig): RunSession {
  * when due and a loadout slot is free. A session loaded in Deployment never passes here again, so the grant
  * cannot repeat (Review Focus 1).
  */
-function enterDeployment(s: RunSession, request: GenRequest, stage: StageState, c: RunConfig): RunResult {
+function enterDeployment(
+  s: RunSession, request: GenRequest, stage: StageState, clue: ClueSquare[] | null, c: RunConfig,
+): RunResult {
   const stageNumber = request.actIndex * c.run.stagesPerAct + request.stageIndex;
   let run: RunState = { ...s.run, actIndex: request.actIndex, stageIndex: request.stageIndex };
   const events: RunEvent[] = [{ type: 'stage_entered', stageNumber }];
@@ -84,23 +88,38 @@ function enterDeployment(s: RunSession, request: GenRequest, stage: StageState, 
     events.push({ type: 'skill_granted', skillId: free.skillId });
   }
   const tally: StageTally = { startCoins: run.coins, salvage: 0, piecesLost: 0 };
-  return done({ ...s, run, phase: 'deployment', stage, entryStage: stage, tally, shop: null, next: null }, events);
+  return done({ ...s, run, phase: 'deployment', stage, entryStage: stage, clue, tally, shop: null, next: null }, events);
+}
+
+/** Copies each entry's piece type and rarity from the snapshot's deck; null when there is no clue or an instance is missing. */
+function resolveClue(clue: CluePlacement[] | null, run: RunState): ClueSquare[] | null {
+  if (!clue) return null;
+  const out: ClueSquare[] = [];
+  for (const { instanceId, to } of clue) {
+    const piece = run.deck.find(p => p.instanceId === instanceId);
+    if (!piece) return null;
+    out.push({ instanceId, to, pieceType: piece.pieceType, ...(piece.rarity != null && { rarity: piece.rarity }) });
+  }
+  return out;
 }
 
 /**
  * Hands the session the stage its request asked for. Refused unless the stage's seed is the request's
  * (`stage_mismatch`) and no stage was provided yet (`stage_already_provided`). In awaiting_stage the stage's
- * Deployment begins; in the shop it is kept in `next.stage` and the phase does not change.
+ * Deployment begins; in the shop it is kept in `next.stage` and the phase does not change. The worker's
+ * `clue` is resolved against the request's deck snapshot (type and rarity copied); an entry naming an
+ * instance that is not in it makes the whole clue null.
  */
-export function provideStage(s: RunSession, stage: StageState, c: RunConfig): RunResult {
+export function provideStage(s: RunSession, stage: StageState, c: RunConfig, clue: CluePlacement[] | null = null): RunResult {
   if (s.phase !== 'awaiting_stage' && s.phase !== 'shop') return wrongPhase(['awaiting_stage', 'shop']);
   const next = s.next;
   if (!next) return fail({ kind: 'not_ready' });
   if (next.stage !== null) return fail({ kind: 'stage_already_provided' });
   const expected = expectedSeed(s.run.seed, next.request.actIndex, next.request.stageIndex);
   if (stage.stageSeed !== expected) return fail({ kind: 'stage_mismatch', expected, got: stage.stageSeed });
-  if (s.phase === 'awaiting_stage') return enterDeployment(s, next.request, stage, c);
-  return done({ ...s, next: { ...next, stage } }, []);
+  const resolved = resolveClue(clue, next.request.run);
+  if (s.phase === 'awaiting_stage') return enterDeployment(s, next.request, stage, resolved, c);
+  return done({ ...s, next: { ...next, stage, clue: resolved } }, []);
 }
 
 /** Deployment: `startStage` with the placements; engine refusals come back as `{ kind: 'engine' }`. */
@@ -182,7 +201,7 @@ function finishWin(
   };
   const next: RunState = { ...ended.value.run, history: [...ended.value.run.history, win] };
   const all = [...events, ...ended.value.events];
-  return proceed({ ...s, run: next, stage: null, entryStage: null, tally: null }, all, c);
+  return proceed({ ...s, run: next, stage: null, entryStage: null, clue: null, tally: null }, all, c);
 }
 
 /**
@@ -208,7 +227,7 @@ function proceed(s: RunSession, events: RunEvent[], c: RunConfig): RunResult {
   if (stageNumber >= c.run.acts * c.run.stagesPerAct - 1) return endRun(s, s.run, events, 'won');
   const piecesLost = s.run.history.at(-1)?.piecesLost ?? 0;
   const shop = openShop(s.run, stageNumber, piecesLost, c);
-  const next = { request: requestFor(s.run, stageNumber + 1, c), stage: null };
+  const next = { request: requestFor(s.run, stageNumber + 1, c), stage: null, clue: null };
   return done(
     { ...s, phase: 'shop', shop, next },
     [...events, { type: 'shop_opened', act: shop.act, recovery: shop.recovery }],
@@ -220,7 +239,7 @@ function endRun(
 ): RunResult {
   const outcome = { result, ...(endReason !== undefined && { endReason }) };
   return done(
-    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, entryStage: null, tally: null, shop: null, next: null, outcome },
+    { ...s, run: { ...run, status: result }, phase: 'ended', stage: null, entryStage: null, clue: null, tally: null, shop: null, next: null, outcome },
     [...events, { type: 'run_ended', ...outcome }],
   );
 }
@@ -312,7 +331,7 @@ export function leave(s: RunSession, c: RunConfig): RunResult {
   const size = nonKingCount(s.run);
   if (size > c.deck.capacity) return fail({ kind: 'deck_over_capacity', size, capacity: c.deck.capacity });
   if (!s.next) return fail({ kind: 'not_ready' });
-  if (s.next.stage) return enterDeployment({ ...s, shop: null }, s.next.request, s.next.stage, c);
+  if (s.next.stage) return enterDeployment({ ...s, shop: null }, s.next.request, s.next.stage, s.next.clue, c);
   return done({ ...s, phase: 'awaiting_stage', shop: null }, []);
 }
 

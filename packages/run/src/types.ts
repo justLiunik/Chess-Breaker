@@ -1,4 +1,6 @@
-import type { CommitError, DeckType, EndReason, GameEvent, Rarity, Result, RunState, StageState } from '@checkbreaker/engine';
+import type {
+  CommitError, DeckType, EndReason, GameEvent, PieceInstance, Rarity, Result, RunState, Square, StageState,
+} from '@checkbreaker/engine';
 
 export type RunPhase = 'awaiting_stage' | 'deployment' | 'action' | 'shop' | 'ended';
 
@@ -18,6 +20,11 @@ export interface ShopState {
   slots: (Offer & { sold: boolean })[];
 }
 
+/** One placement of the solver's proven deployment, as the generation worker reports it (the King included). */
+export type CluePlacement = { instanceId: string; to: Square };
+/** A clue placement with the piece's type and rarity copied from the deck at the time, so a UI needs no lookup; `rarity` is absent for the King. */
+export type ClueSquare = CluePlacement & { pieceType: PieceInstance['pieceType']; rarity?: Rarity };
+
 export interface StageTally { startCoins: number; salvage: number; piecesLost: number }
 
 export interface RunSession {
@@ -29,7 +36,9 @@ export interface RunSession {
   entryStage: StageState | null;
   tally: StageTally | null;
   shop: ShopState | null;
-  next: { request: GenRequest; stage: StageState | null } | null;
+  /** The solver's proven deployment for the current stage (M5.1 placement clue); null for an unproven stage and outside deployment/action. */
+  clue: ClueSquare[] | null;
+  next: { request: GenRequest; stage: StageState | null; clue: ClueSquare[] | null } | null;
   outcome: { result: 'won' | 'lost'; endReason?: EndReason | 'abandoned' } | null;
   /** Set by `devSkipStage` and never cleared: the run used a development tool. Absent otherwise. */
   debug?: true;

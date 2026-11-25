@@ -66,7 +66,7 @@ describe('newRun', () => {
     const s = newRun(SEED, c);
     expect(s).toMatchObject({ version: 1, phase: 'awaiting_stage', stage: null, tally: null, shop: null, outcome: null });
     expect('chooser' in s).toBe(false);
-    expect(s.next).toEqual({ request: { run: s.run, actIndex: 0, stageIndex: 0 }, stage: null });
+    expect(s.next).toEqual({ request: { run: s.run, actIndex: 0, stageIndex: 0 }, stage: null, clue: null });
     expect('previousTemplateId' in s.next!.request).toBe(false);
   });
 

@@ -4,7 +4,7 @@ import type {
   RunState, StageState,
 } from '@checkbreaker/engine';
 import type { RunConfig } from '@checkbreaker/content';
-import type { GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
+import type { ClueSquare, GenRequest, Offer, RunPhase, RunSession, ShopState } from './types';
 
 /**
  * The save file's format version (spec section 8.5); `loadSave` reads this version only. 2 from M5.1: the
@@ -361,6 +361,31 @@ function checkShop(v: unknown, path: string, c: RunConfig): ShopState {
   };
 }
 
+/** `session.clue` / `next.clue`: the placements must be distinct pieces on distinct squares of the player's deployment ranks. */
+function checkClue(v: unknown, path: string, c: RunConfig): ClueSquare[] {
+  const ids = new Set<string>();
+  const squares = new Set<string>();
+  return arr(v, path).map((x, i) => {
+    const at = `${path}[${i}]`;
+    const e = obj(x, at);
+    const instanceId = str(own(e, 'instanceId'), `${at}.instanceId`);
+    const to = str(own(e, 'to'), `${at}.to`);
+    if (!isSquare(to) || !c.rules.deploymentRanks.includes(Number(to[1]))) {
+      bad(`${at}.to`, `expected a square on ranks ${c.rules.deploymentRanks.join(', ')}`);
+    }
+    if (ids.has(instanceId)) bad(`${at}.instanceId`, `${instanceId} appears twice`);
+    if (squares.has(to)) bad(`${at}.to`, `${to} appears twice`);
+    ids.add(instanceId);
+    squares.add(to);
+    const out: ClueSquare = { instanceId, to, pieceType: oneOf(own(e, 'pieceType'), `${at}.pieceType`, INSTANCE_TYPES) };
+    put(out, 'rarity', e, at, tier);
+    return out;
+  });
+}
+/** A clue key absent from the file (a version 2 save written before the clue) loads as null. */
+const clueOf = (o: Obj, path: string, c: RunConfig): ClueSquare[] | null =>
+  Object.hasOwn(o, 'clue') ? nullable(own(o, 'clue'), `${path}.clue`, (x, at) => checkClue(x, at, c)) : null;
+
 function checkSession(v: unknown, c: RunConfig): RunSession {
   const s = obj(v, 'session');
   const session: RunSession = {
@@ -369,6 +394,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
     phase: oneOf(own(s, 'phase'), 'session.phase', PHASES),
     stage: nullable(own(s, 'stage'), 'session.stage', checkStage),
     entryStage: nullable(own(s, 'entryStage'), 'session.entryStage', checkStage),
+    clue: clueOf(s, 'session', c),
     tally: nullable(own(s, 'tally'), 'session.tally', (x, at) => {
       const t = obj(x, at);
       return {
@@ -387,7 +413,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
         stageIndex: int(own(rq, 'stageIndex'), `${at}.request.stageIndex`, 0, c.run.stagesPerAct - 1),
       };
       put(request, 'previousTemplateId', rq, `${at}.request`, str);
-      return { request, stage: nullable(own(n, 'stage'), `${at}.stage`, checkStage) };
+      return { request, stage: nullable(own(n, 'stage'), `${at}.stage`, checkStage), clue: clueOf(n, at, c) };
     }),
     outcome: nullable(own(s, 'outcome'), 'session.outcome', (x, at) => {
       const o = obj(x, at);
@@ -417,6 +443,7 @@ function checkSession(v: unknown, c: RunConfig): RunSession {
   if (inStage !== (session.entryStage !== null)) {
     bad('session.entryStage', inStage ? `phase ${phase} needs it set` : `must be null in phase ${phase}`);
   }
+  if (!inStage && session.clue !== null) bad('session.clue', `must be null in phase ${phase}`);
   for (const field of needs[phase] ?? []) {
     if (session[field] === null) bad(`session.${field}`, `phase ${phase} needs it set`);
   }

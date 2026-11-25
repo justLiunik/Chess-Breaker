@@ -118,9 +118,12 @@ Boundary rules:
   `{ id, ok: true, stage, provenance, ms, clue }` (`ms` timed inside the worker, around `generateStage`; `gen`
   itself still never reads a clock; `clue` is the solver solution's `placements` — `{ instanceId, to }[]`,
   the King included — or `null` for an unproven stage, M5.1 placement clue) or `{ id, ok: false, message }`.
-  The answer goes to `provideStage(s, stage, c, clue)`, which keeps the clue beside `next.stage`;
-  entering Deployment moves it to `RunSession.clue` (saved, validated by `loadSave`, kept by
-  `restartStage`, cleared with `stage`; the save stays version 2). The move line is never sent. An
+  The answer goes to `provideStage(s, stage, c, clue)`, which resolves each entry's `pieceType` and
+  `rarity` from the request's deck snapshot (an instance missing from it makes the whole clue `null`)
+  and keeps the result in `next.clue` while in the shop; entering Deployment moves it to
+  `RunSession.clue`, whose entries are `{ instanceId, to, pieceType, rarity? }` (`rarity` absent for the
+  King). It is saved, validated by `loadSave`, kept by `restartStage` and cleared with `stage`. The save
+  stays version 2: a version-2 save without the `clue` keys loads them as `null`. The move line is never sent. An
   answer for a request the session has moved past is dropped by `id`. Tests replace the worker with
   a `StageSource` double that builds small stages carrying the expected `stageSeed`.
 - **Run-layer additions in M5** ([M5 spec](superpowers/specs/2026-11-16-m5-web-ui-design.md) §6, §9.1):

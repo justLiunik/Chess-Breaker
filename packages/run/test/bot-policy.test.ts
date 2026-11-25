@@ -39,8 +39,8 @@ function shopSession(
     act: 1, stageNumber: 1, roll: 0, rerollsUsed: 0, recovery: false, slots: offers.map(o => ({ ...o, sold: false })), ...over.shop,
   };
   return {
-    version: 1, run, phase: 'shop', stage: null, entryStage: null, tally: null, shop,
-    next: { request: requestFor(run, 2, c), stage: null }, outcome: null,
+    version: 1, run, phase: 'shop', stage: null, entryStage: null, clue: null, tally: null, shop,
+    next: { request: requestFor(run, 2, c), stage: null, clue: null }, outcome: null,
   };
 }
 
