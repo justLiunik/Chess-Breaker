@@ -127,7 +127,7 @@ mix32(hash(seed, ...parts)) / 2^32`, so a change to one step never shifts anothe
 | `draw(stageSeed, 'formation', attempt)` | G2, formation index |
 | `draw(stageSeed, 'mirror', attempt)` | G2, mirroring |
 | `draw(stageSeed, 'par')` | G3, once per stage |
-| `draw(stageSeed, 'spawn', attempt, i, field)` | G4, per pawn and field (square, rarity). Until M5.1 it also drew `promotesTo`; removing that draw changes every generated stage, so golden and determinism fixtures are re-recorded |
+| `draw(stageSeed, 'spawn', attempt, i, field)` | G4, per pawn and field (square, rarity). Until M5.1 it also drew `promotesTo`; draws are keyed, so removing that draw moved no other stream: every enemy piece, pawn square and rarity stayed the same, and stages only lost the `promotesTo` field |
 | `draw(stageSeed, 'bonus-pawn', field)` | G7, the extra pawn |
 | `draw(stageSeed, 'army', …)` and `draw(stageSeed, 'place', …)` | Random-placement fallback in G2 |
 

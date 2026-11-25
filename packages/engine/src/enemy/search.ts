@@ -80,7 +80,15 @@ const QVIA = new Int8Array(80);
 const sameMove = (a: Move, m: Move): boolean =>
   a.from === m.from && a.to === m.to && a.promotion === m.promotion && a.via === m.via;
 
-/** Plays `m` on the context's board, and on its tiers when it has them; returns what unmake needs. */
+/**
+ * Plays `m` on the context's board, and on its tiers when it has them; returns what unmake needs.
+ *
+ * Ruling R7 (M5.1): a White promotion here keeps the pawn's tier, and spawned pawns carry tier 0
+ * (`tiersOf`), so the lookahead searches a hypothetical promoted piece as a Normal-tier piece even
+ * when the pawn is Rare or better. Real moves (`resolveStep`), legality, the preview and the solver
+ * give it the pawn's rarity exactly. Giving spawned pawns their tier would make `hasTiers` true on
+ * almost every stage and trip the rarity depth cap (`maxDepthWithRarity`, policy.ts).
+ */
 function make(ctx: Ctx, m: Move): number {
   const t = ctx.t;
   if (t === null) {

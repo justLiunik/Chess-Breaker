@@ -135,7 +135,8 @@ Boundary rules:
   - While the non-king deck holds more than `deck.capacity` (8) pieces, buying a piece is refused
     with `deck_full` (unchanged), selling, merging and cutting work as usual, and leaving the shop for
     the next stage is refused with a new `RunError`
-    `{ kind: 'deck_over_capacity'; size: number; capacity: 8 }`. After the final stage the run ends
+    `{ kind: 'deck_over_capacity'; size: number; capacity: number }` (`capacity` is `deck.capacity`,
+    8 today). After the final stage the run ends
     and the deck size no longer matters.
   - The bot always promotes to a queen and trims the deck in the shop.
 
@@ -457,9 +458,14 @@ Rulings the generator and solver depend on:
   pattern and the player-visible seed code.
 - A Legendary knight's free second move counts as part of the same turn: a queue is a `MOVE` plus
   its bonus `MOVE`, and the solver tries both.
-- Spawned-pawn moves are not tried in `no_first_turn_mate`: the precondition summons deck pieces only.
+- Spawned-pawn moves are not tried in `no_first_turn_mate`: the precondition summons deck pieces only,
+  so spawn ranks stop at 6 and no spawned pawn can promote-mate on turn 1 (docs/04 §4).
 - A promotion in the solver and in the enemy search branches on all four piece types (queen first):
   stalemate loses here, so a rook or bishop can be right where a queen stalemates (M5.1).
+- The enemy search's lookahead treats a hypothetical White promotion as a Normal-tier piece: the promoted
+  piece keeps the pawn's tier, and spawned pawns carry tier 0. Real moves, legality, the preview and the
+  solver give it the pawn's rarity exactly; giving spawned pawns their tier in the search would trip the
+  rarity depth cap (`maxDepthWithRarity`) on almost every stage (ruling R7, M5.1).
 - The solver's deployment candidates skip placements that give check (I16) and respect
   `deployment.maxQueenSummons`; `startStage` would refuse them anyway (M5.1).
 - The solver's King deployment squares alternate ranks 1 and 2, spread across files (e, d, f, c, g, b, h, a).
@@ -552,7 +558,7 @@ behavior the engine does not express, the engine gains a primitive — the UI ne
 |---|---|
 | Move generation | Table-driven per piece type against hand-verified positions |
 | Queue resolution | Golden tests: queue in → resolved state + events out |
-| Invariants | Property tests asserting I1–I16 (I16 from M5.1) over generated random deployments and queues (fuzz): 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants and Legendary-knight bonus moves) and Focus spent never exceeds the pool. White's Hero Pieces carry random rarities and the deck matches the board (same ids), so multi-captures, bonus moves, R5 Hero captures and lifeline saves occur, each with a coverage count; a board/deck desync refuses with `invariant_violation` I15. `parity.test.ts` checks `commitQueue` = `simulate` + R5 including the deck changes of R5 captures |
+| Invariants | Property tests asserting I1–I15 over generated random deployments and queues (fuzz). I16 (no check at START, M5.1) is not in the fuzz, whose cases begin in the Action phase: `deployment.test.ts` and `view-threats.test.ts` cover it, and the 1,000-stage `bulk.test.ts` checks that every generated stage passes `no_start_check`. The fuzz runs 10,000 cases mixing moves with `ACTIVATE_SKILL` of random loadouts, valid and invalid targets; none throws, none breaks I1–I6, paid moves never exceed credits (plus Twin Step grants and Legendary-knight bonus moves) and Focus spent never exceeds the pool. White's Hero Pieces carry random rarities and the deck matches the board (same ids), so multi-captures, bonus moves, R5 Hero captures and lifeline saves occur, each with a coverage count; a board/deck desync refuses with `invariant_violation` I15. `parity.test.ts` checks `commitQueue` = `simulate` + R5 including the deck changes of R5 captures |
 | Rarity gating | Property test over seeded shop rolls, spawned pawns and promoted pieces: I14 holds for every act; recovery offers are Normal |
 | Rarity movement | Table-driven per tier: Rare bishop never captures on a leap, Unique does; Rare/Unique knight leap sets; Legendary knight bonus used at most once per turn, only by itself, never onto the king's square; Rare rook/queen never capture on a leap; Unique rook diagonal step; Legendary rook captures once after a leap and multi-captures only without one; Legendary queen multi-captures with or without a leap |
 | Multi-capture | Second target only when directly adjacent beyond the first; never across a gap; enemy king as second target → stop on the first, king in check; one credit; both pieces pay salvage |

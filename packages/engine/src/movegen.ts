@@ -306,7 +306,8 @@ export function unmakeMove(b: Int8Array, m: Move): void {
 
 /**
  * `makeMove` on `b` and the tier array `t` beside it: the tier moves with the piece (a promoted pawn's
- * piece keeps the pawn's tier), captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
+ * piece keeps the pawn's tier, which is 0 for a spawned pawn: ruling R7 at the enemy search's `make`),
+ * captured pieces' tiers are cleared. Returns the tiers `unmakeMoveTiered`
  * needs to restore `t` exactly: from, to and via, two bits each.
  */
 export function makeMoveTiered(b: Int8Array, t: Int8Array, m: Move): number {

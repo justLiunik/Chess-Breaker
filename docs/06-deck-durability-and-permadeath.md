@@ -216,9 +216,9 @@ shop has not offered.
 Three paths are not drawn:
 
 - **Promotion** ([02 §2.2](02-rules-framework.md#22-promotion)): a new instance at full durability
-  starts as `deployed`, on the promoted pawn's square, without a summon and without spending
-  durability. From there it follows the diagram: captured → destroyed; survives → back to `in_deck`
-  with its durability untouched.
+  joins the deck as `in_deck` (it was never summoned) while it stands on the promoted pawn's square,
+  without spending durability. Captured later in the stage → destroyed, like any piece on the board;
+  survives → it stays `in_deck` with its durability untouched.
 - **Lifeline** (Unique and Legendary queen, once per instance): `captured` → `in_deck` at stage end
   with 1 durability, instead of destroyed (rule 4).
 - **Recall** (skill, M6 — [03 §5](03-skill-framework.md)): `deployed` → `in_deck` during the stage,
