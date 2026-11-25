@@ -10,6 +10,9 @@ export type Arrow = { from: Square; to: Square; kind?: string };
 /** An icon on a square. `label` is the cause, appended to the square's aria-label. */
 export type Mark = { square: Square; kind: string; label?: string };
 
+/** A ghost of a piece the solver's proven setup puts here (the placement clue). `note` is appended to the square's aria-label. */
+export type ClueMark = { square: Square; piece: BoardPiece; note?: string };
+
 export interface Overlays {
   /** The complete planned board (e.g. the queue's result). Squares where it differs from `stage.board` get ghost styling. */
   ghost?: StageState['board'];
@@ -18,6 +21,8 @@ export interface Overlays {
   highlights?: Square[];
   arrows?: Arrow[];
   marks?: Mark[];
+  /** Translucent ghosts of the proven setup, drawn under any real or planned piece. */
+  clue?: ClueMark[];
   /** Squares drawn with a hatch pattern and tint (the deployment ranks). */
   hatch?: Square[];
   /** The player's own planning arrows and marks (right mouse button); drawn under the other overlays. */
@@ -81,6 +86,8 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
   const highlights = new Set(overlays.highlights);
   const marks = new Map<Square, Mark[]>();
   for (const m of overlays.marks ?? []) marks.set(m.square, [...(marks.get(m.square) ?? []), m]);
+  const clues = new Map<Square, ClueMark>();
+  for (const c of overlays.clue ?? []) clues.set(c.square, c);
   const cells = [];
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
@@ -94,6 +101,8 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
       const attackers = overlays.threats?.[sq]?.attackers;
       const here = marks.get(sq) ?? [];
       const causes = here.map((m) => m.label).filter((l): l is string => l !== undefined);
+      const clue = clues.get(sq);
+      const clueLabel = clue ? [`clue: ${describeOccupant(clue.piece)}`, ...(clue.note ? [clue.note] : [])] : [];
       const classes = [
         'square', (col + row) % 2 === 0 ? 'light' : 'dark', highlights.has(sq) ? 'highlight' : '',
         vacated ? 'vacated' : '', isGhost ? 'ghost' : '',
@@ -103,7 +112,7 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
           key={sq}
           type="button"
           className={classes}
-          aria-label={[`${sq}, ${describeOccupant(vacated ? undefined : planned)}`, ...causes].join(', ')}
+          aria-label={[`${sq}, ${describeOccupant(vacated ? undefined : planned)}`, ...causes, ...clueLabel].join(', ')}
           data-square={sq}
           data-hatch={hatch.has(sq) ? '' : undefined}
           data-vacated={vacated ? '' : undefined}
@@ -129,6 +138,7 @@ export function Board({ stage, overlays = {}, onSquare, onSquareContext, onHover
           onDragOver={(e) => { if (onDrop) e.preventDefault(); }}
           onDrop={(e) => { e.preventDefault(); onDrop?.(sq, e); }}
         >
+          {clue && <span className="clue-ghost" data-clue={clue.piece.pieceType}><PieceGlyph piece={clue.piece} rarity={clue.piece.rarity} /></span>}
           {piece && <PieceGlyph piece={piece} rarity={piece.color === 'white' ? piece.rarity : undefined} />}
           {attackers && (
             <svg className="threat" data-threat={attackers.join(' ')} viewBox="0 0 20 20" aria-hidden="true" focusable="false">

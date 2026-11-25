@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { deploymentStatus, threatMap } from '@checkbreaker/engine';
 import type { BoardPiece, PieceInstance, Square, StageState } from '@checkbreaker/engine';
 import { Board } from '../board/Board';
-import type { Arrow, Mark } from '../board/Board';
+import type { Arrow, ClueMark, Mark } from '../board/Board';
 import { PIECE_NAME, PieceGlyph, RARITY_NAME } from '../board/pieces';
 import { engineConfig } from '../config';
 import { Header } from '../hud/Header';
@@ -25,12 +25,16 @@ export function Deployment() {
   const [hover, setHover] = useState<Square | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   // Which problem is the latest: a refused drop here, or the run layer's refusal of START.
+  const [showClue, setShowClue] = useState(false);
   const [latest, setLatest] = useState<'local' | 'run'>('local');
 
   useShortcuts({ escape: () => setSelected(null) });
 
   const run = session?.run;
   const stage = session?.stage ?? null;
+  // A new stage starts with the clue hidden (a restart keeps the same stage, so it keeps the clue shown).
+  const stageSeed = stage?.stageSeed;
+  useEffect(() => { setShowClue(false); }, [stageSeed]);
   const status = useMemo(
     () => (run && stage ? deploymentStatus(run, stage, placements, engineConfig) : null),
     [run, stage, placements],
@@ -112,6 +116,14 @@ export function Deployment() {
     }
   }
 
+  // The solver's proven setup as ghosts; display only, nothing here feeds a verdict.
+  const clue = session.clue;
+  const clueMarks: ClueMark[] = (clue ?? []).map((c) => {
+    const inst = run.deck.find((i) => i.instanceId === c.instanceId);
+    const note = !inst ? 'you no longer have this piece' : inst.status === 'spent' ? 'this piece is spent' : undefined;
+    return { square: c.to, piece: { pieceType: c.pieceType, color: 'white', ...(c.rarity ? { rarity: c.rarity } : {}) }, ...(note ? { note } : {}) };
+  });
+
   const stagePieces = Object.entries(stage.board)
     .filter(([, p]) => p.color === 'white' && p.pieceType === 'pawn')
     .map(([sq, p]) => `${RARITY_NAME[p.rarity ?? 'normal']} pawn on ${sq}, promotes to any piece`);
@@ -123,7 +135,7 @@ export function Deployment() {
       <div className="deployment-body">
         <Board
           stage={stage}
-          overlays={{ ghost: plannedBoard, threats, hatch, arrows, marks }}
+          overlays={{ ghost: plannedBoard, threats, hatch, arrows, marks, ...(showClue ? { clue: clueMarks } : {}) }}
           onSquare={onSquare}
           onSquareContext={pickUp}
           onHover={setHover}
@@ -203,6 +215,12 @@ export function Deployment() {
               <h2>Stage pieces</h2>
               <ul>{stagePieces.map((t) => <li key={t}>{t}</li>)}</ul>
             </div>
+          )}
+          <button type="button" aria-pressed={showClue} disabled={clue === null} onClick={() => setShowClue(!showClue)}>
+            {showClue ? 'Hide the winning setup' : 'Show a winning setup'}
+          </button>
+          {clue === null && (
+            <p data-testid="no-clue">No proven solution for this stage.{dev ? ' Use Skip stage (dev) if you are stuck.' : ''}</p>
           )}
           <button
             type="button"

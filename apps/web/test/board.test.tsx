@@ -33,3 +33,13 @@ describe('Board ghost', () => {
     expect(square('h8').getAttribute('draggable')).toBe('false');
   });
 });
+
+describe('Board clue overlay', () => {
+  it('the clue overlay draws a ghost and names it in the label', () => {
+    render(<Board stage={{ board: {} }} overlays={{ clue: [{ square: 'a3', piece: { pieceType: 'bishop', color: 'white', rarity: 'normal' }, note: 'you no longer have this piece' }] }} />);
+    const label = square('a3').getAttribute('aria-label')!;
+    expect(label).toContain('clue: white bishop');
+    expect(label).toContain('you no longer have this piece');
+    expect(square('a3').querySelector('[data-clue="bishop"]')).not.toBeNull();
+  });
+});

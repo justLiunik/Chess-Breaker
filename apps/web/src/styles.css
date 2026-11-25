@@ -8,6 +8,7 @@
   --outline: #1d1d1f;
   --threat: #b3261e;
   --highlight: #2563eb;
+  --clue: #c2185b;
   --hatch: rgba(29, 29, 31, 0.28);
   --zone-tint: rgba(37, 99, 235, 0.16);
   --error: #8c1d18;
@@ -83,6 +84,9 @@ circle.plan { fill: none; stroke: var(--c); stroke-width: 0.11; stroke-dasharray
 .board .piece, .board .threat, .board .mark-icon { position: relative; z-index: 2; }
 .board .threat, .board .mark-icon { position: absolute; }
 .board .overlay:not(.plan-overlay) { z-index: 3; }
+/* The placement clue: a translucent magenta ghost filling the square, under any real or planned piece. */
+.clue-ghost { position: absolute; inset: 0; z-index: 1; opacity: 0.45; pointer-events: none; box-shadow: inset 0 0 0 3px var(--clue); }
+.clue-ghost .piece { filter: drop-shadow(0 0 3px var(--clue)); }
 
 /* Reduced motion is a class from settings.ts, never the media query: motion slides/scales newly shown pieces in, reduced fades them. */
 @keyframes piece-slide-in { from { transform: translateY(-18%) scale(0.85); opacity: 0.2; } to { transform: none; opacity: 1; } }

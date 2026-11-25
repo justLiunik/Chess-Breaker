@@ -3,14 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pendingBase, spawnCostOf } from '@checkbreaker/engine';
 import type { PieceInstance } from '@checkbreaker/engine';
-import { memoryStorage, newRun, serializeSave } from '@checkbreaker/run';
+import { expectedSeed, memoryStorage, newRun, provideStage, serializeSave } from '@checkbreaker/run';
 import { engineConfig, runConfig } from '../src/config';
 import { dropRefusalText } from '../src/messages';
 import { DEV_KEY } from '../src/storage';
 import { Deployment } from '../src/screens/Deployment';
 import { RunProvider, useRun } from '../src/state/store';
 import type { StageSource } from '../src/state/stageSource';
-import { testStageSource } from './doubles';
+import { STARTER_MATE, starterMateStage, testStageSource } from './doubles';
 
 type Api = ReturnType<typeof useRun>;
 let api: Api;
@@ -296,5 +296,100 @@ describe('Deployment screen', () => {
       },
     });
     expect(screen.getByTestId('stage-pieces').textContent).toContain('Rare pawn on e2, promotes to any piece');
+  });
+
+  describe('placement clue', () => {
+    const showButton = () => screen.getByRole('button', { name: /winning setup/ });
+
+    /** A Deployment session holding the stage-0 clue, with the deck edited by `edit`, continued from a save. */
+    async function setupClue(edit: (deck: PieceInstance[]) => PieceInstance[]) {
+      const r = provideStage(newRun('7F3A-2210', runConfig), starterMateStage(expectedSeed('7F3A-2210', 0, 0)), runConfig, STARTER_MATE.placements);
+      if (!r.ok) throw new Error('provideStage refused');
+      const session = r.value.session;
+      session.run.deck = edit(session.run.deck);
+      const storage = memoryStorage();
+      storage.write(serializeSave(session, '2026-11-16T00:00:00.000Z'));
+      render(<RunProvider source={testStageSource()} storage={storage}><Probe /></RunProvider>);
+      await act(async () => { api.dispatch({ type: 'continue' }); });
+      await flush();
+    }
+
+    it('Show a winning setup marks every clue square', async () => {
+      await setup();
+      const u = user();
+      await u.click(screen.getByRole('button', { name: 'Show a winning setup' }));
+      expect(square('e1').getAttribute('aria-label')).toContain('clue: white king');
+      expect(square('a3').getAttribute('aria-label')).toContain('clue: white bishop');
+      expect(showButton().textContent).toBe('Hide the winning setup');
+      expect(showButton().getAttribute('aria-pressed')).toBe('true');
+      await u.click(showButton());
+      expect(square('e1').getAttribute('aria-label')).not.toContain('clue:');
+      expect(square('a3').getAttribute('aria-label')).not.toContain('clue:');
+    });
+
+    it('the clue changes no verdict and places nothing', async () => {
+      await setup();
+      const u = user();
+      const counter = screen.getByTestId('spawn-counter').textContent;
+      const start = screen.getByRole('button', { name: /^start/i }) as HTMLButtonElement;
+      expect(start.disabled).toBe(true);
+      await u.click(showButton());
+      expect(screen.getByTestId('spawn-counter').textContent).toBe(counter);
+      expect(start.disabled).toBe(true);
+      for (const inst of api.session!.run.deck) expect(trayPiece(inst.instanceId).textContent).not.toMatch(/placed/);
+      await u.click(trayPiece('p_rook_01'));
+      await u.click(square('e1'));
+      expect(square('e1').getAttribute('aria-label')).toContain('white rook');
+      expect(square('e1').getAttribute('aria-label')).toContain('clue: white king');
+      expect(screen.getByTestId('spawn-counter').textContent).toContain(`${spawnCostOf('rook', 'normal', engineConfig)} / 9`);
+    });
+
+    it('following the clue reaches the Action phase', async () => {
+      await setup();
+      const u = user();
+      for (const p of STARTER_MATE.placements) {
+        await u.click(trayPiece(p.instanceId));
+        await u.click(square(p.to));
+      }
+      await u.click(screen.getByRole('button', { name: /^start/i }));
+      expect(api.session!.phase).toBe('action');
+    });
+
+    describe('on an unproven stage', () => {
+      const unproven = (): StageSource => {
+        const inner = testStageSource();
+        return {
+          async request(id, req) {
+            const a = await inner.request(id, req);
+            return a.ok ? { ...a, clue: null } : a;
+          },
+        };
+      };
+
+      it('disables the button and says why', async () => {
+        await setup(unproven());
+        expect((showButton() as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByText('No proven solution for this stage.')).toBeTruthy();
+        expect(screen.queryByText(/Use Skip stage/)).toBeNull();
+      });
+
+      it('adds the Skip stage hint with the dev toggle on', async () => {
+        localStorage.setItem(DEV_KEY, '1');
+        await setup(unproven());
+        expect(screen.getByText('No proven solution for this stage. Use Skip stage (dev) if you are stuck.')).toBeTruthy();
+      });
+    });
+
+    it('a sold clue piece is labelled', async () => {
+      await setupClue((deck) => deck.filter((i) => i.instanceId !== 'p_bishop_04'));
+      await user().click(showButton());
+      expect(square('a3').getAttribute('aria-label')).toContain('you no longer have this piece');
+    });
+
+    it('a clue piece spent by START is labelled after a restart', async () => {
+      await setupClue((deck) => deck.map((i) => (i.instanceId === 'p_bishop_04' ? { ...i, status: 'spent' as const, durability: 0 } : i)));
+      await user().click(showButton());
+      expect(square('a3').getAttribute('aria-label')).toContain('this piece is spent');
+    });
   });
 });
