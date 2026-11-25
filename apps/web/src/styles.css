@@ -106,3 +106,5 @@ circle.plan { fill: none; stroke: var(--c); stroke-width: 0.11; stroke-dasharray
 .debug-flag { color: var(--error); }
 .award th { text-align: left; font-weight: normal; padding-right: 1.5rem; }
 .award td { text-align: right; }
+.promotion-picker { position: fixed; inset: auto 0 20% 0; margin: 0 auto; width: min(90vw, 26rem); padding: 1rem; background: #fff; border: 3px solid var(--accent, #333); z-index: 5; }
+.promotion-picker .promotion-icon { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: middle; }

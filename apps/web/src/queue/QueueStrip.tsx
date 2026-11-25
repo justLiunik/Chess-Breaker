@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Action, StageState } from '@checkbreaker/engine';
 import { PieceGlyph } from '../board/pieces';
+import { PROMOTION_LETTER } from './PromotionPicker';
 import { engineConfig, skillNames } from '../config';
 import type { Preview } from '../hud/Hud';
 
@@ -43,7 +44,7 @@ export function QueueStrip({ queue, stage, preview, stepIndex, locked, onRemove,
       {queue.map((a, i) => {
         const prev = i === 0 ? stage : preview.steps[i - 1]!.stage;
         const problem = problemOf(preview, i);
-        const name = a.type === 'MOVE' ? `${a.from}→${a.to}` : `${skillName(a.skillId)}${a.target ? ` on ${a.target}` : ''}`;
+        const name = a.type === 'MOVE' ? `${a.from}→${a.to}${a.promotion ? `=${PROMOTION_LETTER[a.promotion]}` : ''}` : `${skillName(a.skillId)}${a.target ? ` on ${a.target}` : ''}`;
         const mover = a.type === 'MOVE' ? prev.board[a.from] : undefined;
         const skillCost = a.type === 'ACTIVATE_SKILL' ? engineConfig.skills[a.skillId]?.cost : undefined;
         return (

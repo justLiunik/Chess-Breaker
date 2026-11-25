@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { legalPlayerMoves, previewSteps, skillUnavailable, threatMap } from '@checkbreaker/engine';
-import type { SkillUnavailable, Square, StageState } from '@checkbreaker/engine';
+import { legalPlayerMoves, previewSteps, promotionChoices, skillUnavailable, threatMap } from '@checkbreaker/engine';
+import type { PromotionType, SkillUnavailable, Square, StageState } from '@checkbreaker/engine';
 import type { RunSession } from '@checkbreaker/run';
 import { clear as clearPlan, empty as emptyPlan, toggleArrow, toggleMark } from '../board/arrows';
 import type { Plan } from '../board/arrows';
@@ -12,6 +12,7 @@ import { Hud, lossBanner } from '../hud/Hud';
 import { useShortcuts } from '../input/shortcuts';
 import type { Shortcuts } from '../input/shortcuts';
 import { commitErrorText } from '../messages';
+import { PromotionPicker } from '../queue/PromotionPicker';
 import { QueueStrip, skillName } from '../queue/QueueStrip';
 import { useQueue } from '../queue/useQueue';
 import { useReducedMotion } from '../settings';
@@ -40,6 +41,7 @@ export function Action() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [resolved, setResolved] = useState<StageState['board'] | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [promoting, setPromoting] = useState<{ from: Square; to: Square; choices: PromotionType[] } | null>(null);
   const [plan, setPlan] = useState<Plan>(emptyPlan);
   const motionReduced = useReducedMotion();
 
@@ -94,11 +96,12 @@ export function Action() {
   if (!session || !run || !stage || !preview || !planStage) return null;
 
   const locked = phase !== 'idle';
+  const picking = promoting !== null;
   const loss = lossBanner(preview);
   const queueError = q.queue.length > 0 && preview.error ? commitErrorText(preview.error) : null;
   const canCommit = !locked && q.queue.length > 0 && preview.error === null;
 
-  const reset = (): void => { setSelected(null); setPendingSkill(null); };
+  const reset = (): void => { setSelected(null); setPendingSkill(null); setPromoting(null); };
 
   const startCommit = (): void => {
     if (!canCommit) return;
@@ -119,24 +122,28 @@ export function Action() {
 
   keys.current = {
     commit: () => {
+      if (picking) return;
       if (phase === 'playback') { clearTimer(); setPhase('idle'); setResolved(null); }
       else if (confirming) return;
       else if (canCommit) { if (loss) setConfirming(true); else startCommit(); }
     },
-    undo: () => { if (!locked && q.queue.length > 0) { q.undo(); reset(); } },
+    undo: () => { if (!locked && !picking && q.queue.length > 0) { q.undo(); reset(); } },
     stepPrev: () => { if (!locked && q.stepIndex > 0) q.setStep(q.stepIndex - 1); },
     stepNext: () => { if (!locked && q.queue.length > 0) q.setStep(q.stepIndex + 1); },
-    escape: () => { if (confirming) setConfirming(false); else reset(); },
+    escape: () => { if (picking) setPromoting(null); else if (confirming) setConfirming(false); else reset(); },
   };
 
   const onSquare = (sq: Square): void => {
-    if (locked) return;
+    if (locked || picking) return;
     if (pendingSkill) {
       q.append({ type: 'ACTIVATE_SKILL', skillId: pendingSkill, target: sq });
       setPendingSkill(null);
       return;
     }
     if (selected && legal.includes(sq)) {
+      // Asked of the position the move is planned in, so a pawn advanced earlier in this queue counts.
+      const choices = promotionChoices(planStage, selected, sq, engineConfig);
+      if (choices) { setPromoting({ from: selected, to: sq, choices }); setSelected(null); return; }
       q.append({ type: 'MOVE', from: selected, to: sq });
       setSelected(null);
       return;
@@ -228,7 +235,7 @@ export function Action() {
           <button
             type="button"
             className="start commit"
-            disabled={!canCommit}
+            disabled={!canCommit || picking}
             onClick={() => (loss ? setConfirming(true) : startCommit())}
           >
             COMMIT
@@ -245,6 +252,15 @@ export function Action() {
           {dev && <button type="button" disabled={locked} onClick={() => dispatch({ type: 'skip' })}>Skip stage (dev)</button>}
         </aside>
       </div>
+      {promoting && (
+        <PromotionPicker
+          choices={promoting.choices}
+          to={promoting.to}
+          rarity={planStage.board[promoting.from]?.rarity ?? 'normal'}
+          onPick={(promotion) => { q.append({ type: 'MOVE', from: promoting.from, to: promoting.to, promotion }); setPromoting(null); }}
+          onCancel={() => setPromoting(null)}
+        />
+      )}
       {confirming && (
         <div className="confirm" role="dialog" aria-modal="true" aria-label="Confirm commit">
           <p><strong>{loss}</strong></p>
