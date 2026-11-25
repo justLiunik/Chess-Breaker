@@ -548,19 +548,24 @@
           "color": "black",
           "stageId": "s05"
         },
+        "h8": {
+          "pieceType": "rook",
+          "color": "black",
+          "stageId": "s06"
+        },
         "a7": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
-          "stageId": "s06",
-          "rarity": "normal"
+          "stageId": "s07",
+          "rarity": "rare"
         },
         "c7": {
           "pieceType": "pawn",
           "color": "white",
           "spawned": true,
-          "stageId": "s07",
-          "rarity": "normal"
+          "stageId": "s08",
+          "rarity": "rare"
         }
       },
       "turnsUsed": 0,

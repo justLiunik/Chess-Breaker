@@ -2,7 +2,7 @@ import * as internal from '@checkbreaker/engine/internal';
 import {
   applyEnemyTurn, enemyClock, enemyMove, hash, legalPlayerMoves, promotionChoices, simulate, startStage, toIndex,
 } from '@checkbreaker/engine';
-import type { Action, EnemyPick, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, EnemyPick, PromotionType, RunState, StageState } from '@checkbreaker/engine';
 import type { GenConfig } from '@checkbreaker/content';
 import type { Placement } from '../../src/types';
 
@@ -12,7 +12,7 @@ const { applyPlayerMove, fromBoard, hasBonusMove, tiersOf } = internal;
 export type BruteOpts = {
   /** Also the two-move queues of a piece with a bonus move (the Legendary knight). */
   bonus: boolean;
-  /** Also every queue that moves a White pawn to rank 8 (where it promotes, for now to a queen). */
+  /** Also every queue that moves a White pawn to rank 8 (one queue per promotion choice). */
   pawnToRank8: boolean;
 };
 
@@ -38,22 +38,24 @@ export type BruteResult = { mate: { turn: number; line: Action[][] } | null; sta
  */
 export type BruteFilter = (stage: StageState, queue: Action[], turn: number, target: number) => boolean;
 
-/** The engine's own test for a MOVE that brings a pawn to rank 8 (`promotionChoices`). */
-const promotes = (stage: StageState, from: string, to: string, config: GenConfig): boolean =>
-  stage.board[from]?.pieceType === 'pawn' && to.endsWith('8') && promotionChoices(stage, from, to, config) !== null;
+/** The engine's own promotion choices for a MOVE (`promotionChoices`), asked only of a pawn's move to rank 8; null when it does not promote. */
+const choicesOf = (stage: StageState, from: string, to: string, config: GenConfig): PromotionType[] | null =>
+  (stage.board[from]?.pieceType === 'pawn' && to.endsWith('8') ? promotionChoices(stage, from, to, config) : null);
 
-/** One MOVE action; a move that promotes promotes to a queen (four-way branching: M5.1 Task 4). */
-const move = (stage: StageState, from: string, to: string, config: GenConfig): Action =>
-  (promotes(stage, from, to, config) ? { type: 'MOVE', from, to, promotion: 'queen' } : { type: 'MOVE', from, to });
+/** The MOVE actions from→to: one per promotion choice (queen, rook, bishop, knight) when the move promotes, else the plain MOVE. */
+const movesOf = (stage: StageState, from: string, to: string, config: GenConfig): Action[] =>
+  choicesOf(stage, from, to, config)?.map((promotion): Action => ({ type: 'MOVE', from, to, promotion }))
+    ?? [{ type: 'MOVE', from, to }];
 
 /**
  * Every queue the oracle tries on `stage` (Action phase, no skills), in a fixed order: for each White
  * piece in square-index order (a1 first), `[MOVE from→to]` for each `legalPlayerMoves` target, and, when
  * `opts.bonus` and the piece has a bonus move, `[MOVE from→to, MOVE to→c]` for each `legalPlayerMoves`
- * target c on the board after the first move. Targets are pseudo-legal; `simulate` refuses the queues
- * that end with the White King attacked. With `opts.pawnToRank8` false, no queue moves a pawn to rank 8.
- * Without skills the engine accepts no other queue: there is one move credit per turn, and only a
- * bonus-move piece's own paid MOVE earns a free MOVE, by that piece, once.
+ * target c on the board after the first move. A MOVE that promotes gives one queue per
+ * `promotionChoices` entry, in its order (queen, rook, bishop, knight). Targets are pseudo-legal;
+ * `simulate` refuses the queues that end with the White King attacked. With `opts.pawnToRank8` false,
+ * no queue moves a pawn to rank 8. Without skills the engine accepts no other queue: there is one move
+ * credit per turn, and only a bonus-move piece's own paid MOVE earns a free MOVE, by that piece, once.
  */
 export function bruteQueues(stage: StageState, opts: BruteOpts, config: GenConfig): Action[][] {
   const out: Action[][] = [];
@@ -64,14 +66,16 @@ export function bruteQueues(stage: StageState, opts: BruteOpts, config: GenConfi
     const piece = stage.board[from]!;
     const bonus = opts.bonus && hasBonusMove(piece, config);
     for (const to of legalPlayerMoves(stage, from, config)) {
-      if (!opts.pawnToRank8 && promotes(stage, from, to, config)) continue;
-      const first = move(stage, from, to, config);
-      out.push([first]);
-      if (!bonus) continue;
-      const mid: StageState = { ...stage, board: applyPlayerMove(stage.board, from, to, config).board };
-      for (const c of legalPlayerMoves(mid, to, config)) {
-        if (!opts.pawnToRank8 && promotes(mid, to, c, config)) continue; // never true: a bonus-move piece is no pawn
-        out.push([first, move(mid, to, c, config)]);
+      if (!opts.pawnToRank8 && choicesOf(stage, from, to, config) !== null) continue;
+      for (const first of movesOf(stage, from, to, config)) {
+        out.push([first]);
+        // A bonus-move piece is never a pawn: its first move never promotes, and neither does its second.
+        if (!bonus) continue;
+        const mid: StageState = { ...stage, board: applyPlayerMove(stage.board, from, to, config).board };
+        for (const c of legalPlayerMoves(mid, to, config)) {
+          if (!opts.pawnToRank8 && choicesOf(mid, to, c, config) !== null) continue; // never true, as above
+          for (const second of movesOf(mid, to, c, config)) out.push([first, second]);
+        }
       }
     }
   }

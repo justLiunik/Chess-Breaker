@@ -33,7 +33,11 @@ const ACT3_STAGES = 40; // Act III stages in the run (333 slots, capped); Acts I
 // validationFailed stages allowed per act, as measured: none in Acts I-II; in Act III one of the 40
 // (BULK-34, tpl-act3-last-line), whose 20 boards all have a turn-1 mate for the strong deck.
 const MAX_VALIDATION_FAILED = [0, 0, 1];
-const TIMEOUT_MS = 125_000; // ~2x the measured 63 s for 1,000 stages
+// This test guards validity and determinism, not speed (gen:report measures speed). 125 s was ~2x
+// the measured 63 s for 1,000 stages (81 s just before M5.1). M5.1's four-way promotion branching in
+// the engine (move generation, the enemy search, hasLegalQueue) took a solo run to 102-112 s (107.6 s
+// at M5.1 Task 4), and a full parallel `npm test` then timed out at 125 s (148 s there).
+const TIMEOUT_MS = 240_000;
 
 describe('1,000-stage CI run', () => {
   it('covers all nine (act, stage) pairs', () => {

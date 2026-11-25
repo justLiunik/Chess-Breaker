@@ -2,7 +2,7 @@ import * as internal from '@checkbreaker/engine/internal';
 import {
   applyEnemyTurn, enemyClock, enemyMove, hash, legalPlayerMoves, promotionChoices, simulate, toIndex,
 } from '@checkbreaker/engine';
-import type { Action, BoardPiece, EnemyPick, RunState, StageState } from '@checkbreaker/engine';
+import type { Action, BoardPiece, EnemyPick, PromotionType, RunState, StageState } from '@checkbreaker/engine';
 import type { GenConfig } from '@checkbreaker/content';
 import type { SolveResult } from '../types';
 
@@ -11,25 +11,34 @@ const { applyPlayerMove, evaluate, fromBoard, hasBonusMove, tiersOf } = internal
 export const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
- * One MOVE action; a move that promotes promotes to a queen (four-way branching: M5.1 Task 4). Only a
- * pawn's move to rank 8 is asked of `promotionChoices`, which judges the move again.
+ * The MOVE actions from→to: one per `promotionChoices` entry, in its order (queen, rook, bishop,
+ * knight), when the move promotes, else the plain MOVE. Only a pawn's move to rank 8 is asked of
+ * `promotionChoices`, which judges the move again, so the other moves cost nothing extra.
  */
-const move = (stage: StageState, from: string, to: string, config: GenConfig): Action =>
-  (stage.board[from]?.pieceType !== 'pawn' || !to.endsWith('8') || promotionChoices(stage, from, to, config) === null
-    ? { type: 'MOVE', from, to }
-    : { type: 'MOVE', from, to, promotion: 'queen' });
+function movesOf(stage: StageState, from: string, to: string, config: GenConfig): Action[] {
+  const choices = stage.board[from]?.pieceType === 'pawn' && to.endsWith('8') ? promotionChoices(stage, from, to, config) : null;
+  return choices === null
+    ? [{ type: 'MOVE', from, to }]
+    : choices.map((promotion): Action => ({ type: 'MOVE', from, to, promotion }));
+}
 
-/** A queue's text: each MOVE as `from+to`, joined by `,` (`b1c3,c3d5`). */
+const PROMOTION_LETTER: Record<PromotionType, string> = { queen: 'Q', rook: 'R', bishop: 'B', knight: 'N' };
+
+/** A queue's text: each MOVE as `from+to`, with `=` and the piece letter when it promotes, joined by `,` (`b1c3,c3d5`, `e7e8=R`). */
 export function queueText(queue: Action[]): string {
-  return queue.map((a) => (a.type === 'MOVE' ? `${a.from}${a.to}` : a.skillId)).join(',');
+  return queue.map((a) => (a.type === 'MOVE'
+    ? `${a.from}${a.to}${a.promotion === undefined ? '' : `=${PROMOTION_LETTER[a.promotion]}`}`
+    : a.skillId)).join(',');
 }
 
 /**
  * The queues the solver tries on an Action-phase stage (§9.1: no skills), in a fixed order: for each
  * White piece in square-index order (a1 first), `[MOVE from→to]` for each `legalPlayerMoves` target and,
  * for a piece with a bonus move (the Legendary knight), `[MOVE from→to, MOVE to→c]` for each
- * `legalPlayerMoves` target c on the board after the first move. Targets are pseudo-legal: `simulate`
- * refuses the queues that leave the White King attacked.
+ * `legalPlayerMoves` target c on the board after the first move. A MOVE that promotes gives one queue
+ * per promotion choice, queen first (docs/04 §5: a queen can stalemate where a rook mates), wherever it
+ * stands in the queue. Targets are pseudo-legal: `simulate` refuses the queues that leave the White
+ * King attacked.
  */
 export function queuesOf(stage: StageState, config: GenConfig): Action[][] {
   const out: Action[][] = [];
@@ -39,12 +48,16 @@ export function queuesOf(stage: StageState, config: GenConfig): Action[][] {
   for (const from of squares) {
     const bonus = hasBonusMove(stage.board[from]!, config);
     for (const to of legalPlayerMoves(stage, from, config)) {
-      const first = move(stage, from, to, config);
-      out.push([first]);
-      // A bonus-move piece (the Legendary knight) is never a pawn, so its first move never promotes.
-      if (!bonus) continue;
-      const mid: StageState = { ...stage, board: applyPlayerMove(stage.board, from, to, config).board };
-      for (const c of legalPlayerMoves(mid, to, config)) out.push([first, move(mid, to, c, config)]);
+      for (const first of movesOf(stage, from, to, config)) {
+        out.push([first]);
+        // A bonus-move piece (the Legendary knight) is never a pawn, so its first move never promotes
+        // and the board after it needs no promotion.
+        if (!bonus) continue;
+        const mid: StageState = { ...stage, board: applyPlayerMove(stage.board, from, to, config).board };
+        for (const c of legalPlayerMoves(mid, to, config)) {
+          for (const second of movesOf(mid, to, c, config)) out.push([first, second]);
+        }
+      }
     }
   }
   return out;
