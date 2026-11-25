@@ -482,13 +482,18 @@ decisions in [11 S](11-open-decisions.md#s-chess-promotion-and-no-check-at-start
 - [x] Data, schemas and the validator agree. `npm test`, `typecheck`, `validate`, `check:links` and
       `build` pass: 86 files / 1,108 tests, 74 validator checks, 0 broken links, main chunk 125.37 kB
       gzip (2026-11-25).
-- [ ] Placement clue:
+- [x] Placement clue:
   - the worker and the `StageSource` double pass the clue, and an unproven stage gives `null`;
   - the run layer keeps it across `restartStage` and save/load, clears it at stage end, and
     `loadSave` refuses a malformed clue;
   - the Deployment button marks every clue square with the right piece, is disabled with its reason
     on an unproven stage, and labels a piece that has since been sold;
   - the marks change no `deploymentStatus` verdict.
+
+  Evidence: commits 8602c1b..b16b100 on M5.1. `npm test`: 87 files / 1,138 tests, all passing
+  (the bulk test did not time out under parallel load, so no solo re-run was needed). `typecheck`
+  clean; `validate`: 74 checks, 0 failures; `check:links`: 230 links, 0 broken; main chunk 126.05 kB
+  gzip (2026-11-25).
 - [ ] The user plays again and says whether the stages and the economy now feel right (the input for a
       later tuning pass).
 
